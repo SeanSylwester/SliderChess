@@ -7,7 +7,7 @@ function connectWebSocket(): void {
     // Extract game ID from URL, if available
     const gameId = parseInt(window.location.pathname.slice(1)); // Remove leading '/'
 
-    ws = new WebSocket('ws://localhost:3000');
+    ws = new WebSocket('wss://sliderchess.onrender.com');
 
     ws.onopen = () => {
         console.log('Connected to WebSocket server');

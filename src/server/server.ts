@@ -12,7 +12,7 @@ import { ClientInfo } from './types.js';
 import { handleMessage, handleQuitGame } from './messageHandler.js';
 import { MESSAGE_TYPES, GameInfo, GameListMessage, JoinGameMessage, Message, ChangeNameMessage } from '../shared/types.js';
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // Create HTTP server
 const server = http.createServer(app);
