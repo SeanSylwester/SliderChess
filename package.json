@@ -1,0 +1,27 @@
+{
+    "type": "module",
+    "name": "hello-world-typescript",
+    "version": "1.0.0",
+    "description": "Simple hello world with TypeScript client and server",
+    "exports": "./dist/server/server.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/server/server.js",
+        "client": "node dist/client/client.js",
+        "dev": "ts-node src/server/server.ts"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "express": "^4.18.2",
+        "ws": "^8.19.0"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.17",
+        "@types/node": "^20.0.0",
+        "@types/ws": "^8.5.4",
+        "ts-node": "^10.9.1",
+        "typescript": "^5.0.0"
+    }
+}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SliderChess</title>
+</head>
+
+<body>
+    <div id="lobby-screen" style="display: block;">
+        <h1>SliderChess Lobby</h1>
+        <span>Name:<input type="text" id="playerName"/> <button id="updateName">Update</button></span>
+        <h2>Game List</h2>
+        <button id="refreshGameList">Refresh</button>
+        <button id="createGame">Create game</button>
+        <ol id="gameList"></ol>
+    </div>
+
+    <div id="game-screen" style="display: none;">
+        <h1>Game Room #<span id="gameIdDisplay"></span></h1>
+        <button id="claimWhite">White</button><span id="whitePlayerInfo"></span> </br>
+        <button id="claimBlack">Black</button><span id="blackPlayerInfo"></span> </br>
+        <button id="claimSpectator">Spectators</button><span id="spectatorInfo"></span> </br>
+        <div id="gameInfo"></div>
+        <canvas id="board" width="600" height="620"></canvas>
+        <textarea id="movesLog" rows="41" cols="20" readonly></textarea>
+        <br />
+        <button id="quitGame">Quit</button>
+        <button id="flipBoard">Flip board view</button>
+        <button id="rewind">Undo</button>
+        <button id="draw">Offer Draw</button>
+        <br />
+        <textarea id="chatLog" rows="10" cols="70" readonly></textarea>
+        <br />
+        <input type="text" id="chatEntry" /> <button id="sendChat">Send</button>
+    </div>
+
+    <img id="piecesSpriteSheet" src="Chess_Pieces_Sprite.svg" style="display:none;" />
+    <script type="module" src="/client/client.js"></script>
+</body>
+
+</html>

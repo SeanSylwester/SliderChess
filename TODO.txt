@@ -1,0 +1,9 @@
+get working online
+tiles
+
+
+make timer work
+server-side valid move checking
+server-side confirmation of checkmate/stalemate
+    then I'd only need to check for any valid moves when the client requests it, instead of every single move
+add password protection to servers
