@@ -4,6 +4,9 @@ const bishopDirections = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
 const rookDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const kingQueenDirections = bishopDirections.concat(rookDirections);
 
+export function formatMinSec(time: number, decimals=0): string {
+    return `${Math.floor(time/60)}:${(time % 60).toFixed(decimals).padStart(decimals === 0 ? 2 : 3 + decimals, '0')}`
+}
 export function oppositeColor(c1: PieceColor, c2: PieceColor) {
     // returns true if one is black and the other is white. False if either is empty
     return (c1 === PieceColor.WHITE && c2 === PieceColor.BLACK) || (c1 === PieceColor.BLACK && c2 === PieceColor.WHITE)
@@ -33,6 +36,42 @@ export function findKing(playerColor: PieceColor, board: Piece[][]): [row: numbe
     return [-1, -1];  // this should really never happen...
 }
 
+export function getPiecesOnTile(row: number, col: number, board: Piece[][]): Piece[] {
+    // order is clockwise starting from the bottom left
+    return [board[row][col], 
+            board[row+1][col],
+            board[row+1][col+1], 
+            board[row][col+1]];
+}
+export function setPiecesOnTile(row: number, col: number, board: Piece[][], pieces: Piece[]): void {
+    // order is clockwise starting from the bottom left
+    board[row][col] = pieces[0];
+    board[row+1][col] = pieces[1];
+    board[row+1][col+1] = pieces[2];
+    board[row][col+1] = pieces[3];
+}
+export function rotateTileOnBoard(fromRow: number, fromCol: number, toRow: number, toCol: number, board: Piece[][], reverse: boolean): void {
+    // mutates board
+    let rotation: number;
+    const pieces = getPiecesOnTile(fromRow, fromCol, board);
+    if (toRow % 2 && toCol % 2) {
+        rotation = 2;
+    } else if (toRow % 2) {
+        rotation = reverse ? 1 : 3;
+    } else if (toCol % 2) {
+        rotation = reverse ? 3 : 1;
+    } else {
+        rotation = 0;
+    }
+    setPiecesOnTile(fromRow, fromCol, board, pieces.slice(rotation).concat(pieces.slice(0, rotation)));
+}
+export function swapTilesOnBoard(fromRow: number, fromCol: number, toRow: number, toCol: number, board: Piece[][]): void {
+    // mutates board
+    let temp = getPiecesOnTile(toRow, toCol, board);
+    setPiecesOnTile(toRow, toCol, board, getPiecesOnTile(fromRow, fromCol, board));
+    setPiecesOnTile(fromRow, fromCol, board, temp);
+}
+
 export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
     if (playerColor === PieceColor.NONE) {
         console.error("Invalid player color for checking for check")
@@ -44,7 +83,6 @@ export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
         console.error(`Could not find king of color ${playerColor}`);
         return false;
     }
-    console.log(`Found king at ${kingRow}, ${kingCol}`);
 
 
     // check for knight checks
@@ -54,7 +92,6 @@ export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
         if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7) {
             const piece = board[toRow][toCol];
             if (piece.type === PieceType.KNIGHT && piece.color !== playerColor) {
-                console.log(`Found check from knight at ${toRow}, ${toCol}`)
                 return true;
             }
         }
@@ -76,7 +113,6 @@ export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
                 if (piece.type !== PieceType.EMPTY) {
                     // found a piece! If it's an enemy piece of the right type, return true, otherwise end search in this direction
                     if (pieceTypesList[list].includes(piece.type) && oppositeColor(playerColor, piece.color)) {
-                        console.log(`Found check from ${PieceType[piece.type]} at ${toRow}, ${toCol}`)
                         return true;
                     }
                     break;

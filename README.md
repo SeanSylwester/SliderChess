@@ -1,6 +1,10 @@
-# Hello World TypeScript - Client & Server
+# SliderChess - Client & Server in TypeScript Node.js
 
-A simple TypeScript application with an Express server and Node.js/browser client.
+An online, real-time, chess variant app. Written in TypeScript with a Node.js Express/WebSockets server and a browser client.
+The server sends the list of games to the client, who can either join a game in progress as a player or spectator or create a new game.
+You can share the URL of your game room to link people directly to your game, or they can browse for it in the game list.
+
+This was my first webdev project and my first using TypeScript, Node.js, and WebSockets. I only had a vague familiarity with JavaScript before hand. So basically, don't judge me for the code quality and don't use it as a reference ;p 
 
 ## Setup
 
@@ -26,18 +30,12 @@ Or with hot reload:
 npm run dev
 ```
 
-**Run the Node.js client (in another terminal):**
-```bash
-npm run client
-```
-
 **Browser client:**
 Navigate to `http://localhost:3000` in your browser and click the button to fetch data from the server.
 
 ## Project Structure
 
-- `src/server.ts` - Express HTTP server
-- `src/client.ts` - Node.js HTTP client
+- `src/server/` - Express and WebSockets HTTP server
 - `public/index.html` - Browser client
 - `tsconfig.json` - TypeScript configuration
 - `package.json` - Project dependencies and scripts

@@ -1,6 +1,6 @@
-import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES } from "../shared/types.js";
+import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage } from "../shared/types.js";
 import { sendMessage, sendChat } from "./client.js";
-import { sameColor, oppositeColor, col0ToFile, inCheck, findKing } from '../shared/utils.js'
+import { sameColor, oppositeColor, col0ToFile, inCheck, findKing, formatMinSec, swapTilesOnBoard, rotateTileOnBoard, getPiecesOnTile, setPiecesOnTile } from '../shared/utils.js'
 
 const canvas = document.getElementById("board") as HTMLCanvasElement;
 canvas.addEventListener('click', handleClick);
@@ -14,13 +14,14 @@ const textMargin = 4;
 const canvasWidth = canvas.width - textSpace;
 const canvasHeight = canvas.height - textSpace;
 const pitch = canvasWidth / 8; // size of each square
+const tilePct = 0.2; // percentage of the square on each side for selecting a tile instead
 const piecesImg = document.getElementById("piecesSpriteSheet") as HTMLImageElement;
 const fillStyles = ["#f0d9b5", "#b58863"]; // light and dark squares
 let flip = false;
 let localGameState: GameState | null = null;
 let myColor = PieceColor.NONE;
-let selectedSquare: {row: number, col: number} | null = null;
-let validSquares: {toRow: number, toCol: number}[] | null = null;
+let selectedSquare: {row: number, col: number, isTile: boolean} | null = null;
+let validSquares: ReturnType<typeof getValidMoves> | null;
 const knightMoves = [[-2, 1], [-1, 2], [1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1]];
 const bishopDirections = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
 const rookDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -68,20 +69,29 @@ export function updateNames(playerWhiteName: string | null, playerBlackName: str
 
     document.getElementById('spectatorInfo')!.textContent = spectatorNames.join(', ');
 }
-export function updateTimes( timeLeftWhite?: number, timeLeftBlack?: number, initialTimeWhite?: number, initialTimeBlack?: number, incrementWhite?: number, incrementBlack?: number): void {
+const initialTimeWhiteText = document.getElementById('initialTimeWhite')! as HTMLSpanElement;
+const incrementWhiteText = document.getElementById('incrementWhite')! as HTMLSpanElement;
+const timeLeftWhiteText = document.getElementById('timeLeftWhite')! as HTMLSpanElement;
+const initialTimeBlackText = document.getElementById('initialTimeBlack')! as HTMLSpanElement;
+const incrementBlackText = document.getElementById('incrementBlack')! as HTMLSpanElement;
+const timeLeftBlackText = document.getElementById('timeLeftBlack')! as HTMLSpanElement;
+export function updateTimes( timeLeftWhite: number, timeLeftBlack: number, initialTimeWhite: number, initialTimeBlack: number, incrementWhite: number, incrementBlack: number): void {
     if (!localGameState) {
         return;
     }
-    // TODO
+    initialTimeWhiteText.textContent = formatMinSec(initialTimeWhite, 0);
+    initialTimeBlackText.textContent = formatMinSec(initialTimeBlack, 0);
+    incrementWhiteText.textContent = incrementWhite.toString();
+    incrementBlackText.textContent = incrementBlack.toString();
+    timeLeftWhiteText.textContent = formatMinSec(timeLeftWhite, 1);
+    timeLeftBlackText.textContent = formatMinSec(timeLeftBlack, 1);
 }
-export function updateChat(chatLog: string[]): void {
+export function updateChat(message: string): void {
     if (!localGameState) {
         return;
     }
-    localGameState.chatLog.push(...chatLog);
-    chatLog.forEach(msg => {
-        chatLogElement.value += "\n" + msg;
-    })
+    localGameState.chatLog.push(message);
+    chatLogElement.value += "\n" + message;
     chatLogElement.scrollTop = chatLogElement.scrollHeight;
 }
 
@@ -96,7 +106,7 @@ function handleClick(event: MouseEvent): void {
 
     let col: number;
     let row: number;
-    console.log(`Clicked on row ${Math.floor(event.offsetY / pitch)}, col ${Math.floor((event.offsetX - textSpace) / pitch)}`);
+    //console.log(`Clicked on row ${Math.floor(event.offsetY / pitch)}, col ${Math.floor((event.offsetX - textSpace) / pitch)}`);
     // transmute to unflipped row/col index, which matches the board[row][col]
     if (flip) {
         col = 7 - Math.floor((event.offsetX - textSpace) / pitch);
@@ -106,70 +116,113 @@ function handleClick(event: MouseEvent): void {
         row = 7 - Math.floor(event.offsetY / pitch);
     }
 
+    const xSquareOffset = (event.offsetX - textSpace) % pitch;
+    const ySquareOffset = event.offsetY % pitch;
+    // force isTile if our current selection is a tile
+    const isTile = selectedSquare?.isTile || (xSquareOffset < pitch*tilePct || xSquareOffset > pitch*(1-tilePct)) && (ySquareOffset < pitch*tilePct || ySquareOffset > pitch*(1-tilePct));
+    // for tiles, make the selected square the bottom left corner unless it's a rotation, i.e. make the row and column even, rounding down
+    if (isTile) {
+        // don't do this correction if it's the second click within the same tile
+        if (selectedSquare === null || !selectedSquare.isTile || ![0, 1].includes(row - selectedSquare.row) || ![0, 1].includes(col - selectedSquare.col)) {
+            row -= row % 2;
+            col -= col % 2;
+        }
+    }
+    console.log(`(${row}, ${col}) ${isTile}`);
 
     const piece = localGameState.board[row][col];
-    console.log(`Clicked on ${col0ToFile(col)}${row+1}: ${PieceColor[piece.color]} ${PieceType[piece.type]}`);
+    //console.log(`Clicked on ${col0ToFile(col)}${row+1}: ${PieceColor[piece.color]} ${PieceType[piece.type]}`);
 
     if (selectedSquare === null) {
         // selecting a new piece
-        const piece = localGameState.board[row][col];
-        if (piece.color === myColor) {
-            selectedSquare = {row, col};
-            validSquares = getValidMoves(localGameState.board, row, col);
-            highlightSquare(row, col, "rgb(255 0 0 / 75%)");
+        if (isTile || localGameState.board[row][col].color === myColor) {
+            selectedSquare = {row, col, isTile};
+            validSquares = getValidMoves(localGameState.board, row, col, isTile, false);
+            highlightSquare(row, col, "rgb(255 0 0 / 75%)", isTile, true);
             validSquares.forEach(square => {
-                highlightSquare(square.toRow, square.toCol, "rgb(255 0 0 / 25%)");
+                highlightSquare(square.toRow, square.toCol, "rgb(255 0 0 / 25%)", square.isTile);
             })
         } 
     } else {
         // try to move piece if we think it's valid. If it's not my turn or it's an invalid move, the server will reject it. Regardless, clear the highlight
         if (validSquares?.some(square => square.toRow === row && square.toCol === col)) {
-            requestMovePiece(selectedSquare.row, selectedSquare.col, row, col);
+            requestMovePiece(selectedSquare.row, selectedSquare.col, row, col, isTile);
         }
-        drawSquare(selectedSquare.row, selectedSquare.col);
+        drawSquare(selectedSquare.row, selectedSquare.col, selectedSquare.isTile);
         if (validSquares) {
             validSquares.forEach(square => {
-                drawSquare(square.toRow, square.toCol);
+                drawSquare(square.toRow, square.toCol, square.isTile);
             })
         }
         selectedSquare = null;
         validSquares = null;
 
-        // redo the last move highligh
+        // redo the last move highlight
         highlightLastMove();
     }
 }
 
-export function wouldBeInCheck(playerColor: PieceColor, board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
-    // TODO: I don't know if mutating the board is okay here
-    const temp = board[toRow][toCol];
-    board[toRow][toCol] = board[fromRow][fromCol];
-    board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
-    const check = inCheck(playerColor, board);
-    board[fromRow][fromCol] = board[toRow][toCol];
-    board[toRow][toCol] = temp;
+export function wouldBeInCheck(playerColor: PieceColor, board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): boolean {
+    // TODO: I don't know if mutating the board is okay here.
+    let check: boolean;
+    if (isTile) {
+        if (toRow % 2 || toCol % 2) {
+            rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, false);
+            check = inCheck(playerColor, board);
+            rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, true);
+        } else {
+            swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board);
+            check = inCheck(playerColor, board);
+            swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board); 
+        }      
+    } else {
+        const temp = board[toRow][toCol];
+        board[toRow][toCol] = board[fromRow][fromCol];
+        board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
+        check = inCheck(playerColor, board);
+        board[fromRow][fromCol] = board[toRow][toCol];
+        board[toRow][toCol] = temp;
+    }
 
     return check;
 }
 
-export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number, returnFirst=false): { toRow: number, toCol: number }[] {
-    const piece = board[fromRow][fromCol];
-    let validMoves: { toRow: number, toCol: number }[] = [];
+export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number, isTile: boolean, returnFirst: boolean): { toRow: number, toCol: number, isTile: boolean }[] {
+    const tileColorFallback = myColor; // TODO: I need to pass this in if I want this to work as a util
+    const piece = isTile ? { type: PieceType.TILE, color: tileColorFallback } : board[fromRow][fromCol];
+    let validMoves: { toRow: number, toCol: number, isTile: boolean }[] = [];
 
     // need to check every possible move for if we'd be (still) in check afterwards
-    function pushValidIfNotCheck(toRow: number, toCol: number): void {
-        if (piece.type === PieceType.KING) {
-            console.log(`Found potential move from ${fromRow}, ${fromCol} to ${toRow}, ${toCol}`);
-        }
-        if (!wouldBeInCheck(piece.color, board, fromRow, fromCol, toRow, toCol)) {
-            if (piece.type === PieceType.KING) {
-                console.log("And we wouldn't be in check :)");
-            }
-            validMoves.push({ toRow: toRow, toCol: toCol });
+    function pushValidIfNotCheck(toRow: number, toCol: number, isTile=false, markAsTile=false): void {
+        if (!wouldBeInCheck(piece.color, board, fromRow, fromCol, toRow, toCol, isTile)) {
+            validMoves.push({ toRow: toRow, toCol: toCol, isTile: markAsTile });
         }
     }
 
     switch (piece.type) {
+        case PieceType.TILE:
+            // first, check if we can move this piece at all (no kings or piece of different color)
+            const pieces = getPiecesOnTile(fromRow, fromCol, board);
+            if (!pieces.some(piece => piece.type === PieceType.KING || oppositeColor(tileColorFallback, piece.color))) {
+                // orthogonal directions
+                for (const direction of rookDirections) {
+                    const toRow = fromRow + 2*direction[0];
+                    const toCol = fromCol + 2*direction[1];
+                    if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7 ) {
+                        const pieces = getPiecesOnTile(toRow, toCol, board);
+                        if (!pieces.some(piece => piece.type === PieceType.KING || oppositeColor(tileColorFallback, piece.color))) {
+                            pushValidIfNotCheck(toRow, toCol, true, true);
+                        }
+                    }
+                }
+
+                // rotations
+                pushValidIfNotCheck(fromRow+1, fromCol, true, false);
+                pushValidIfNotCheck(fromRow+1, fromCol+1, true, false);
+                pushValidIfNotCheck(fromRow, fromCol+1, true, false);
+            }
+            break;
+
         case PieceType.PAWN:
             const direction = (piece.color === PieceColor.WHITE) ? 1 : -1;
             
@@ -255,23 +308,23 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                 if (piece.color === PieceColor.WHITE) {
                     if (localGameState!.canCastleKingsideWhite 
                             && board[0][5].type === PieceType.EMPTY && board[0][6].type === PieceType.EMPTY 
-                            && !wouldBeInCheck(PieceColor.WHITE, board, 0, 4, 0, 5)) {
+                            && !wouldBeInCheck(PieceColor.WHITE, board, 0, 4, 0, 5, false)) {
                         pushValidIfNotCheck(0, 6);
                     }
                     if (localGameState!.canCastleQueensideWhite 
                             && board[0][1].type === PieceType.EMPTY && board[0][2].type === PieceType.EMPTY && board[0][3].type === PieceType.EMPTY 
-                            && !wouldBeInCheck(PieceColor.WHITE, board, 0, 4, 0, 3)) {
+                            && !wouldBeInCheck(PieceColor.WHITE, board, 0, 4, 0, 3, false)) {
                         pushValidIfNotCheck(0, 2);
                     }
                 } else {
                     if (localGameState!.canCastleKingsideBlack 
                             && board[7][5].type === PieceType.EMPTY && board[7][6].type === PieceType.EMPTY 
-                            && !wouldBeInCheck(PieceColor.WHITE, board, 7, 4, 7, 5)) {
+                            && !wouldBeInCheck(PieceColor.WHITE, board, 7, 4, 7, 5, false)) {
                         pushValidIfNotCheck(7, 6);
                     }
                     if (localGameState!.canCastleQueensideBlack
                             && board[7][1].type === PieceType.EMPTY && board[7][2].type === PieceType.EMPTY && board[7][3].type === PieceType.EMPTY 
-                            && !wouldBeInCheck(PieceColor.WHITE, board, 7, 4, 7, 3)) {
+                            && !wouldBeInCheck(PieceColor.WHITE, board, 7, 4, 7, 3, false)) {
                         pushValidIfNotCheck(7, 2);
                     }
                 }
@@ -297,7 +350,7 @@ export function anyValidMoves(playerColor: PieceColor, board: Piece[][]): boolea
     for (row = 0; row < 8; row++) {
         for (col = 0; col < 8; col++) {
             const piece = board[row][col];
-            if (piece.color === playerColor && getValidMoves(board, row, col, true).length > 0) {
+            if (piece.color === playerColor && (getValidMoves(board, row, col, false, true).length > 0 || getValidMoves(board, row, col, true, true).length > 0)) {
                 return true;
             }
         }
@@ -361,9 +414,21 @@ export function renderFullBoard(): void {
 
     ctx.stroke();
 }
-export function drawSquare(row: number, col: number, piece?: Piece): void {  
+export function drawSquare(row: number, col: number, isTile: boolean, piece?: Piece): void {  
+    //console.log(`(${row}, ${col}), ${isTile}, ${piece}`);
+    if (isTile) {
+        // patch fix to make sure that tiles are always drawn correctly
+        row -= row % 2;
+        col -= col % 2;
+    }
     let x: number;
-    let y: number;  
+    let y: number; 
+    if (isTile) {
+        drawSquare(row, col, false);
+        drawSquare(row+1, col, false);
+        drawSquare(row, col+1, false);
+        drawSquare(row+1, col+1, false);
+    } 
     if (flip) {
         x = (7 - col) * pitch + textSpace;
         y = row * pitch;
@@ -382,18 +447,40 @@ export function drawSquare(row: number, col: number, piece?: Piece): void {
     }
     ctx.stroke();
 }
-function highlightSquare(row: number, col: number, style: string): void {
-    //console.log(`Highlighting square at row ${row+1}, col ${col+1}`);
-    if (flip) {
-        col = 7 - col;
-    } else {
-        row = 7 - row;
+function highlightSquare(row: number, col: number, style: string, isTile: boolean, firstTile?: boolean): void {
+    //console.log(`Highlighting ${isTile ? 'tile' : 'square'} at row ${row+1}, col ${col+1}`);
+    if (isTile) {
+        // patch fix to make sure that tiles are always drawn correctly
+        row -= row % 2;
+        col -= col % 2;
+    }
+
+    // avoids re-mapping the row/col on recursive calls
+    if (firstTile !== false) {
+        if (flip) {
+            col = 7 - col;
+            if (isTile) col -= 1;
+        } else {
+            row = 7 - row;
+            if (isTile) row -= 1;
+        }
     }
     ctx.strokeStyle = style;
     ctx.lineWidth = 2;
     const avoidGhost = 1;
-    ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + avoidGhost, row * pitch + ctx.lineWidth/2 + avoidGhost, 
-                   pitch - ctx.lineWidth - 2*avoidGhost, pitch - ctx.lineWidth - 2*avoidGhost);
+    if (isTile) {
+        ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + avoidGhost, row * pitch + ctx.lineWidth/2 + avoidGhost, 
+                    2*pitch - ctx.lineWidth - 2*avoidGhost, 2*pitch - ctx.lineWidth - 2*avoidGhost);
+        
+        // highlight the bottom left corner of the tile
+        if (firstTile) {
+            // patch fix to highlight the correct one on the flipped view
+            highlightSquare(row + (flip ? 0 : 1), col + (flip ? 1 : 0), 'rgb(255 0 0 / 75%)', false, false);
+        }
+    } else {
+        ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + avoidGhost, row * pitch + ctx.lineWidth/2 + avoidGhost, 
+                    pitch - ctx.lineWidth - 2*avoidGhost, pitch - ctx.lineWidth - 2*avoidGhost);
+    }
 }
 function highlightLastMove(): void {
     if (!localGameState || localGameState.movesLog.length === 0) {
@@ -402,8 +489,8 @@ function highlightLastMove(): void {
     }
     
     const localLastMove = localGameState.movesLog.at(-1)!;
-    highlightSquare(localLastMove.fromRow, localLastMove.fromCol, "rgb(0 255 0 / 75%)");
-    highlightSquare(localLastMove.toRow, localLastMove.toCol, "rgb(0 255 0 / 75%)");
+    highlightSquare(localLastMove.fromRow, localLastMove.fromCol, "rgb(0 255 0 / 75%)", localLastMove.isTile);
+    highlightSquare(localLastMove.toRow, localLastMove.toCol, "rgb(0 255 0 / 75%)", localLastMove.isTile);
 }
 function clearLastMoveHighlight(): void {
     if (!localGameState || localGameState.movesLog.length === 0) {
@@ -411,17 +498,17 @@ function clearLastMoveHighlight(): void {
         return;
     }
     const localLastMove = localGameState.movesLog.at(-1)!;
-    drawSquare(localLastMove.fromRow, localLastMove.fromCol);
-    drawSquare(localLastMove.toRow, localLastMove.toCol);
+    drawSquare(localLastMove.fromRow, localLastMove.fromCol, localLastMove.isTile);
+    drawSquare(localLastMove.toRow, localLastMove.toCol, localLastMove.isTile);
 }
 
 const movesLogElement = document.getElementById('movesLog') as HTMLTextAreaElement;
-function updateMovesLog(oldPiece:Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, checkmate: boolean, stalemate: boolean): void {
+function updateMovesLog(oldPiece:Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean, checkmate: boolean, stalemate: boolean): void {
     if (!localGameState) {
         console.error("No local game state to log move to");
         return;
     }
-    localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation});
+    localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile});
     
     if (localGameState.movesLog.length % 2 === 1) {
         // prep for white move
@@ -457,19 +544,32 @@ function fullMovesLog(): void {
 }
 
 
-export function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number): void {
-    sendMessage({ type: MESSAGE_TYPES.MOVE_PIECE, data: { fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol } });
+export function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): void {
+    sendMessage({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, isTile: isTile } satisfies MovePieceMessage);
 }
-export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string): void {
+export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean): void {
     if (!localGameState) {
         console.error("No local game state to move piece on");
         return;
     }
-    // TODO: detect castling here? like if king moves 2 spaces then also move the rook?
-    const oldPiece = localGameState.board[toRow][toCol];
-    const newPiece = localGameState.board[fromRow][fromCol];
-    localGameState.board[toRow][toCol] = newPiece;
-    localGameState.board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
+    let oldPiece: Piece;
+    let newPiece: Piece;
+    if (isTile) {
+        // TODO: set these to account for castling checks
+        oldPiece = {type: PieceType.TILE, color: PieceColor.NONE};
+        newPiece = {type: PieceType.TILE, color: PieceColor.NONE};
+        if (toRow % 2 || toCol % 2) {
+            rotateTileOnBoard(fromRow, fromCol, toRow, toCol, localGameState.board, false);
+        } else {
+            swapTilesOnBoard(fromRow, fromCol, toRow, toCol, localGameState.board);
+        }
+        
+    } else {
+        oldPiece = localGameState.board[toRow][toCol];
+        newPiece = localGameState.board[fromRow][fromCol];
+        localGameState.board[toRow][toCol] = newPiece;
+        localGameState.board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
+    }
 
     // keep track of if castling is allowed
     if (newPiece.type === PieceType.ROOK) {
@@ -489,7 +589,6 @@ export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol
         if (newPiece.color === PieceColor.WHITE) {
             localGameState.canCastleQueensideWhite = false;
             localGameState.canCastleKingsideWhite = false;
-    
         } else {
             localGameState.canCastleQueensideBlack = false;
             localGameState.canCastleKingsideBlack = false;
@@ -510,14 +609,14 @@ export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol
             const rook = localGameState.board[castleRow][0];
             localGameState.board[castleRow][3] = localGameState.board[castleRow][0];
             localGameState.board[castleRow][0] = { type: PieceType.EMPTY, color: PieceColor.NONE };
-            drawSquare(castleRow, 0);
-            drawSquare(castleRow, 3, rook);
+            drawSquare(castleRow, 0, false);
+            drawSquare(castleRow, 3, false, rook);
         } else {
             const rook = localGameState.board[castleRow][7];
             localGameState.board[castleRow][5] = localGameState.board[castleRow][7];
             localGameState.board[castleRow][7] = { type: PieceType.EMPTY, color: PieceColor.NONE };
-            drawSquare(castleRow, 7);
-            drawSquare(castleRow, 5, rook);
+            drawSquare(castleRow, 7, false);
+            drawSquare(castleRow, 5, false, rook);
         }
     }
 
@@ -525,12 +624,12 @@ export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol
     clearLastMoveHighlight();
 
     // clear the origin square, then highlight
-    drawSquare(fromRow, fromCol);
-    highlightSquare(fromRow, fromCol, "rgb(0 255 0 / 75%)");
+    drawSquare(fromRow, fromCol, isTile);
+    highlightSquare(fromRow, fromCol, "rgb(0 255 0 / 75%)", isTile);
 
     // draw the destination square, then highlight
-    drawSquare(toRow, toCol, newPiece);
-    highlightSquare(toRow, toCol, "rgb(0 255 0 / 75%)");
+    drawSquare(toRow, toCol, isTile);
+    highlightSquare(toRow, toCol, "rgb(0 255 0 / 75%)", isTile);
 
     // check for checkmate/stalemate
     let checkmate = false;
@@ -545,5 +644,5 @@ export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol
         }
     }
     // log the move
-    updateMovesLog(oldPiece, newPiece, fromRow, fromCol, toRow, toCol, notation, checkmate, stalemate)
+    updateMovesLog(oldPiece, newPiece, fromRow, fromCol, toRow, toCol, notation, isTile, checkmate, stalemate)
 }

@@ -5,7 +5,7 @@ export interface GameState {
     id: number;
     board: Piece[][];
     chatLog: string[];
-    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string}[];
+    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean}[];
     currentTurn: PieceColor;
     initialTimeWhite: number; // in seconds
     initialTimeBlack: number; // in seconds
@@ -39,6 +39,7 @@ export enum PieceType {
     KNIGHT,
     ROOK,
     PAWN,
+    TILE,
     EMPTY
 }
 
@@ -81,42 +82,55 @@ export const MESSAGE_TYPES = {
 // Message type definitions
 export interface Message {
     type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYPES];
-    data?: unknown;
 }
 
 export interface ChangeNameMessage extends Message {
     type: typeof MESSAGE_TYPES.CHANGE_NAME;
-    data: { name: string };
+    name: string;
 }
 export interface JoinGameMessage extends Message {
     type: typeof MESSAGE_TYPES.JOIN_GAME;
-    data: { gameId: number };
+    gameId: number;
 }
 export interface ChangePositionMessage extends Message {
     type: typeof MESSAGE_TYPES.CHANGE_POSITION;
-    data: { position: PieceColor };
+    position: PieceColor;
 }
 export interface MovePieceMessage extends Message {
     type: typeof MESSAGE_TYPES.MOVE_PIECE;
-    data: { fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string };
+    fromRow: number;
+    fromCol: number;
+    toRow: number;
+    toCol: number; 
+    notation?: string; 
+    isTile: boolean;
 }
 export interface ValidMovesMessage extends Message {
     type: typeof MESSAGE_TYPES.VALID_MOVES;
-    data: { fromRow?: number, fromCol?: number, validMoves?: { toRow: number, toCol: number }[] };
+    fromRow?: number; 
+    fromCol?: number;
+    validMoves?: { toRow: number, toCol: number }[];
 }
 export interface TimeMessage extends Message {
     type: typeof MESSAGE_TYPES.TIME;
-    data: { whiteTime: number; blackTime: number; whiteIncrement: number; blackIncrement: number; };
+    initialTimeWhite: number;
+    initialTimeBlack: number;
+    timeLeftWhite: number;
+    timeLeftBlack: number;
+    incrementWhite: number;
+    incrementBlack: number;
+    clockRunning: boolean;
 }
 export interface ChatMessage extends Message {
     type: typeof MESSAGE_TYPES.CHAT;
-    data: { message: string };
+    message: string;
 }
 export interface GameStateMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_STATE;
-    data: { gameState: GameState, yourColor: PieceColor };
+    gameState: GameState;
+    yourColor: PieceColor;
 }
 export interface GameListMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_LIST;
-    data: { gameList: GameInfo[] };
+    gameList: GameInfo[];
 }

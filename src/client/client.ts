@@ -1,5 +1,6 @@
-import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor } from "../shared/types.js";
-import { flipBoard, movePiece, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat } from "./gameLogic.js";
+import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage } from "../shared/types.js";
+import { flipBoard, movePiece, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, updateTimes } from "./gameLogic.js";
+import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
 let fromHistory = false;
 
@@ -8,12 +9,13 @@ function connectWebSocket(): void {
     const gameId = parseInt(window.location.pathname.slice(1)); // Remove leading '/'
 
     ws = new WebSocket('wss://sliderchess.onrender.com');
+    //ws = new WebSocket('ws://localhost:10000');
 
     ws.onopen = () => {
         console.log('Connected to WebSocket server');
         if (!isNaN(gameId)) {
             fromHistory = true;
-            ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, data: { gameId: gameId } } as JoinGameMessage));
+            ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: gameId } satisfies JoinGameMessage));
         }
     };
 
@@ -22,20 +24,20 @@ function connectWebSocket(): void {
 
         switch (message.type) {
             case MESSAGE_TYPES.CHANGE_NAME:
-                console.log('Received name list:', message.data);
-                playerNameEntry.value = message.data.name;
+                console.log('Received name list:', message);
+                playerNameEntry.value = message.name;
                 break;
             case MESSAGE_TYPES.GAME_LIST:
-                console.log('Received game list:', message.data);
-                updateGameList(message.data.gameList);
+                console.log('Received game list:', message);
+                updateGameList(message.gameList);
                 break;
             case MESSAGE_TYPES.GAME_STATE:
-                console.log('Received game state:', message.data);
-                initLocalGameState(message.data.gameState, message.data.yourColor);
+                console.log('Received game state:', message);
+                initLocalGameState(message.gameState, message.yourColor);
                 break;
             case MESSAGE_TYPES.JOIN_GAME:
-                console.log('Joining game room:', message.data.gameId);
-                showScreen(SCREENS.GAME_ROOM, message.data.gameId);
+                console.log('Joining game room:', message.gameId);
+                showScreen(SCREENS.GAME_ROOM, message.gameId);
                 break;
             case MESSAGE_TYPES.QUIT_GAME:
                 console.log('Quitting game room');
@@ -43,17 +45,21 @@ function connectWebSocket(): void {
                 showScreen(SCREENS.LOBBY);
                 break;
             case MESSAGE_TYPES.MOVE_PIECE:
-                console.log('Moving piece:', message.data);
-                movePiece(message.data.fromRow, message.data.fromCol, message.data.toRow, message.data.toCol, message.data.notation);
+                console.log('Moving piece:', message);
+                movePiece(message.fromRow, message.fromCol, message.toRow, message.toCol, message.notation, message.isTile);
                 break;
             case MESSAGE_TYPES.CHAT:
-                console.log('Received chat message:', message.data.message);
-                updateChat(message.data.message);
+                console.log('Received chat message:', message.message);
+                updateChat(message.message);
+                break;
+            case MESSAGE_TYPES.TIME:
+                console.log('Received time message:', message.message);
+                updateTimes(message.timeLeftWhite, message.timeLeftBlack, message.initialTimeWhite, message.initialTimeBlack, message.incrementWhite, message.incrementBlack);
                 break;
             default:
                 const responseElement = document.getElementById('response');
                 if (responseElement) {
-                    responseElement.textContent = message.data || JSON.stringify(message);
+                    responseElement.textContent = message || JSON.stringify(message);
                 }
             // handle other message types as needed
         }
@@ -77,7 +83,7 @@ function connectWebSocket(): void {
     };
 }
 
-export function sendMessage(message: Message): void {
+export function sendMessage<T extends Message>(message: T): void {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(message));
     } else {
@@ -111,7 +117,7 @@ function showScreen(screenId: typeof SCREENS[keyof typeof SCREENS], gameId?: num
 // lobby screen
 function updateName(): void {
     const nameInput = document.getElementById('playerName') as HTMLInputElement;
-    sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, data: { name: nameInput.value } } as Message);
+    sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: nameInput.value } satisfies ChangeNameMessage);
 }
 const updateNameButton = document.getElementById('updateName');
 const playerNameEntry = document.getElementById('playerName') as HTMLInputElement;
@@ -133,16 +139,12 @@ function updateGameList(gameList: GameInfo[]): void {
             const gameButton = document.createElement('button');
             gameButton.textContent = "Join";
             gameButton.addEventListener('click', () => {
-                sendMessage({ type: MESSAGE_TYPES.JOIN_GAME, data: { gameId: game.gameId } } as JoinGameMessage);
+                sendMessage({ type: MESSAGE_TYPES.JOIN_GAME, gameId: game.gameId } satisfies JoinGameMessage);
             });
             gameItem.appendChild(gameButton);
 
             const gameText = document.createElement('span');
-            let wmin = Math.floor(game.timeLeftWhite / 60);
-            let bmin = Math.floor(game.timeLeftBlack / 60);
-            let wsec = (game.timeLeftWhite % 60).toString().padStart(2, '0');
-            let bsec = (game.timeLeftBlack % 60).toString().padStart(2, '0');
-            gameText.textContent = `${game.playerWhite || 'None'} (${wmin}:${wsec}) vs ${game.playerBlack || 'None'}  (${bmin}:${bsec}). ${game.numberOfSpectators} spectators`;
+            gameText.textContent = `${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
             gameItem.appendChild(gameText);
 
             gameListElement.appendChild(gameItem);
@@ -150,14 +152,14 @@ function updateGameList(gameList: GameInfo[]): void {
     }
 }
 const refreshGameListButton = document.getElementById('refreshGameList');
-refreshGameListButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.GAME_LIST } as Message));
+refreshGameListButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.GAME_LIST }));
 
 export function sendChat(message: string) {
-    sendMessage({ type: MESSAGE_TYPES.CHAT, data: { message: message } } as ChatMessage);
+    sendMessage({ type: MESSAGE_TYPES.CHAT,  message: message } satisfies ChatMessage);
 }
 
 const createGame = document.getElementById('createGame');
-createGame!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CREATE_GAME } as Message));
+createGame!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CREATE_GAME }));
 
 
 // game screen
@@ -176,23 +178,23 @@ chatEntry!.addEventListener('keypress', function (event) {
 });
 
 const quitGameButton = document.getElementById('quitGame');
-quitGameButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.QUIT_GAME } as Message));
+quitGameButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.QUIT_GAME }));
 
 const flipBoardButton = document.getElementById('flipBoard');
 flipBoardButton!.addEventListener('click', flipBoard);
 
 const rewindButton = document.getElementById('rewind');
-rewindButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.REWIND } as Message));
+rewindButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.REWIND }));
 
 const drawButton = document.getElementById('draw');
-drawButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.DRAW } as Message));
+drawButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.DRAW }));
 
 const claimWhiteButton = document.getElementById('claimWhite');
-claimWhiteButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, data: { position: PieceColor.WHITE } } as ChangePositionMessage));
+claimWhiteButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, position: PieceColor.WHITE } satisfies ChangePositionMessage));
 const claimBlackButton = document.getElementById('claimBlack');
-claimBlackButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, data: { position: PieceColor.BLACK } } as ChangePositionMessage));
+claimBlackButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, position: PieceColor.BLACK } satisfies ChangePositionMessage));
 const claimSpectatorButton = document.getElementById('claimSpectator');
-claimSpectatorButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, data: { position: PieceColor.NONE } } as ChangePositionMessage));
+claimSpectatorButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, position: PieceColor.NONE } satisfies ChangePositionMessage));
 
 
 // Connect when page loads
@@ -203,8 +205,8 @@ window.addEventListener("popstate", (event) => {
     const gameId = parseInt(window.location.pathname.slice(1)); // Remove leading '/'
     fromHistory = true;
     if (isNaN(gameId)) {
-        sendMessage({ type: MESSAGE_TYPES.QUIT_GAME } as Message);
+        sendMessage({ type: MESSAGE_TYPES.QUIT_GAME });
     } else {
-        sendMessage({ type: MESSAGE_TYPES.JOIN_GAME, data: { gameId: gameId } } as JoinGameMessage);
+        sendMessage({ type: MESSAGE_TYPES.JOIN_GAME, gameId: gameId } satisfies JoinGameMessage);
     }
 });

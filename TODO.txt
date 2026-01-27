@@ -1,6 +1,6 @@
-get working online
-tiles
-
+promotion
+surrender
+createGame dialog box
 
 make timer work
 server-side valid move checking

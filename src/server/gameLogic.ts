@@ -1,6 +1,6 @@
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage } from '../shared/types.js';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage } from '../shared/types.js';
 import { ClientInfo } from './types.js';
-import { sameColor, oppositeColor, col0ToFile } from '../shared/utils.js'
+import { sameColor, oppositeColor, col0ToFile, swapTilesOnBoard, rotateTileOnBoard } from '../shared/utils.js'
 import { inCheck } from '../shared/utils.js';
 
 
@@ -14,7 +14,7 @@ export class Game {
     spectators: ClientInfo[] = [];
     board: Piece[][];
     chatLog: string[] = [];
-    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string}[] = [];
+    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean}[] = [];
     currentTurn: PieceColor = PieceColor.WHITE;
     initialTimeWhite = 600; // in seconds
     initialTimeBlack = 600; // in seconds
@@ -128,17 +128,25 @@ export class Game {
         this.sendGameStateToAll();
     }
 
-    public sendMessageToAll(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYPES], data: any): void {
+    public sendMessageToAll<T extends Message>(message: T): void {
         // TODO: make type checking work on data
         if (this.playerWhite !== null) {
-            this.playerWhite.ws.send(JSON.stringify({ type: type, data: data }));
+            this.playerWhite.ws.send(JSON.stringify(message));
         }
         if (this.playerBlack !== null) {
-            this.playerBlack.ws.send(JSON.stringify({ type: type, data: data }));
+            this.playerBlack.ws.send(JSON.stringify(message));
         }
         for (const spectator of this.spectators) {
-            spectator.ws.send(JSON.stringify({ type: type, data: data }));
+            spectator.ws.send(JSON.stringify(message));
         }
+    }
+
+    public syncTime(): void {
+        this.sendMessageToAll({type: MESSAGE_TYPES.TIME, 
+                               initialTimeWhite: this.initialTimeWhite, initialTimeBlack: this.initialTimeBlack, 
+                               timeLeftWhite: this.timeLeftWhite, timeLeftBlack: this.timeLeftBlack, 
+                               incrementWhite: this.incrementWhite, incrementBlack: this.incrementBlack,
+                               clockRunning: this.clockRunning} satisfies TimeMessage);
     }
 
     public logChatMessage(message: string, client?: ClientInfo): void {
@@ -149,7 +157,44 @@ export class Game {
         }
 
         // push to players and spectators
-        this.sendMessageToAll(MESSAGE_TYPES.CHAT, { message: [this.chatLog[this.chatLog.length - 1]] });
+        this.sendMessageToAll({type: MESSAGE_TYPES.CHAT, message: this.chatLog[this.chatLog.length - 1] } satisfies ChatMessage);
+
+        // check for special timing messages
+        const timingRe = /^t(?<colors>[wb]+)(?<time>\d*\.?\d*)(?<hasIncrement>\+?)(?<increment>\d*\.?\d*)/
+        const match = timingRe.exec(message.toLowerCase());
+        if (match !== null) {
+            if (match.groups!.colors.includes('w')) {
+                if (match.groups!.time) {
+                    // total time is the new time setting plus the already elapsed time
+                    const elapsedTime = this.initialTimeWhite - this.timeLeftWhite;
+                    this.timeLeftWhite = parseFloat(match.groups!.time) * 60;
+                    this.initialTimeWhite = this.timeLeftWhite + elapsedTime;
+                }
+                if (match.groups!.increment) {
+                    this.incrementWhite = parseFloat(match.groups!.increment);
+                }
+            }
+            if (match.groups!.colors.includes('b')) {
+                if (match.groups!.time) {
+                    // total time is the new time setting plus the already elapsed time
+                    const elapsedTime = this.initialTimeBlack - this.timeLeftBlack;
+                    this.timeLeftBlack = parseFloat(match.groups!.time) * 60;
+                    this.initialTimeBlack = this.timeLeftBlack + elapsedTime;
+                }
+                if (match.groups!.increment) {
+                    this.incrementBlack = parseFloat(match.groups!.increment);
+                }
+            }
+            this.logChatMessage('Updated time settings');
+            this.syncTime();
+        }
+        /*
+        const timingRe = /^t(?<colors>[wb]+)(?<time>\d*\.?\d*)(?<hasIncrement>\+?)(?<increment>\d*\.?\d*)/
+        const testMessages = ['Tw10+5', 'Tb+3.3', 'Tb30.1', 'Twb20', 'T b20+3.2', 'Tw20 3', 'TB2', 'Tx20+5', 'w10+5'];
+        for (message of testMessages) {
+            console.log(timingRe.exec(message.toLowerCase()));
+        }
+        */
     }
 
     public sendGameState(client: ClientInfo): void {
@@ -177,7 +222,7 @@ export class Game {
             drawBlack: this.drawBlack
         };
         const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
-        client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_STATE, data: { gameState: gameState, yourColor: clientColor } } as GameStateMessage));
+        client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage));
     }
 
     public sendGameStateToAll(): void {
@@ -203,7 +248,7 @@ export class Game {
         return this.playerWhite === null && this.playerBlack === null && this.spectators.length === 0;
     }
 
-    public movePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
+    public movePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): boolean {
         // reject a move to the same spot (they're probably just deselecting)
         if (fromRow === toRow && fromCol === toCol) {
             return false;
@@ -213,8 +258,17 @@ export class Game {
             return false;
         }
 
-        const oldPiece = this.board[toRow][toCol];
-        const newPiece = this.board[fromRow][fromCol];
+        let oldPiece: Piece;
+        let newPiece: Piece;
+        if (isTile) {
+            // TODO: set these to account for castling checks
+            oldPiece = {type: PieceType.TILE, color: PieceColor.NONE};
+            newPiece = {type: PieceType.TILE, color: this.currentTurn};
+        } else {
+            oldPiece = this.board[toRow][toCol];
+            newPiece = this.board[fromRow][fromCol];
+        }
+
 
         // Check if there is a piece at the from position and if it belongs to the current player
         if (newPiece.type === PieceType.EMPTY) {
@@ -225,17 +279,26 @@ export class Game {
         }
 
         // Check if the move is valid
-        if (!this.isValidMove(fromRow, fromCol, toRow, toCol)) {
+        if (!this.isValidMove(fromRow, fromCol, toRow, toCol, isTile)) {
             return false;
         }
 
         // Move the piece
-        // TODO: handle en passant and promotion
-        this.board[toRow][toCol] = newPiece;
-        this.board[fromRow][fromCol] = { type: PieceType.EMPTY, color: PieceColor.NONE };
+        // TODO: handle promotion
+        if (isTile) {
+            if (toRow % 2 || toCol % 2) {
+                rotateTileOnBoard(fromRow, fromCol, toRow, toCol, this.board, false);
+            } else {
+                swapTilesOnBoard(fromRow, fromCol, toRow, toCol, this.board);
+            }
+        } else {
+            this.board[toRow][toCol] = newPiece;
+            this.board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
+        }
 
 
         // keep track of if castling is allowed
+        // TODO: track if the rook moves on a tile
         if (newPiece.type === PieceType.ROOK) {
             if (newPiece.color === PieceColor.WHITE) {
                 if (fromRow === 0) {
@@ -292,22 +355,25 @@ export class Game {
                 castle = 'O-O';
             }
         }
-        const capture = (!enPassant && oldPiece.type === PieceType.EMPTY) ? '' : 'x';
-        const pieceChar = newPiece.type === PieceType.PAWN ? (capture ? col0ToFile(fromCol) : '') : (newPiece.type === PieceType.KNIGHT ? 'N' : PieceType[newPiece.type][0]);
         const check = inCheck(this.currentTurn, this.board) ? '+' : '';
-        const notation = castle === '' ? `${pieceChar}${capture}${col0ToFile(toCol)}${toRow+1}${check}` : castle;
-        this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation});
+        let notation: string;
+        if (isTile) {
+            if (toRow % 2 || toCol % 2) {
+                notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${check}`;
+            } else {
+                notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${check}`;
+            }
+            this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile});
+        } else {
+            const capture = (!enPassant && oldPiece.type === PieceType.EMPTY) ? '' : 'x';
+            const pieceChar = newPiece.type === PieceType.PAWN ? (capture ? col0ToFile(fromCol) : '') : (newPiece.type === PieceType.KNIGHT ? 'N' : PieceType[newPiece.type][0]);
+            notation = castle === '' ? `${pieceChar}${capture}${col0ToFile(toCol)}${toRow+1}${check}` : castle;
+            this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile});
+        }
 
         // Send move to all players and spectators
-        const message = JSON.stringify({ type: MESSAGE_TYPES.MOVE_PIECE, data: { fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation } } as MovePieceMessage);
-        for (const player of [this.playerWhite, this.playerBlack]) {
-            if (player) {
-                player.ws.send(message);
-            }
-        }
-        for (const spectator of this.spectators) {
-            spectator.ws.send(message);
-        }
+        this.sendMessageToAll({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile } satisfies MovePieceMessage);
+        this.syncTime();
 
         return true;
     }
@@ -320,8 +386,16 @@ export class Game {
         const lastMove = this.movesLog.pop()!;
 
         // undo board movement
-        this.board[lastMove.fromRow][lastMove.fromCol] = lastMove.newPiece;
-        this.board[lastMove.toRow][lastMove.toCol] = lastMove.oldPiece;
+        if (lastMove.isTile) {
+            if (lastMove.toRow % 2 || lastMove.toCol % 2) {
+                rotateTileOnBoard(lastMove.fromRow, lastMove.fromCol, lastMove.toRow, lastMove.toCol, this.board, true);
+            } else {
+                swapTilesOnBoard(lastMove.fromRow, lastMove.fromCol, lastMove.toRow, lastMove.toCol, this.board);
+            }
+        } else {
+            this.board[lastMove.fromRow][lastMove.fromCol] = lastMove.newPiece;
+            this.board[lastMove.toRow][lastMove.toCol] = lastMove.oldPiece;
+        }
 
         // undo rook movement when castling 
         if (lastMove.notation === 'O-O') {
@@ -348,6 +422,7 @@ export class Game {
         }
 
         // if we undid a king or rook move, loop through all the moves to determine if castling is allowed again
+        // TODO: decide what to do about tile moves
         if ([PieceType.ROOK, PieceType.KING].includes(lastMove.newPiece.type)) {
             this.canCastleKingsideWhite = true;
             this.canCastleQueensideWhite = true;
@@ -374,14 +449,14 @@ export class Game {
                 }
             });
         }
-        // Update the current turn
-        this.currentTurn = (this.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
+        // Update the current turn (this will undo an end-of-game set to PieceColor.NONE)
+        this.currentTurn = (this.movesLog.length % 2 ? PieceColor.BLACK : PieceColor.WHITE);
 
         // resend the game state
         this.sendGameStateToAll();
     }
 
-    public isValidMove(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
+    public isValidMove(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): boolean {
         return true; // TODO
     }
 

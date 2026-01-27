@@ -40,7 +40,7 @@ export function updateGameList() {
     }));
 }
 export function sendGameList(client: ClientInfo,): void {
-    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_LIST, data: { gameList: gameList } } as GameListMessage));
+    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_LIST,  gameList: gameList } satisfies GameListMessage));
 }
 export function pushGameList(): void {
     updateGameList();
@@ -54,11 +54,15 @@ export function pushGameList(): void {
 
 // functions to force a client to change screens to a game room (by JOIN_GAME), or the lobby (by QUIT_GAME)
 export function serveGameRoom(client: ClientInfo): void {
-    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, data: { gameId: client.gameId } } as JoinGameMessage));
+    if (!client.gameId) {
+        console.error(`Client ${client.id} is missing gameId, cannot assign to room`);
+        return;
+    }
+    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId } satisfies JoinGameMessage));
 }
 export function serveLobby(client: ClientInfo): void {
     sendGameList(client);
-    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.QUIT_GAME } as Message));
+    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.QUIT_GAME }));
 }
 
 // Handle WebSocket connections
@@ -69,7 +73,7 @@ wss.on('connection', (ws: WebSocket) => {
     console.log(`Client connected: ${clientId}`);
 
     // Send welcome message to new client
-    ws.send(JSON.stringify({ type: MESSAGE_TYPES.CHANGE_NAME, data: { name: clientInfo.name } } as ChangeNameMessage));
+    ws.send(JSON.stringify({ type: MESSAGE_TYPES.CHANGE_NAME, name: clientInfo.name } satisfies ChangeNameMessage));
 
     // send current game list
     sendGameList(clientInfo);

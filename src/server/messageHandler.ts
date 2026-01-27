@@ -17,16 +17,16 @@ export function handleMessage(
             handleCreateGame(client, games);
             break;
         case MESSAGE_TYPES.JOIN_GAME:
-            handleJoinGame(client, message.data.gameId, games);
+            handleJoinGame(client, message.gameId, games);
             break;
         case MESSAGE_TYPES.CHANGE_POSITION:
-            handleChangePosition(client, message.data.position, games);
+            handleChangePosition(client, message.position, games);
             break;
         case MESSAGE_TYPES.QUIT_GAME:
             handleQuitGame(client, games);
             break;
         case MESSAGE_TYPES.MOVE_PIECE:
-            handleMovePiece(client, message.data.fromRow, message.data.fromCol, message.data.toRow, message.data.toCol, games);
+            handleMovePiece(client, message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, games);
             break;
         case MESSAGE_TYPES.REWIND:
             handleRewind(client, games);
@@ -35,11 +35,11 @@ export function handleMessage(
             handleDraw(client, games);
             break;
         case MESSAGE_TYPES.CHANGE_NAME:
-            handleChangeName(client, message.data.name);
+            handleChangeName(client, message.name);
             break;
         case MESSAGE_TYPES.CHAT:
-            console.log(`Chat message from client ${client.id}: ${message.data.message}`);
-            handleChat(client, message.data.message, games);
+            console.log(`Chat message from client ${client.id}: ${message.message}`);
+            handleChat(client, message.message, games);
             break;
         case MESSAGE_TYPES.GAME_LIST:
             console.log(`Request for the game list from client ${client.id}`);
@@ -113,14 +113,14 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
     }
 }
 
-function handleMovePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, games: Map<number, Game>): void {
+function handleMovePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, games: Map<number, Game>): void {
     if (c.gameId === undefined) {
         console.log(`Client ${c.id} is not in a game, cannot move piece.`);
         return;
     }
     const game = games.get(c.gameId);
     if (game) {
-        game.movePiece(c, fromRow, fromCol, toRow, toCol);  // check logic in here
+        game.movePiece(c, fromRow, fromCol, toRow, toCol, isTile);  // check logic in here
     } else {
         console.error(`Game with ID ${c.gameId} not found for client ${c.id}`);
     }
