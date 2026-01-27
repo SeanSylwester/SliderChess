@@ -46,7 +46,7 @@ function connectWebSocket(): void {
                 break;
             case MESSAGE_TYPES.MOVE_PIECE:
                 console.log('Moving piece:', message);
-                movePiece(message.fromRow, message.fromCol, message.toRow, message.toCol, message.notation, message.isTile);
+                movePiece(message.fromRow, message.fromCol, message.toRow, message.toCol, message.notation, message.isTile, message.promotions);
                 break;
             case MESSAGE_TYPES.CHAT:
                 console.log('Received chat message:', message.message);

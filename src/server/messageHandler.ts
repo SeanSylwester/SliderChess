@@ -2,7 +2,7 @@ import WebSocket from 'ws';
 import { ClientInfo } from './types.js';
 import { Game } from './gameLogic.js';
 import { pushGameList, updateGameList, sendGameList, serveGameRoom, serveLobby } from './server.js';
-import { MESSAGE_TYPES, PieceColor } from '../shared/types.js';
+import { MESSAGE_TYPES, PieceColor, Piece } from '../shared/types.js';
 
 export function handleMessage(
     data: Buffer,
@@ -26,7 +26,7 @@ export function handleMessage(
             handleQuitGame(client, games);
             break;
         case MESSAGE_TYPES.MOVE_PIECE:
-            handleMovePiece(client, message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, games);
+            handleMovePiece(client, message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, message.promotions, games);
             break;
         case MESSAGE_TYPES.REWIND:
             handleRewind(client, games);
@@ -113,14 +113,14 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
     }
 }
 
-function handleMovePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, games: Map<number, Game>): void {
+function handleMovePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[], games: Map<number, Game>): void {
     if (c.gameId === undefined) {
         console.log(`Client ${c.id} is not in a game, cannot move piece.`);
         return;
     }
     const game = games.get(c.gameId);
     if (game) {
-        game.movePiece(c, fromRow, fromCol, toRow, toCol, isTile);  // check logic in here
+        game.movePiece(c, fromRow, fromCol, toRow, toCol, isTile, promotions);  // check logic in here
     } else {
         console.error(`Game with ID ${c.gameId} not found for client ${c.id}`);
     }

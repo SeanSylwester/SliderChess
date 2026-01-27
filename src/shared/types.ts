@@ -5,7 +5,7 @@ export interface GameState {
     id: number;
     board: Piece[][];
     chatLog: string[];
-    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean}[];
+    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]}[];
     currentTurn: PieceColor;
     initialTimeWhite: number; // in seconds
     initialTimeBlack: number; // in seconds
@@ -102,8 +102,9 @@ export interface MovePieceMessage extends Message {
     fromCol: number;
     toRow: number;
     toCol: number; 
-    notation?: string; 
+    notation?: string; // only calculated at the server and sent back
     isTile: boolean;
+    promotions: {row: number, col: number, piece: Piece}[];
 }
 export interface ValidMovesMessage extends Message {
     type: typeof MESSAGE_TYPES.VALID_MOVES;

@@ -1,4 +1,5 @@
-promotion
+promotions notation
+promotions choose piece
 surrender
 createGame dialog box
 

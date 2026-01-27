@@ -1,6 +1,6 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage } from '../shared/types.js';
 import { ClientInfo } from './types.js';
-import { sameColor, oppositeColor, col0ToFile, swapTilesOnBoard, rotateTileOnBoard } from '../shared/utils.js'
+import { sameColor, oppositeColor, col0ToFile, swapTilesOnBoard, rotateTileOnBoard, getPieceChar } from '../shared/utils.js'
 import { inCheck } from '../shared/utils.js';
 
 
@@ -14,7 +14,7 @@ export class Game {
     spectators: ClientInfo[] = [];
     board: Piece[][];
     chatLog: string[] = [];
-    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean}[] = [];
+    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]}[] = [];
     currentTurn: PieceColor = PieceColor.WHITE;
     initialTimeWhite = 600; // in seconds
     initialTimeBlack = 600; // in seconds
@@ -248,7 +248,7 @@ export class Game {
         return this.playerWhite === null && this.playerBlack === null && this.spectators.length === 0;
     }
 
-    public movePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): boolean {
+    public movePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): boolean {
         // reject a move to the same spot (they're probably just deselecting)
         if (fromRow === toRow && fromCol === toCol) {
             return false;
@@ -284,7 +284,6 @@ export class Game {
         }
 
         // Move the piece
-        // TODO: handle promotion
         if (isTile) {
             if (toRow % 2 || toCol % 2) {
                 rotateTileOnBoard(fromRow, fromCol, toRow, toCol, this.board, false);
@@ -295,6 +294,11 @@ export class Game {
             this.board[toRow][toCol] = newPiece;
             this.board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
         }
+
+        // handle promotions
+        promotions.forEach(promo => {
+            this.board[promo.row][promo.col] = promo.piece;
+        });
 
 
         // keep track of if castling is allowed
@@ -357,25 +361,29 @@ export class Game {
         }
         const check = inCheck(this.currentTurn, this.board) ? '+' : '';
         let notation: string;
+        let promotionNotation = '';
+        for (const promo of promotions) {
+            promotionNotation += `${isTile ? col0ToFile(promo.col) : ''}=${getPieceChar(promo.piece, false, promo.col)}`
+        }
         if (isTile) {
-            if (toRow % 2 || toCol % 2) {
-                notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${check}`;
-            } else {
-                notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${check}`;
-            }
-            this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile});
+            notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}`;
+            this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
         } else {
             const capture = (!enPassant && oldPiece.type === PieceType.EMPTY) ? '' : 'x';
-            const pieceChar = newPiece.type === PieceType.PAWN ? (capture ? col0ToFile(fromCol) : '') : (newPiece.type === PieceType.KNIGHT ? 'N' : PieceType[newPiece.type][0]);
-            notation = castle === '' ? `${pieceChar}${capture}${col0ToFile(toCol)}${toRow+1}${check}` : castle;
-            this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile});
+            const pieceChar = getPieceChar(newPiece, capture === 'x', fromCol);
+            notation = castle === '' ? `${pieceChar}${capture}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}` : castle;
+            this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
         }
 
         // Send move to all players and spectators
-        this.sendMessageToAll({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile } satisfies MovePieceMessage);
+        this.sendMessageToAll({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions } satisfies MovePieceMessage);
         this.syncTime();
 
         return true;
+    }
+
+    public getPlayerColor(c: ClientInfo): PieceColor {
+        return c === this.playerWhite ? PieceColor.WHITE : (c === this.playerBlack ? PieceColor.BLACK : PieceColor.NONE);
     }
 
     public rewind(): void {
@@ -384,6 +392,11 @@ export class Game {
             return;
         }
         const lastMove = this.movesLog.pop()!;
+
+        // undo promotions
+        lastMove.promotions.forEach(promo => {
+            this.board[promo.row][promo.col] = {type: PieceType.PAWN, color: promo.piece.color};
+        });
 
         // undo board movement
         if (lastMove.isTile) {

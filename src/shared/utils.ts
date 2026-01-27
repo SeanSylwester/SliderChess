@@ -36,6 +36,11 @@ export function findKing(playerColor: PieceColor, board: Piece[][]): [row: numbe
     return [-1, -1];  // this should really never happen...
 }
 
+export function getPieceChar(piece: Piece, isCapture: boolean, fromCol: number): string {
+    // arguments are only used for pawn moves. Can set to anything if you're sure it's not a pawn
+    return piece.type === PieceType.PAWN ? (isCapture ? col0ToFile(fromCol) : '') : (piece.type === PieceType.KNIGHT ? 'N' : PieceType[piece.type][0]);
+}
+
 export function getPiecesOnTile(row: number, col: number, board: Piece[][]): Piece[] {
     // order is clockwise starting from the bottom left
     return [board[row][col], 
