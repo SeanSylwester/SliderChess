@@ -1,5 +1,5 @@
 import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage } from "../shared/types.js";
-import { flipBoard, movePiece, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime } from "./gameLogic.js";
+import { flipBoard, move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime } from "./gameLogic.js";
 import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
 let fromHistory = false;
@@ -24,44 +24,33 @@ function connectWebSocket(): void {
 
         switch (message.type) {
             case MESSAGE_TYPES.CHANGE_NAME:
-                console.log('Received name list:', message);
                 playerNameEntry.value = message.name;
                 break;
             case MESSAGE_TYPES.GAME_LIST:
-                console.log('Received game list:', message);
                 updateGameList(message.gameList);
                 break;
             case MESSAGE_TYPES.GAME_STATE:
-                console.log('Received game state:', message);
                 initLocalGameState(message.gameState, message.yourColor);
                 break;
             case MESSAGE_TYPES.JOIN_GAME:
-                console.log('Joining game room:', message.gameId);
                 showScreen(SCREENS.GAME_ROOM, message.gameId);
                 break;
             case MESSAGE_TYPES.QUIT_GAME:
-                console.log('Quitting game room');
                 clearLocalGameState();
                 showScreen(SCREENS.LOBBY);
                 break;
             case MESSAGE_TYPES.MOVE_PIECE:
-                console.log('Moving piece:', message);
-                movePiece(message.fromRow, message.fromCol, message.toRow, message.toCol, message.notation, message.isTile, message.promotions);
+                move(message.fromRow, message.fromCol, message.toRow, message.toCol, message.notation, message.isTile, message.promotions);
                 break;
             case MESSAGE_TYPES.CHAT:
-                console.log('Received chat message:', message.message);
                 updateChat(message.message);
                 break;
             case MESSAGE_TYPES.TIME:
-                console.log('Received time message:', message.message);
                 syncTime(message.clockRunning, message.timeLeftWhite, message.timeLeftBlack, message.initialTimeWhite, message.initialTimeBlack, message.incrementWhite, message.incrementBlack);
                 break;
             default:
-                const responseElement = document.getElementById('response');
-                if (responseElement) {
-                    responseElement.textContent = message || JSON.stringify(message);
-                }
-            // handle other message types as needed
+                console.error(`Unknown message type ${message.type}`);
+                console.error(message);
         }
 
     };
@@ -92,11 +81,9 @@ export function sendMessage<T extends Message>(message: T): void {
 }
 
 function showScreen(screenId: typeof SCREENS[keyof typeof SCREENS], gameId?: number): void {
-    console.log('showScreen called');
     const lobbyScreen = document.getElementById('lobby-screen');
     const gameScreen = document.getElementById('game-screen');
     const url = new URL(window.location.href);
-    console.log(`before: ${window.history.length}`);
     switch (screenId) {
         case SCREENS.LOBBY:
             lobbyScreen!.style.display = 'block';
@@ -109,7 +96,6 @@ function showScreen(screenId: typeof SCREENS[keyof typeof SCREENS], gameId?: num
             if (!fromHistory) window.history.pushState({}, '', window.location.origin + `/${gameId}`);
             break;
     }
-    console.log(`after: ${window.history.length}`);
     fromHistory = false;
 }
 
@@ -154,10 +140,6 @@ function updateGameList(gameList: GameInfo[]): void {
 const refreshGameListButton = document.getElementById('refreshGameList');
 refreshGameListButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.GAME_LIST }));
 
-export function sendChat(message: string) {
-    sendMessage({ type: MESSAGE_TYPES.CHAT,  message: message } satisfies ChatMessage);
-}
-
 const createGame = document.getElementById('createGame');
 createGame!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CREATE_GAME }));
 
@@ -167,7 +149,7 @@ const sendChatButton = document.getElementById('sendChat');
 const chatEntry = document.getElementById('chatEntry') as HTMLInputElement;
 sendChatButton!.addEventListener('click', () => {
     if (chatEntry.value.trim() !== '') {
-        sendChat(chatEntry.value);
+        sendMessage({ type: MESSAGE_TYPES.CHAT,  message: chatEntry.value } satisfies ChatMessage);
         chatEntry.value = '';
     }
 });

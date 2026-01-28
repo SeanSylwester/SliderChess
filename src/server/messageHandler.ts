@@ -1,49 +1,75 @@
 import WebSocket from 'ws';
 import { ClientInfo } from './types.js';
 import { Game } from './gameLogic.js';
-import { pushGameList, updateGameList, sendGameList, serveGameRoom, serveLobby } from './server.js';
-import { MESSAGE_TYPES, PieceColor, Piece } from '../shared/types.js';
+import { updateGameList, sendGameList, serveGameRoom, serveLobby } from './server.js';
+import { MESSAGE_TYPES } from '../shared/types.js';
 
-export function handleMessage(
-    data: Buffer,
-    client: ClientInfo,
-    games: Map<number, Game>,
-    clients: Map<WebSocket, ClientInfo>
-): void {
+export function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): void {
     const message = JSON.parse(data.toString());
+
+    // lookup the game that the client is in for most message types
+    let game: Game | undefined;
+    if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.QUIT_GAME, MESSAGE_TYPES.MOVE_PIECE, MESSAGE_TYPES.REWIND, MESSAGE_TYPES.DRAW, MESSAGE_TYPES.CHAT].includes(message.type)) {
+        if (client.gameId === undefined) {
+            console.error(`Client ${client.id} is not in a game.`);
+            return;
+        }
+        game = games.get(client.gameId);
+        if (game === undefined) {
+            console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
+            return;
+        }
+    }
 
     switch (message.type) {
         case MESSAGE_TYPES.CREATE_GAME:
             handleCreateGame(client, games);
             break;
+
         case MESSAGE_TYPES.JOIN_GAME:
             handleJoinGame(client, message.gameId, games);
             break;
+
         case MESSAGE_TYPES.CHANGE_POSITION:
-            handleChangePosition(client, message.position, games);
+            game!.changePosition(client, message.position);
+            updateGameList();
             break;
+
         case MESSAGE_TYPES.QUIT_GAME:
             handleQuitGame(client, games);
             break;
+
         case MESSAGE_TYPES.MOVE_PIECE:
-            handleMovePiece(client, message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, message.promotions, games);
+            game!.move(client,  message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, message.promotions); 
             break;
+
         case MESSAGE_TYPES.REWIND:
-            handleRewind(client, games);
+            game!.rewind();
             break;
+
         case MESSAGE_TYPES.DRAW:
-            handleDraw(client, games);
+            game!.draw(client);
             break;
+
         case MESSAGE_TYPES.CHANGE_NAME:
-            handleChangeName(client, message.name);
+            const oldName = client.name;
+            client.name = message.newName;
+            console.log(`Client ${client.id} changed name from ${oldName} to ${client.name}`);
+            updateGameList();
             break;
+
         case MESSAGE_TYPES.CHAT:
-            handleChat(client, message.message, games);
+            game!.logChatMessage(message, client);
             break;
+
         case MESSAGE_TYPES.GAME_LIST:
             updateGameList();
             sendGameList(client);
             break;
+        
+        default:
+            console.error(`Unknown message type ${message.type}`);
+            console.error(message);
     }
 }
 
@@ -74,21 +100,6 @@ function handleJoinGame(client: ClientInfo, gameId: number, games: Map<number, G
     }
 }
 
-export function handleChangePosition(client: ClientInfo, position: PieceColor, games: Map<number, Game>) {
-    if (client.gameId === undefined) {
-        console.error(`Client ${client.id} is not in a game, cannot change positions.`);
-        return;
-    }
-    const game = games.get(client.gameId);
-    if (!game) {
-        console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
-        return;
-    }
-
-    game.changePosition(client, position);
-    updateGameList();
-}
-
 export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): void {
     if (client.gameId === undefined) {
         console.error(`Client ${client.id} is not in a game, cannot quit.`);
@@ -107,65 +118,5 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
         serveLobby(client);
     } else {
         console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
-    }
-}
-
-function handleMovePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[], games: Map<number, Game>): void {
-    if (c.gameId === undefined) {
-        console.error(`Client ${c.id} is not in a game, cannot move piece.`);
-        return;
-    }
-    const game = games.get(c.gameId);
-    if (game) {
-        game.movePiece(c, fromRow, fromCol, toRow, toCol, isTile, promotions);  // check logic in here
-    } else {
-        console.error(`Game with ID ${c.gameId} not found for client ${c.id}`);
-    }
-}
-
-function handleRewind(c: ClientInfo, games: Map<number, Game>): void {
-    if (c.gameId === undefined) {
-        console.error(`Client ${c.id} is not in a game, cannot rewind.`);
-        return;
-    }
-    const game = games.get(c.gameId);
-    if (game) {
-        game.rewind();
-    } else {
-        console.error(`Game with ID ${c.gameId} not found for client ${c.id}`);
-    }
-}
-
-function handleDraw(c: ClientInfo, games: Map<number, Game>): void {
-    if (c.gameId === undefined) {
-        console.error(`Client ${c.id} is not in a game, cannot offer draw.`);
-        return;
-    }
-    const game = games.get(c.gameId);
-    if (game) {
-        game.draw(c);
-    } else {
-        console.error(`Game with ID ${c.gameId} not found for client ${c.id}`);
-    }
-}
-
-function handleChangeName(c: ClientInfo, newName: string): void {
-    const oldName = c.name;
-    c.name = newName;
-    console.log(`Client ${c.id} changed name from ${oldName} to ${c.name}`);
-
-    updateGameList();
-}
-
-function handleChat(c: ClientInfo, message: string, games: Map<number, Game>): void {
-    if (c.gameId === undefined) {
-        console.error(`Client ${c.id} is not in a game, cannot send chat message.`);
-        return;
-    }
-    const game = games.get(c.gameId);
-    if (game) {
-        game.logChatMessage(message, c);
-    } else {
-        console.error(`Game with ID ${c.gameId} not found for client ${c.id}`);
     }
 }

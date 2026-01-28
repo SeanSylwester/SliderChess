@@ -1,3 +1,15 @@
+export interface Move {
+    oldPiece: Piece;
+    newPiece: Piece;
+    fromRow: number;
+    fromCol: number;
+    toRow: number;
+    toCol: number;
+    notation: string;
+    isTile: boolean;
+    promotions: {row: number, col: number, piece: Piece}[]
+}
+
 export interface GameState {
     playerWhiteName: string | null;
     playerBlackName: string | null;
@@ -5,7 +17,7 @@ export interface GameState {
     id: number;
     board: Piece[][];
     chatLog: string[];
-    movesLog: {oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]}[];
+    movesLog: Move[];
     currentTurn: PieceColor;
     initialTimeWhite: number; // in seconds
     initialTimeBlack: number; // in seconds
@@ -14,10 +26,10 @@ export interface GameState {
     timeLeftWhite: number; // in seconds
     timeLeftBlack: number; // in seconds
     clockRunning: boolean;
-    canCastleKingsideWhite: boolean;
-    canCastleQueensideWhite: boolean;
-    canCastleKingsideBlack: boolean;
-    canCastleQueensideBlack: boolean;
+    KW: boolean;
+    QW: boolean;
+    KB: boolean;
+    QB: boolean;
     drawWhite: boolean;
     drawBlack: boolean;
 }

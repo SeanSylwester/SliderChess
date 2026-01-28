@@ -2,8 +2,9 @@ options to change game rules (chat controls for now?)
     can you move a tile with enemy pieces
         if so, can you move a tile "through check" i.e. such that if you only moved 1 of 2 squares, you'd be in check?
     can you move a tile with a king on it
-    does moving the king/rook with tiles stop you from castling, even if you move it back?
+    does moving the king/rook with tiles stop you from castling, even if you move it back? (right now it doesn't)
     can you move a tile with a piece that's giving check? (I forgot to implement this)
+    can you double-move a pawn that gets moved onto the home row by a tile move
 promotions choose piece other than queen
 surrender button
 createGame dialog box

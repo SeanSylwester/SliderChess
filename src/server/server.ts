@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 import { Game } from './gameLogic.js';
 import { ClientInfo } from './types.js';
 import { handleMessage, handleQuitGame } from './messageHandler.js';
-import { MESSAGE_TYPES, GameInfo, GameListMessage, JoinGameMessage, Message, ChangeNameMessage } from '../shared/types.js';
+import { MESSAGE_TYPES, GameListMessage, JoinGameMessage, ChangeNameMessage } from '../shared/types.js';
 const app = express();
 const PORT = process.env.PORT || 10000;
 
@@ -31,6 +31,7 @@ let gameList = Array.from(games.values()).map((game) => ({
     playerBlack: game.playerBlack?.name || null, numberOfSpectators: game.spectators.length,
     timeLeftWhite: game.timeLeftWhite, timeLeftBlack: game.timeLeftBlack
 }));
+
 export function updateGameList() {
     // TODO: probably don't need to recreate the whole array each time...
     gameList = Array.from(games.values()).map((game) => ({
@@ -39,9 +40,11 @@ export function updateGameList() {
         timeLeftWhite: game.timeLeftWhite, timeLeftBlack: game.timeLeftBlack
     }));
 }
+
 export function sendGameList(client: ClientInfo,): void {
     client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_LIST,  gameList: gameList } satisfies GameListMessage));
 }
+
 export function pushGameList(): void {
     updateGameList();
     clients.forEach((client) => {
@@ -60,6 +63,7 @@ export function serveGameRoom(client: ClientInfo): void {
     }
     client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId } satisfies JoinGameMessage));
 }
+
 export function serveLobby(client: ClientInfo): void {
     sendGameList(client);
     client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.QUIT_GAME }));
@@ -80,10 +84,9 @@ wss.on('connection', (ws: WebSocket) => {
 
     // Handle messages from client
     ws.on('message', (data: Buffer) => {
-        console.log(`Message from ${clientId} (${clientInfo.name}):`, JSON.parse(data.toString()));
         const client = clients.get(ws);
         if (client) {
-            handleMessage(data, client, games, clients);
+            handleMessage(data, client, games);
         } else {
             console.error(`Client info not found for WebSocket: ${clientId}`);
         }
