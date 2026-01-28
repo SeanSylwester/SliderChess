@@ -1,8 +1,14 @@
-promotions choose piece
-surrender
+options to change game rules (chat controls for now?)
+    can you move a tile with enemy pieces
+        if so, can you move a tile "through check" i.e. such that if you only moved 1 of 2 squares, you'd be in check?
+    can you move a tile with a king on it
+    does moving the king/rook with tiles stop you from castling, even if you move it back?
+    can you move a tile with a piece that's giving check? (I forgot to implement this)
+promotions choose piece other than queen
+surrender button
 createGame dialog box
+detect timer running out
 
-make timer work
 server-side valid move checking
 server-side confirmation of checkmate/stalemate
     then I'd only need to check for any valid moves when the client requests it, instead of every single move

@@ -9,11 +9,13 @@ const chatLogElement = document.getElementById("chatLog") as HTMLTextAreaElement
 
 const ctx = canvas.getContext("2d")!;
 ctx.font = "24px Arial";
+ctx.lineWidth = 2;
+const lineSpace = 1;
 const textSpace = 20;
 const textMargin = 4;
-const canvasWidth = canvas.width - textSpace;
-const canvasHeight = canvas.height - textSpace;
-const pitch = canvasWidth / 8; // size of each square
+const boardWidth = canvas.width - textSpace;
+const boardHeight = canvas.height - textSpace;
+const pitch = Math.floor(boardWidth / 8); // size of each square
 const tilePct = 0.2; // percentage of the square on each side for selecting a tile instead
 const piecesImg = document.getElementById("piecesSpriteSheet") as HTMLImageElement;
 const fillStyles = ["#f0d9b5", "#b58863"]; // light and dark squares
@@ -164,14 +166,14 @@ function handleClick(event: MouseEvent): void {
     // transmute to unflipped row/col index, which matches the board[row][col]
     if (flip) {
         col = 7 - Math.floor((event.offsetX - textSpace) / pitch);
-        row = Math.floor(event.offsetY / pitch);
+        row = Math.floor((event.offsetY - lineSpace) / pitch);
     } else {
         col = Math.floor((event.offsetX - textSpace) / pitch);
-        row = 7 - Math.floor(event.offsetY / pitch);
+        row = 7 - Math.floor((event.offsetY - lineSpace) / pitch);
     }
 
     const xSquareOffset = (event.offsetX - textSpace) % pitch;
-    const ySquareOffset = event.offsetY % pitch;
+    const ySquareOffset = (event.offsetY - 1) % pitch;
     // force isTile if our current selection is a tile, or if we try to highlight an empty square
     const isTile = selectedSquare?.isTile || (!selectedSquare && localGameState.board[row][col].type === PieceType.EMPTY) 
                         || (xSquareOffset < pitch*tilePct || xSquareOffset > pitch*(1-tilePct)) && (ySquareOffset < pitch*tilePct || ySquareOffset > pitch*(1-tilePct));
@@ -183,7 +185,7 @@ function handleClick(event: MouseEvent): void {
             col -= col % 2;
         }
     }
-    console.log(`(${row}, ${col}) ${isTile}`);
+    //console.log(`(${row}, ${col}) ${isTile}`);
 
     const piece = localGameState.board[row][col];
     //console.log(`Clicked on ${col0ToFile(col)}${row+1}: ${PieceColor[piece.color]} ${PieceType[piece.type]}`);
@@ -463,20 +465,20 @@ export function renderFullBoard(): void {
     // clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // draw squares and pieces
+    // draw squares and pieces, top to bottom (rank 8-1), left to right (file a-h)
     let piece: {type: PieceType, color: number};
     let x: number;
     let y: number;
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
-            // draw squares
             if (flip) {
                 x = (7 - col) * pitch + textSpace;
-                y = (7 - row) * pitch;
+                y = (7 - row) * pitch + lineSpace;
             } else {
                 x = col * pitch + textSpace;
-                y = row * pitch;
+                y = row * pitch + lineSpace;
             }
+            // draw squares
             ctx.fillStyle = fillStyles[(row + col) % 2];
             ctx.fillRect(x, y, pitch, pitch);
 
@@ -499,42 +501,88 @@ export function renderFullBoard(): void {
     ctx.textAlign = "center";
     for (let col = 0; col < 8; col++) {
         // 97 is 'a'
-        ctx.fillText(col0ToFile(flip ? 7-col: col), col * pitch + pitch/2 + textSpace, canvasHeight + textMargin);
+        ctx.fillText(col0ToFile(flip ? 7-col: col), col * pitch + pitch/2 + textSpace, boardHeight + textMargin);
     }
 
+    drawTileBorders();
+
     ctx.stroke();
+}
+function drawTileBorders(): void {
+    const start = performance.now();
+    for(let i=0;i<1000;i++){
+    ctx.strokeStyle = '#000000';
+    let x: number;
+    let y: number;
+    for (let row = 0; row < 8; row+=2) {
+        for (let col = 0; col < 8; col+=2) {
+            x = col * pitch + textSpace;
+            y = row * pitch + lineSpace;
+            ctx.strokeRect(x, y, 2*pitch, 2*pitch);
+        }
+    }
+}
+    ctx.stroke();
+    console.log(`renderFullBoard() time: ${performance.now() - start}ms`);
 }
 export function drawSquare(row: number, col: number, isTile: boolean, piece?: Piece): void {  
     //console.log(`(${row}, ${col}), ${isTile}, ${piece}`);
     if (isTile) {
-        // patch fix to make sure that tiles are always drawn correctly
+        // patch fix to make sure that tiles are always drawn correctly, forcing to the bottom left corner
         row -= row % 2;
         col -= col % 2;
-    }
-    let x: number;
-    let y: number; 
-    if (isTile) {
+
         drawSquare(row, col, false);
         drawSquare(row+1, col, false);
         drawSquare(row, col+1, false);
         drawSquare(row+1, col+1, false);
-    } 
-    if (flip) {
-        x = (7 - col) * pitch + textSpace;
-        y = row * pitch;
     } else {
-        x = col * pitch + textSpace;
-        y = (7 - row) * pitch;
-    }
-    ctx.fillStyle = fillStyles[1 - (row + col) % 2];
-    ctx.fillRect(x, y, pitch, pitch);
+        // x and y point to the top left corner of the square (flipped or not)
+        let x: number;
+        let y: number; 
+        
+        if (flip) {
+            // in the flipped view, the columns are reversed because file h is at x=0
+            x = (7 - col) * pitch + textSpace;
+            y = row * pitch + lineSpace;
+        } else {
+            // in the regular view, the rows are reversed because rank 8 is at y=0
+            x = col * pitch + textSpace;
+            y = (7 - row) * pitch + lineSpace;
+        }
 
-    if (!piece && localGameState) {
-        piece = localGameState.board[row][col];
+        // draw background
+        ctx.fillStyle = fillStyles[1 - (row + col) % 2];
+        ctx.fillRect(x, y, pitch, pitch);
+
+        // grab piece from the board, or use the argument
+        if (!piece && localGameState) {
+            piece = localGameState.board[row][col];
+        }
+        if (piece) {
+            ctx.drawImage(piecesImg, 45*piece.type, 45*piece.color, 45, 45, x, y, pitch, pitch);
+        }
+
+        // this is 3x faster than just drawing all 16 tiles, but it's like 6us vs 2us... is it worth the complexity??
+        // I'm going to leave it in just cuz then I don't have to decide when to actual call drawTileBorders()...
+        // draw tile boundary
+        //console.log(`${row}, ${col}`);
+        let left = col % 2 === 0;
+        let top = row % 2 === 1;
+        if (flip) {
+            left = !left;
+            top = !top;
+        }
+        // draw from top left going around, only filling in the correct lines
+        ctx.beginPath()
+        ctx.moveTo(x, y);
+        ctx.strokeStyle = '#000000';
+        top ? ctx.lineTo(x+pitch, y) : ctx.moveTo(x+pitch, y);
+        !left ? ctx.lineTo(x+pitch, y+pitch) : ctx.moveTo(x+pitch, y+pitch);
+        !top ? ctx.lineTo(x, y+pitch) : ctx.moveTo(x, y+pitch);
+        left ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     }
-    if (piece) {
-        ctx.drawImage(piecesImg, 45*piece.type, 45*piece.color, 45, 45, x, y, pitch, pitch);
-    }
+
     ctx.stroke();
 }
 function highlightSquare(row: number, col: number, style: string, isTile: boolean, firstTile?: boolean): void {
@@ -556,10 +604,9 @@ function highlightSquare(row: number, col: number, style: string, isTile: boolea
         }
     }
     ctx.strokeStyle = style;
-    ctx.lineWidth = 2;
     const avoidGhost = 1;
     if (isTile) {
-        ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + avoidGhost, row * pitch + ctx.lineWidth/2 + avoidGhost, 
+        ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + avoidGhost, row * pitch + ctx.lineWidth/2 + avoidGhost + lineSpace, 
                     2*pitch - ctx.lineWidth - 2*avoidGhost, 2*pitch - ctx.lineWidth - 2*avoidGhost);
         
         // highlight the bottom left corner of the tile
@@ -568,7 +615,7 @@ function highlightSquare(row: number, col: number, style: string, isTile: boolea
             highlightSquare(row + (flip ? 0 : 1), col + (flip ? 1 : 0), 'rgb(255 0 0 / 75%)', false, false);
         }
     } else {
-        ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + avoidGhost, row * pitch + ctx.lineWidth/2 + avoidGhost, 
+        ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + avoidGhost, row * pitch + ctx.lineWidth/2 + avoidGhost + lineSpace, 
                     pitch - ctx.lineWidth - 2*avoidGhost, pitch - ctx.lineWidth - 2*avoidGhost);
     }
 }
