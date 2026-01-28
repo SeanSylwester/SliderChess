@@ -1,5 +1,5 @@
 import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage } from "../shared/types.js";
-import { flipBoard, movePiece, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, updateTimes } from "./gameLogic.js";
+import { flipBoard, movePiece, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime } from "./gameLogic.js";
 import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
 let fromHistory = false;
@@ -54,7 +54,7 @@ function connectWebSocket(): void {
                 break;
             case MESSAGE_TYPES.TIME:
                 console.log('Received time message:', message.message);
-                updateTimes(message.timeLeftWhite, message.timeLeftBlack, message.initialTimeWhite, message.initialTimeBlack, message.incrementWhite, message.incrementBlack);
+                syncTime(message.clockRunning, message.timeLeftWhite, message.timeLeftBlack, message.initialTimeWhite, message.initialTimeBlack, message.incrementWhite, message.incrementBlack);
                 break;
             default:
                 const responseElement = document.getElementById('response');

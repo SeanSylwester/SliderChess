@@ -38,11 +38,9 @@ export function handleMessage(
             handleChangeName(client, message.name);
             break;
         case MESSAGE_TYPES.CHAT:
-            console.log(`Chat message from client ${client.id}: ${message.message}`);
             handleChat(client, message.message, games);
             break;
         case MESSAGE_TYPES.GAME_LIST:
-            console.log(`Request for the game list from client ${client.id}`);
             updateGameList();
             sendGameList(client);
             break;
@@ -60,11 +58,10 @@ function handleCreateGame(client: ClientInfo, games: Map<number, Game>): void {
 
 function handleJoinGame(client: ClientInfo, gameId: number, games: Map<number, Game>): void {
     if (client.gameId !== undefined) {
-        console.log(`Client ${client.id} is already in a game (${client.gameId}), cannot join another.`);
+        console.error(`Client ${client.id} is already in a game (${client.gameId}), cannot join another.`);
         return;
     }
 
-    console.log(`Assigning client ${client.id} to game ${gameId}`);
     const game = games.get(gameId);
     if (game) {
         game.addPlayer(client);
@@ -79,7 +76,7 @@ function handleJoinGame(client: ClientInfo, gameId: number, games: Map<number, G
 
 export function handleChangePosition(client: ClientInfo, position: PieceColor, games: Map<number, Game>) {
     if (client.gameId === undefined) {
-        console.log(`Client ${client.id} is not in a game, cannot change positions.`);
+        console.error(`Client ${client.id} is not in a game, cannot change positions.`);
         return;
     }
     const game = games.get(client.gameId);
@@ -94,7 +91,7 @@ export function handleChangePosition(client: ClientInfo, position: PieceColor, g
 
 export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): void {
     if (client.gameId === undefined) {
-        console.log(`Client ${client.id} is not in a game, cannot quit.`);
+        console.error(`Client ${client.id} is not in a game, cannot quit.`);
         return;
     }
 
@@ -102,7 +99,7 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
     if (game) {
         game.removePlayer(client);
         if (game.isEmpty()) {
-            //games.delete(client.gameId);
+            games.delete(client.gameId);
             console.log(`Removed empty game ${game.id}`);
         }
         client.gameId = undefined;
@@ -115,7 +112,7 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
 
 function handleMovePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[], games: Map<number, Game>): void {
     if (c.gameId === undefined) {
-        console.log(`Client ${c.id} is not in a game, cannot move piece.`);
+        console.error(`Client ${c.id} is not in a game, cannot move piece.`);
         return;
     }
     const game = games.get(c.gameId);
@@ -128,7 +125,7 @@ function handleMovePiece(c: ClientInfo, fromRow: number, fromCol: number, toRow:
 
 function handleRewind(c: ClientInfo, games: Map<number, Game>): void {
     if (c.gameId === undefined) {
-        console.log(`Client ${c.id} is not in a game, cannot rewind.`);
+        console.error(`Client ${c.id} is not in a game, cannot rewind.`);
         return;
     }
     const game = games.get(c.gameId);
@@ -141,7 +138,7 @@ function handleRewind(c: ClientInfo, games: Map<number, Game>): void {
 
 function handleDraw(c: ClientInfo, games: Map<number, Game>): void {
     if (c.gameId === undefined) {
-        console.log(`Client ${c.id} is not in a game, cannot offer draw.`);
+        console.error(`Client ${c.id} is not in a game, cannot offer draw.`);
         return;
     }
     const game = games.get(c.gameId);
@@ -162,7 +159,7 @@ function handleChangeName(c: ClientInfo, newName: string): void {
 
 function handleChat(c: ClientInfo, message: string, games: Map<number, Game>): void {
     if (c.gameId === undefined) {
-        console.log(`Client ${c.id} is not in a game, cannot send chat message.`);
+        console.error(`Client ${c.id} is not in a game, cannot send chat message.`);
         return;
     }
     const game = games.get(c.gameId);

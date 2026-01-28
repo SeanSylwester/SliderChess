@@ -27,19 +27,56 @@ const bishopDirections = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
 const rookDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const kingQueenDirections = bishopDirections.concat(rookDirections);
 
+const whitePlayerInfoText = document.getElementById('whitePlayerInfo')!;
+const claimWhiteButton = document.getElementById('claimWhite')! as HTMLButtonElement;
+const blackPlayerInfoText = document.getElementById('blackPlayerInfo')!;
+const claimBlackButton = document.getElementById('claimBlack')! as HTMLButtonElement;
+const spectatorInfoText = document.getElementById('spectatorInfo')!;
 
+const initialTimeBottomText = document.getElementById('initialTimeBottom')! as HTMLSpanElement;
+const incrementBottomText = document.getElementById('incrementBottom')! as HTMLSpanElement;
+const timeLeftBottomText = document.getElementById('timeLeftBottom')! as HTMLSpanElement;
+const initialTimeTopText = document.getElementById('initialTimeTop')! as HTMLSpanElement;
+const incrementTopText = document.getElementById('incrementTop')! as HTMLSpanElement;
+const timeLeftTopText = document.getElementById('timeLeftTop')! as HTMLSpanElement;
+const clockPeriod = 100; // in ms
+
+function countClock(): void {
+    if (localGameState?.clockRunning) {
+        if (localGameState.currentTurn === PieceColor.WHITE) {
+            localGameState.timeLeftWhite -= clockPeriod / 1000;
+        } else if (localGameState.currentTurn === PieceColor.BLACK) {
+            localGameState.timeLeftBlack -= clockPeriod / 1000;
+        }
+
+        if (flip) {
+            timeLeftTopText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
+            timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftBlack, 1);
+        } else {
+            timeLeftTopText.textContent = formatMinSec(localGameState.timeLeftBlack, 1);
+            timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
+        }
+    }
+}
+
+const timerId = setInterval(countClock, clockPeriod);
+const drawButton = document.getElementById('draw') as HTMLButtonElement;
 export function initLocalGameState(gameState: GameState, yourColor: PieceColor): void {
     localGameState = gameState;
     myColor = yourColor;
     if (myColor === PieceColor.WHITE) {
         flip = false;
+        drawButton.disabled = false;
     } else if (myColor === PieceColor.BLACK) {
         flip = true;
+        drawButton.disabled = false;
+    } else {
+        drawButton.disabled = true;
     }
 
     document.getElementById('gameIdDisplay')!.textContent = `${gameState.id}`;
     updateNames(gameState.playerWhiteName, gameState.playerBlackName, gameState.spectatorNames);
-    updateTimes(gameState.timeLeftWhite, gameState.timeLeftBlack, gameState.initialTimeWhite, gameState.initialTimeBlack, gameState.incrementWhite, gameState.incrementBlack);
+    syncTime(gameState.clockRunning, gameState.timeLeftWhite, gameState.timeLeftBlack, gameState.initialTimeWhite, gameState.initialTimeBlack, gameState.incrementWhite, gameState.incrementBlack);
     chatLogElement.value = gameState.chatLog.join("\n");
     chatLogElement.scrollTop = chatLogElement.scrollHeight;
     fullMovesLog();
@@ -61,30 +98,47 @@ export function updateNames(playerWhiteName: string | null, playerBlackName: str
         return;
     }
     console.log(playerWhiteName);
-    document.getElementById('whitePlayerInfo')!.textContent = playerWhiteName ? playerWhiteName : '';
-    (document.getElementById('claimWhite')! as HTMLButtonElement).disabled = (playerWhiteName !== null);
+    whitePlayerInfoText.textContent = playerWhiteName ? playerWhiteName : '';
+    claimWhiteButton.disabled = (playerWhiteName !== null);
 
-    document.getElementById('blackPlayerInfo')!.textContent = playerBlackName ? playerBlackName : '';
-    (document.getElementById('claimBlack')! as HTMLButtonElement).disabled = (playerBlackName !== null);
+    blackPlayerInfoText.textContent = playerBlackName ? playerBlackName : '';
+    claimBlackButton.disabled = (playerBlackName !== null);
 
-    document.getElementById('spectatorInfo')!.textContent = spectatorNames.join(', ');
+    spectatorInfoText.textContent = spectatorNames.join(', ');
 }
-const initialTimeWhiteText = document.getElementById('initialTimeWhite')! as HTMLSpanElement;
-const incrementWhiteText = document.getElementById('incrementWhite')! as HTMLSpanElement;
-const timeLeftWhiteText = document.getElementById('timeLeftWhite')! as HTMLSpanElement;
-const initialTimeBlackText = document.getElementById('initialTimeBlack')! as HTMLSpanElement;
-const incrementBlackText = document.getElementById('incrementBlack')! as HTMLSpanElement;
-const timeLeftBlackText = document.getElementById('timeLeftBlack')! as HTMLSpanElement;
-export function updateTimes( timeLeftWhite: number, timeLeftBlack: number, initialTimeWhite: number, initialTimeBlack: number, incrementWhite: number, incrementBlack: number): void {
+export function updateTimeDisplay(): void{
     if (!localGameState) {
         return;
     }
-    initialTimeWhiteText.textContent = formatMinSec(initialTimeWhite, 0);
-    initialTimeBlackText.textContent = formatMinSec(initialTimeBlack, 0);
-    incrementWhiteText.textContent = incrementWhite.toString();
-    incrementBlackText.textContent = incrementBlack.toString();
-    timeLeftWhiteText.textContent = formatMinSec(timeLeftWhite, 1);
-    timeLeftBlackText.textContent = formatMinSec(timeLeftBlack, 1);
+
+    if (flip) {
+        initialTimeTopText.textContent = formatMinSec(localGameState.initialTimeBlack, 0);
+        initialTimeBottomText.textContent = formatMinSec(localGameState.initialTimeWhite, 0);
+        incrementTopText.textContent = localGameState.incrementBlack.toString();
+        incrementBottomText.textContent = localGameState.incrementWhite.toString();
+        timeLeftTopText.textContent = formatMinSec(localGameState.timeLeftBlack, 1);
+        timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
+    } else {
+        initialTimeBottomText.textContent = formatMinSec(localGameState.initialTimeWhite, 0);
+        initialTimeTopText.textContent = formatMinSec(localGameState.initialTimeBlack, 0);
+        incrementBottomText.textContent = localGameState.incrementWhite.toString();
+        incrementTopText.textContent = localGameState.incrementBlack.toString();
+        timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
+        timeLeftTopText.textContent = formatMinSec(localGameState.timeLeftBlack, 1);
+    }
+}
+export function syncTime( clockRunning: boolean, timeLeftWhite: number, timeLeftBlack: number, initialTimeWhite: number, initialTimeBlack: number, incrementWhite: number, incrementBlack: number): void {
+    if (!localGameState) {
+        return;
+    }
+    localGameState.clockRunning = clockRunning;
+    localGameState.initialTimeWhite = initialTimeWhite;
+    localGameState.initialTimeBlack = initialTimeBlack;
+    localGameState.incrementWhite = incrementWhite;
+    localGameState.incrementBlack = incrementBlack;
+    localGameState.timeLeftWhite = timeLeftWhite;
+    localGameState.timeLeftBlack = timeLeftBlack;
+    updateTimeDisplay();
 }
 export function updateChat(message: string): void {
     if (!localGameState) {
@@ -399,6 +453,7 @@ export function flipBoard(): void {
     flip = !flip;
     renderFullBoard();
     highlightLastMove();
+    updateTimeDisplay();
 }
 export function renderFullBoard(): void {
     if (!localGameState) {
@@ -607,6 +662,9 @@ export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol
         localGameState.board[toRow][toCol] = newPiece;
         localGameState.board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
     }
+
+    // Update the current turn
+    localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
 
     
     // handle promotions

@@ -24,6 +24,8 @@ export class Game {
     timeLeftBlack = this.initialTimeBlack; // in seconds
     clockRunning = false;
 
+    lastMoveTime = 0;
+
     canCastleKingsideWhite = true;
     canCastleQueensideWhite = true;
     canCastleKingsideBlack = true;
@@ -92,9 +94,11 @@ export class Game {
         switch (originalPosition) {
             case PieceColor.WHITE:
                 this.playerWhite = null;
+                this.applyTimeAndPause();
                 break;
             case PieceColor.BLACK:
                 this.playerBlack = null;
+                this.applyTimeAndPause();
                 break;
             case PieceColor.NONE:
                 const index = this.spectators.indexOf(c);
@@ -103,7 +107,7 @@ export class Game {
                 }
                 break;
         }
-        console.log(`Client  ${c} (${c.name}) moved from position ${originalPosition} to ${position} in game ${this.id}`);
+        //console.log(`Client  ${c} (${c.name}) moved from position ${originalPosition} to ${position} in game ${this.id}`);
         this.logChatMessage(`${c.name} has moved from position ${originalPosition === PieceColor.NONE ? 'spectator' : PieceColor[originalPosition]} to ${position === PieceColor.NONE ? 'spectator' : PieceColor[position]}.`);
 
         this.sendGameStateToAll();
@@ -113,11 +117,11 @@ export class Game {
         if (this.playerWhite === player) {
             this.playerWhite = null;
             this.logChatMessage(`White player ${player.name} has disconnected.`);
-            this.clockRunning = false;
+            this.applyTimeAndPause();
         } else if (this.playerBlack === player) {
             this.playerBlack = null;
             this.logChatMessage(`Black player ${player.name} has disconnected.`);
-            this.clockRunning = false;
+            this.applyTimeAndPause();
         } else {
             const index = this.spectators.indexOf(player);
             if (index > -1) {
@@ -346,9 +350,6 @@ export class Game {
             }
         }
 
-        // Update the current turn
-        this.currentTurn = (this.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
-
         // Log the move
         // TODO: add disambiguation identifier
         let castle = '';
@@ -359,7 +360,7 @@ export class Game {
                 castle = 'O-O';
             }
         }
-        const check = inCheck(this.currentTurn, this.board) ? '+' : '';
+        const check = inCheck(this.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE, this.board) ? '+' : '';
         let notation: string;
         let promotionNotation = '';
         for (const promo of promotions) {
@@ -377,9 +378,46 @@ export class Game {
 
         // Send move to all players and spectators
         this.sendMessageToAll({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions } satisfies MovePieceMessage);
-        this.syncTime();
+
+        // change turns and handle clock
+        this.changeTurn(true);
 
         return true;
+    }
+
+    public applyElapsedTime(): void {
+        const newTime = Date.now();
+        if (this.clockRunning) {
+            if (this.currentTurn === PieceColor.WHITE) this.timeLeftWhite -= (newTime - this.lastMoveTime) / 1000;
+            else if (this.currentTurn === PieceColor.BLACK) this.timeLeftBlack -= (newTime - this.lastMoveTime) / 1000;
+        }
+        this.lastMoveTime = newTime;
+    }
+
+    public applyTimeAndPause(): void {
+        this.applyElapsedTime();
+        this.clockRunning = false;
+        this.syncTime();
+    }
+
+    public changeTurn(applyIncrement: boolean): void {
+        // TODO: I don't like this, but applyIncrement===False takes increment time away from the opponent, for use with rewind()
+        this.applyElapsedTime();
+
+        // Add time increment and update the current turn
+        if (this.currentTurn === PieceColor.WHITE) {
+            if(applyIncrement) this.timeLeftWhite += this.incrementWhite;
+            else this.timeLeftBlack -= this.incrementBlack;
+            this.currentTurn = PieceColor.BLACK;
+        } else {
+            if(applyIncrement) this.timeLeftBlack += this.incrementBlack;
+            else this.timeLeftWhite -= this.incrementWhite;
+            this.currentTurn = PieceColor.WHITE;
+        }
+
+        // start clock (in case it was paused) and sync time
+        this.clockRunning = true;
+        this.syncTime();
     }
 
     public getPlayerColor(c: ClientInfo): PieceColor {
@@ -388,7 +426,7 @@ export class Game {
 
     public rewind(): void {
         if (this.movesLog.length === 0) {
-            console.log('Ignoring rewind with no moves played yet');
+            //console.log('Ignoring rewind with no moves played yet');
             return;
         }
         const lastMove = this.movesLog.pop()!;
@@ -462,8 +500,8 @@ export class Game {
                 }
             });
         }
-        // Update the current turn (this will undo an end-of-game set to PieceColor.NONE)
-        this.currentTurn = (this.movesLog.length % 2 ? PieceColor.BLACK : PieceColor.WHITE);
+        // apply time and update the current turn (this will undo an end-of-game set to PieceColor.NONE)
+        this.changeTurn(false);
 
         // resend the game state
         this.sendGameStateToAll();
@@ -489,6 +527,7 @@ export class Game {
         if (this.drawWhite && this.drawBlack) {
             this.logChatMessage('Draw accepted. Game over!');
             this.clockRunning = false;
+            this.syncTime();
             this.currentTurn = PieceColor.NONE;
         }
 
