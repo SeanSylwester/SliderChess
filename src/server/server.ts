@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 import { Game } from './gameLogic.js';
 import { ClientInfo } from './types.js';
 import { handleMessage, handleQuitGame } from './messageHandler.js';
-import { MESSAGE_TYPES, GameListMessage, JoinGameMessage, ChangeNameMessage } from '../shared/types.js';
+import { MESSAGE_TYPES, GameListMessage, JoinGameMessage, ChangeNameMessage, Message } from '../shared/types.js';
 const app = express();
 const PORT = process.env.PORT || 10000;
 
@@ -31,6 +31,14 @@ let gameList = Array.from(games.values()).map((game) => ({
     playerBlack: game.playerBlack?.name || null, numberOfSpectators: game.spectators.length,
     timeLeftWhite: game.timeLeftWhite, timeLeftBlack: game.timeLeftBlack
 }));
+
+export function sendMessage<T extends Message>(client: ClientInfo, message: T): void {
+    if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(JSON.stringify(message));
+    } else {
+        console.error('WebSocket is not connected');
+    }
+}
 
 export function updateGameList() {
     // TODO: probably don't need to recreate the whole array each time...

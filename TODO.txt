@@ -1,8 +1,13 @@
 implement special rules for castling
 implement special rules for en passant
 promotions choose piece other than queen
-surrender button
 createGame dialog box
+3 fold repetition and related rules
+server power to kick zombie players
+resume from notation
 
 gameover screen
+highlight tile rotations
 add password protection to servers
+refactor so that white/black properties are just indexed into by the color number (white==0, black==1)
+add checkmate/stalemate/draw/surrender to the notation box by having the server send a GAME_OVER message

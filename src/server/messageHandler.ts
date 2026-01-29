@@ -10,7 +10,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
     // lookup the game that the client is in for most message types
     let game: Game | undefined;
     if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.QUIT_GAME, MESSAGE_TYPES.MOVE_PIECE, 
-                MESSAGE_TYPES.REWIND, MESSAGE_TYPES.DRAW, MESSAGE_TYPES.CHAT, 
+                MESSAGE_TYPES.REWIND, MESSAGE_TYPES.DRAW, MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, 
                 MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER].includes(message.type)) {
         if (client.gameId === undefined) {
             console.error(`Client ${client.id} is not in a game.`);
@@ -51,6 +51,10 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
         case MESSAGE_TYPES.DRAW:
             game!.draw(client);
+            break;
+
+        case MESSAGE_TYPES.SURRENDER:
+            game!.surrender(client);
             break;
 
         case MESSAGE_TYPES.CHANGE_NAME:

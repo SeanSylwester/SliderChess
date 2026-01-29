@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# saved games
+savedGames/
+
 # Environment variables
 .env
 .env.local

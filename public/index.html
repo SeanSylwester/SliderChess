@@ -19,25 +19,6 @@
 
     <div id="game-screen" style="display: none;">
         <h1>Game Room #<span id="gameIdDisplay"></span></h1>
-        <input type="checkbox" id="ruleMoveOwnKing" checked="true"/><label for="ruleMoveOwnKing">Forbid tile-moving your own king?</label> </br>
-        <dd>
-            <input type="checkbox" id="ruleMoveOwnKingInCheck" checked="true"/><label for="ruleMoveOwnKingInCheck">Just forbid tile-moving your own king when you're in check?</label>
-        </dd>
-        <input type="checkbox" id="ruleMoveOpp" checked="true"/><label for="ruleMoveOpp">Forbid tile-moving any of your opponent's pieces?</label> </br>
-        <dd>
-            <input type="checkbox" id="ruleMoveOppKing" checked="true"/><label for="ruleMoveOppKing">Just forbid tile-moving your opponent's king?</label> </br>
-            <input type="checkbox" id="ruleMoveOppCheck" checked="true"/><label for="ruleMoveOppCheck">Just forbid tile-moving an opponent piece that's giving check?</label> </br>
-        </dd>
-        <input type="checkbox" id="ruleDoubleMovePawn" checked="true"/><label for="ruleDoubleMovePawn">Allow pawns to double move from their original rank after being tile-moved?</label> </br>
-        <input type="checkbox" id="ruleCastleNormal"/><label for="ruleCastleNormal">Allow castling after your king or rook tile-moves, but only if they are tile-moved back to their original spots?</label> </br>
-        <input type="checkbox" id="ruleCastleMoved"/><label for="ruleCastleMoved">Allow castling after your king or rook tile-moves, even if they're not in their original spots?</label> </br>
-        <input type="checkbox" id="ruleEnPassantTile"/><label for="ruleEnPassantTile">Allow en passant from any similar tile move?</label> </br>
-        <dd>
-            <input type="checkbox" id="ruleEnPassantTileHome"/><label for="ruleEnPassantTileHome">Allow en passant from a tile move from the captured pawn's original rank?</label> </br>
-        </dd>
-        <input type="checkbox" id="ruleIgnoreAll"/><label for="ruleIgnoreAll">Ignore all movement rules?</label> </br>
-
-
         <button id="claimWhite">White</button><span id="whitePlayerInfo"></span> </br>
         <button id="claimBlack">Black</button><span id="blackPlayerInfo"></span> </br>
         <button id="claimSpectator">Spectators</button><span id="spectatorInfo"></span> </br>
@@ -50,10 +31,31 @@
         <button id="flipBoard">Flip board view</button>
         <button id="rewind">Undo</button>
         <button id="draw">Offer Draw</button>
+        <button id="surrender">Surrender</button>
         <br />
         <textarea id="chatLog" rows="10" cols="70" readonly></textarea>
         <br />
-        <input type="text" id="chatEntry" /> <button id="sendChat">Send</button>
+        <input type="text" id="chatEntry" /> <button id="sendChat">Send</button> </br>
+        
+        <div id="rulesDiv">
+            <input type="checkbox" id="ruleMoveOwnKing" checked="true"/><label for="ruleMoveOwnKing">Forbid tile-moving your own king?</label> </br>
+            <dd>
+                <input type="checkbox" id="ruleMoveOwnKingInCheck" checked="true"/><label for="ruleMoveOwnKingInCheck">Just forbid tile-moving your own king when you're in check?</label>
+            </dd>
+            <input type="checkbox" id="ruleMoveOpp" checked="true"/><label for="ruleMoveOpp">Forbid tile-moving any of your opponent's pieces?</label> </br>
+            <dd>
+                <input type="checkbox" id="ruleMoveOppKing" checked="true"/><label for="ruleMoveOppKing">Just forbid tile-moving your opponent's king?</label> </br>
+                <input type="checkbox" id="ruleMoveOppCheck" checked="true"/><label for="ruleMoveOppCheck">Just forbid tile-moving an opponent piece that's giving check?</label> </br>
+            </dd>
+            <input type="checkbox" id="ruleDoubleMovePawn" checked="true"/><label for="ruleDoubleMovePawn">Allow pawns to double move from their original rank after being tile-moved?</label> </br>
+            <input type="checkbox" id="ruleCastleNormal"/><label for="ruleCastleNormal">Allow castling after your king or rook tile-moves, but only if they are tile-moved back to their original spots?</label> </br>
+            <input type="checkbox" id="ruleCastleMoved"/><label for="ruleCastleMoved">Allow castling after your king or rook tile-moves, even if they're not in their original spots?</label> </br>
+            <input type="checkbox" id="ruleEnPassantTile"/><label for="ruleEnPassantTile">Allow en passant from any similar tile move?</label> </br>
+            <dd>
+                <input type="checkbox" id="ruleEnPassantTileHome"/><label for="ruleEnPassantTileHome">Allow en passant from a tile move from the captured pawn's original rank?</label> </br>
+            </dd>
+            <input type="checkbox" id="ruleIgnoreAll"/><label for="ruleIgnoreAll">Ignore all movement rules?</label> </br>
+        </div>
     </div>
 
     <img id="piecesSpriteSheet" src="Chess_Pieces_Sprite.svg" style="display:none;" />

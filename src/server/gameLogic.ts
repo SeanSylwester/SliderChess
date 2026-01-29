@@ -1,6 +1,7 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
 import { ClientInfo } from './types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves } from '../shared/utils.js'
+import { sendMessage } from './server.js';
 
 export class Game {
     playerWhite: ClientInfo | null = null;
@@ -29,6 +30,9 @@ export class Game {
 
     drawWhite = false;
     drawBlack = false;
+
+    confirmSurrenderWhite = false;
+    confirmSurrenderBlack = false;
 
     rules: Rules = {
         ruleMoveOwnKing: true,
@@ -148,13 +152,13 @@ export class Game {
 
     public sendMessageToAll<T extends Message>(message: T): void {
         if (this.playerWhite !== null) {
-            this.playerWhite.ws.send(JSON.stringify(message));
+            sendMessage(this.playerWhite, message);
         }
         if (this.playerBlack !== null) {
-            this.playerBlack.ws.send(JSON.stringify(message));
+            sendMessage(this.playerBlack, message);
         }
         for (const spectator of this.spectators) {
-            spectator.ws.send(JSON.stringify(message));
+            sendMessage(spectator, message);
         }
     }
 
@@ -255,7 +259,7 @@ export class Game {
             rules: this.rules
         };
         const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
-        client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage));
+        sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage);
     }
 
     public sendGameStateToAll(): void {
@@ -278,8 +282,14 @@ export class Game {
         this.sendMessageToAll({ type: MESSAGE_TYPES.RULES, rules: this.rules } satisfies RulesMessage);
     }
 
+    public endGame(chatMessage: string): void {
+        this.logChatMessage(chatMessage);
+        this.clockRunning = false;
+        this.syncTime();
+        this.currentTurn = PieceColor.NONE;
+    }
+
     public draw(client: ClientInfo): void {
-        const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
         if (client === this.playerWhite) {
             this.drawWhite = !this.drawWhite;
             this.logChatMessage(this.drawWhite ? 'I offer a draw' : 'I revoke my offer of a draw', client);
@@ -292,12 +302,30 @@ export class Game {
         }
         
         if (this.drawWhite && this.drawBlack) {
-            this.logChatMessage('Draw accepted. Game over!');
-            this.clockRunning = false;
-            this.syncTime();
-            this.currentTurn = PieceColor.NONE;
+            this.endGame('Draw accepted. Game over!')
         }
 
+    }
+
+    public surrender(client: ClientInfo): void {
+        if (client === this.playerWhite) {
+            if (this.confirmSurrenderWhite) {
+                this.endGame(`${client.name} (WHITE) has surrendered. Game over!`)
+            } else {
+                this.confirmSurrenderWhite = true;
+                sendMessage(client, {type: MESSAGE_TYPES.CHAT, message: 'Click surrender again to confirm'} satisfies ChatMessage);
+            }
+        } else if (client === this.playerBlack) {
+            if (this.confirmSurrenderBlack) {
+                this.endGame(`${client.name} (BLACK) has surrendered. Game over!`)
+            } else {
+                this.confirmSurrenderBlack = true;
+                sendMessage(client, {type: MESSAGE_TYPES.CHAT, message: 'Click surrender again to confirm'} satisfies ChatMessage);
+            }
+        } else {
+            console.log('Ignoring surrender request from a spectator');
+            return;
+        }
     }
 
     public isEmpty(): boolean {
@@ -309,9 +337,11 @@ export class Game {
 
         // Add time increment and update the current turn
         if (this.currentTurn === PieceColor.WHITE) {
+            this.confirmSurrenderWhite = false;
             if(applyIncrement) this.timeLeftWhite += this.incrementWhite;
             this.currentTurn = PieceColor.BLACK;
         } else {
+            this.confirmSurrenderBlack = false;
             if(applyIncrement) this.timeLeftBlack += this.incrementBlack;
             this.currentTurn = PieceColor.WHITE;
         }

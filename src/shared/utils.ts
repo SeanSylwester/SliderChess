@@ -117,12 +117,13 @@ export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
                 const piece = board[toRow][toCol]
                 if (piece.type !== PieceType.EMPTY) {
                     // found a piece! If it's an enemy piece of the right type, return true, otherwise end search in this direction
-                    if (pieceTypesList[list].includes(piece.type) && oppositeColor(playerColor, piece.color)) {
+                    // check for king checks for all directions, but only on i=1
+                    if ((pieceTypesList[list].includes(piece.type) || (i === 1 && piece.type === PieceType.KING)) && oppositeColor(playerColor, piece.color)) {
                         return true;
                     }
                     break;
                 }
-
+                
             }
         }
     }

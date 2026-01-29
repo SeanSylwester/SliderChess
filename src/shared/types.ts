@@ -98,6 +98,7 @@ export const MESSAGE_TYPES = {
     MOVE_PIECE: 'movePiece',
     REWIND: 'rewind',
     DRAW: 'draw',
+    SURRENDER: 'surrender',
     VALID_MOVES: 'validMoves',
     PAUSE: 'pause',
     TIME: 'time',

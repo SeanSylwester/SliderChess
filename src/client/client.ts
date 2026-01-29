@@ -4,12 +4,12 @@ import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
 let fromHistory = false;
 
-function connectWebSocket(): void {
+function connectWebSocket(url: string): void {
     // Extract game ID from URL, if available
     const gameId = parseInt(window.location.pathname.slice(1)); // Remove leading '/'
 
-    ws = new WebSocket('wss://sliderchess.onrender.com');
-    //ws = new WebSocket('ws://localhost:10000');
+    ws = new WebSocket(url);
+    ws = new WebSocket('ws://localhost:10000');
 
     ws.onopen = () => {
         console.log('Connected to WebSocket server');
@@ -60,19 +60,15 @@ function connectWebSocket(): void {
     };
 
     ws.onerror = (error: Event) => {
-        console.error('WebSocket error:', error);
-        const responseElement = document.getElementById('response');
-        if (responseElement) {
-            responseElement.textContent = 'Error: Connection failed';
+        console.log('WebSocket error:', error);
+        if (url !== 'ws://localhost:10000') {
+            console.log('Trying to connect at localhost instead...');
+            ws = new WebSocket('ws://localhost:10000');
         }
     };
 
     ws.onclose = () => {
         console.log('Disconnected from server');
-        const responseElement = document.getElementById('response');
-        if (responseElement) {
-            responseElement.textContent = 'Disconnected from server';
-        }
     };
 }
 
@@ -175,6 +171,9 @@ rewindButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.
 const drawButton = document.getElementById('draw');
 drawButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.DRAW }));
 
+const surrenderButton = document.getElementById('surrender');
+surrenderButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.SURRENDER }));
+
 const claimWhiteButton = document.getElementById('claimWhite');
 claimWhiteButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, position: PieceColor.WHITE } satisfies ChangePositionMessage));
 const claimBlackButton = document.getElementById('claimBlack');
@@ -184,7 +183,7 @@ claimSpectatorButton!.addEventListener('click', () => sendMessage({ type: MESSAG
 
 
 // Connect when page loads
-window.addEventListener('DOMContentLoaded', connectWebSocket);
+window.addEventListener('DOMContentLoaded', () => {connectWebSocket('wss://sliderchess.onrender.com');});
 
 // handle back/forward
 window.addEventListener("popstate", (event) => {

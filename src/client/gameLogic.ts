@@ -140,6 +140,7 @@ function appendToMovesLog(notation: string, checkmate: boolean, stalemate: boole
     }  else {
         movesLogElement.value += ' ';
     }
+    movesLogElement.scrollTop = movesLogElement.scrollHeight;
 }
 
 function redrawMovesLog(): void {
@@ -423,6 +424,7 @@ function clearLastMoveHighlight(): void {
 
 // game logic stuff
 const drawButton = document.getElementById('draw') as HTMLButtonElement;
+const surrenderButton = document.getElementById('surrender') as HTMLButtonElement;
 let localGameState: GameState | null = null;
 let myColor = PieceColor.NONE;
 let selectedSquare: {row: number, col: number, isTile: boolean} | null = null;
@@ -434,11 +436,14 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     if (myColor === PieceColor.WHITE) {
         flip = false;
         drawButton.disabled = false;
+        surrenderButton.disabled = false;
     } else if (myColor === PieceColor.BLACK) {
         flip = true;
         drawButton.disabled = false;
+        surrenderButton.disabled = false;
     } else {
         drawButton.disabled = true;
+        surrenderButton.disabled = true;
     }
 
     document.getElementById('gameIdDisplay')!.textContent = `${gameState.id}`;
