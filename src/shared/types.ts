@@ -105,6 +105,7 @@ export const MESSAGE_TYPES = {
     GAME_STATE: 'gameState',
     GAME_LIST: 'serverList',
     RULES: 'rules',
+    GAME_OVER: 'gameOver',
 } as const;
 
 // Message type definitions

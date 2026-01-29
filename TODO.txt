@@ -3,8 +3,6 @@ implement special rules for en passant
 promotions choose piece other than queen
 surrender button
 createGame dialog box
-detect timer running out
 
-server-side confirmation of checkmate/stalemate
-    then I'd only need to check for any valid moves when the client requests it, instead of every single move
+gameover screen
 add password protection to servers

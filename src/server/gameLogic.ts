@@ -1,6 +1,6 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
 import { ClientInfo } from './types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves } from '../shared/utils.js'
 
 export class Game {
     playerWhite: ClientInfo | null = null;
@@ -400,5 +400,21 @@ export class Game {
 
         // resend the game state
         this.sendGameStateToAll();
+    }
+
+    public gameOver(): void {
+        if (!anyValidMoves(this.currentTurn, this.board, this.movesLog.at(-1), this.rules)) {
+            if (inCheck(this.currentTurn, this.board)) {
+                this.logChatMessage(`${PieceColor[this.currentTurn]} is in checkmate!`);
+            } else {
+                this.logChatMessage(`${PieceColor[this.currentTurn]} is in stalemate!`);
+            }
+        }
+        if (this.timeLeftBlack < 0) {
+            this.logChatMessage(`BLACK has run out of time!`);
+        }
+        if (this.timeLeftWhite < 0) {
+            this.logChatMessage(`WHITE has run out of time!`);
+        }
     }
 }

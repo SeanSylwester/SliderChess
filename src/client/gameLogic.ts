@@ -1,4 +1,4 @@
-import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, ChatMessage, Rules, RulesMessage } from "../shared/types.js";
+import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, ChatMessage, Rules, RulesMessage, Message } from "../shared/types.js";
 import { sendMessage } from "./client.js";
 import { col0ToFile, inCheck, formatMinSec, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves } from '../shared/utils.js'
 
@@ -585,18 +585,21 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
     localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
     highlightLastMove();
 
-    // check for checkmate/stalemate
+    // check for checkmate/stalemate/timer
     let checkmate = false;
     let stalemate = false;
     if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules)) {
         if (inCheck(myColor, localGameState.board)) {
-            sendMessage({ type: MESSAGE_TYPES.CHAT,  message: "I'm in checkmate! :(" } satisfies ChatMessage);
             checkmate = true;
         } else {
-            sendMessage({ type: MESSAGE_TYPES.CHAT,  message: "I'm in stalemate! :|" } satisfies ChatMessage);
             stalemate = true;
         }
     }
+    if (checkmate || stalemate || localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0) {
+        sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
+    }
+
+
     // update the move log text
     appendToMovesLog(notation, checkmate, stalemate);
     
