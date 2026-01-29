@@ -32,6 +32,21 @@ export interface GameState {
     QB: boolean;
     drawWhite: boolean;
     drawBlack: boolean;
+    rules: Rules;
+}
+
+export interface Rules {
+    ruleMoveOwnKing: boolean;
+    ruleMoveOwnKingInCheck: boolean;
+    ruleMoveOpp: boolean;
+    ruleMoveOppKing: boolean;
+    ruleMoveOppCheck: boolean;
+    ruleDoubleMovePawn: boolean;
+    ruleCastleNormal: boolean;
+    ruleCastleMoved: boolean;
+    ruleEnPassantTile: boolean;
+    ruleEnPassantTileHome: boolean;
+    ruleIgnoreAll: boolean;
 }
 
 export interface GameInfo {
@@ -89,6 +104,7 @@ export const MESSAGE_TYPES = {
     CHAT: 'chat',
     GAME_STATE: 'gameState',
     GAME_LIST: 'serverList',
+    RULES: 'rules',
 } as const;
 
 // Message type definitions
@@ -118,12 +134,6 @@ export interface MovePieceMessage extends Message {
     isTile: boolean;
     promotions: {row: number, col: number, piece: Piece}[];
 }
-export interface ValidMovesMessage extends Message {
-    type: typeof MESSAGE_TYPES.VALID_MOVES;
-    fromRow?: number; 
-    fromCol?: number;
-    validMoves?: { toRow: number, toCol: number }[];
-}
 export interface TimeMessage extends Message {
     type: typeof MESSAGE_TYPES.TIME;
     initialTimeWhite: number;
@@ -146,4 +156,8 @@ export interface GameStateMessage extends Message {
 export interface GameListMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_LIST;
     gameList: GameInfo[];
+}
+export interface RulesMessage extends Message {
+    type: typeof MESSAGE_TYPES.RULES;
+    rules: Rules;
 }

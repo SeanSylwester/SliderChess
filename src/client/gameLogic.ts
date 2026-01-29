@@ -1,4 +1,4 @@
-import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, ChatMessage } from "../shared/types.js";
+import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, ChatMessage, Rules, RulesMessage } from "../shared/types.js";
 import { sendMessage } from "./client.js";
 import { col0ToFile, inCheck, formatMinSec, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves } from '../shared/utils.js'
 
@@ -12,7 +12,73 @@ ctx.font = "24px Arial";
 ctx.lineWidth = 2;
 
 
+// Rules
+const ruleMoveOwnKing = document.getElementById("ruleMoveOwnKing") as HTMLInputElement;
+ruleMoveOwnKing.addEventListener('change', sendRules);
+const ruleMoveOwnKingInCheck = document.getElementById("ruleMoveOwnKingInCheck") as HTMLInputElement;
+ruleMoveOwnKingInCheck.addEventListener('change', sendRules);
+const ruleMoveOpp = document.getElementById("ruleMoveOpp") as HTMLInputElement;
+ruleMoveOpp.addEventListener('change', sendRules);
+const ruleMoveOppKing = document.getElementById("ruleMoveOppKing") as HTMLInputElement;
+ruleMoveOppKing.addEventListener('change', sendRules);
+const ruleMoveOppCheck = document.getElementById("ruleMoveOppCheck") as HTMLInputElement;
+ruleMoveOppCheck.addEventListener('change', sendRules);
+const ruleDoubleMovePawn = document.getElementById("ruleDoubleMovePawn") as HTMLInputElement;
+ruleDoubleMovePawn.addEventListener('change', sendRules);
+const ruleCastleNormal = document.getElementById("ruleCastleNormal") as HTMLInputElement;
+ruleCastleNormal.addEventListener('change', sendRules);
+const ruleCastleMoved = document.getElementById("ruleCastleMoved") as HTMLInputElement;
+ruleCastleMoved.addEventListener('change', sendRules);
+const ruleEnPassantTile = document.getElementById("ruleEnPassantTile") as HTMLInputElement;
+ruleEnPassantTile.addEventListener('change', sendRules);
+const ruleEnPassantTileHome = document.getElementById("ruleEnPassantTileHome") as HTMLInputElement;
+ruleEnPassantTileHome.addEventListener('change', sendRules);
+const ruleIgnoreAll = document.getElementById("ruleIgnoreAll") as HTMLInputElement;
+ruleIgnoreAll.addEventListener('change', sendRules);
+function getRules(): Rules {
+    return {ruleMoveOwnKing: ruleMoveOwnKing.checked,
+            ruleMoveOwnKingInCheck: ruleMoveOwnKingInCheck.checked,
+            ruleMoveOpp: ruleMoveOpp.checked,
+            ruleMoveOppKing: ruleMoveOppKing.checked,
+            ruleMoveOppCheck: ruleMoveOppCheck.checked,
+            ruleDoubleMovePawn: ruleDoubleMovePawn.checked,
+            ruleCastleNormal: ruleCastleNormal.checked,
+            ruleCastleMoved: ruleCastleMoved.checked,
+            ruleEnPassantTile: ruleEnPassantTile.checked,
+            ruleEnPassantTileHome: ruleEnPassantTileHome.checked,
+            ruleIgnoreAll: ruleIgnoreAll.checked};
+}
+export function sendRules(): void {
+    sendMessage({type: MESSAGE_TYPES.RULES, rules: getRules() } satisfies RulesMessage);
+}
+export function updateRules(rules: Rules): void {
+    ruleMoveOwnKing.checked = rules.ruleMoveOwnKing;
+    ruleMoveOwnKingInCheck.checked = rules.ruleMoveOwnKingInCheck;
+    ruleMoveOpp.checked = rules.ruleMoveOpp;
+    ruleMoveOppKing.checked = rules.ruleMoveOppKing;
+    ruleMoveOppCheck.checked = rules.ruleMoveOppCheck;
+    ruleDoubleMovePawn.checked = rules.ruleDoubleMovePawn;
+    ruleCastleNormal.checked = rules.ruleCastleNormal;
+    ruleCastleMoved.checked = rules.ruleCastleMoved;
+    ruleEnPassantTile.checked = rules.ruleEnPassantTile;
+    ruleEnPassantTileHome.checked = rules.ruleEnPassantTileHome;
+    ruleIgnoreAll.checked = rules.ruleIgnoreAll;
 
+    ruleMoveOwnKingInCheck.disabled = ruleMoveOwnKing.checked;
+
+    ruleMoveOppKing.disabled = ruleMoveOpp.checked;
+    ruleMoveOppCheck.disabled = ruleMoveOpp.checked;
+
+    ruleEnPassantTileHome.disabled = ruleEnPassantTile.checked;
+
+    ruleDoubleMovePawn.disabled = true; // TODO
+    ruleCastleNormal.disabled = true; // TODO
+    ruleCastleMoved.disabled = true; // TODO
+    ruleEnPassantTile.disabled = true; // TODO
+    ruleEnPassantTileHome.disabled = true; // TODO
+
+    if(localGameState) localGameState.rules = getRules();
+}
 
 // UI stuff
 const chatLogElement = document.getElementById("chatLog") as HTMLTextAreaElement;
@@ -438,7 +504,7 @@ function handleClick(event: MouseEvent): void {
         // selecting a new piece
         if (isTile || localGameState.board[unflippedRow][unflippedCol].color === myColor) {
             selectedSquare = {row: unflippedRow, col: unflippedCol, isTile};
-            validSquares = getValidMoves(localGameState.board, unflippedRow, unflippedCol, isTile, myColor, false, localGameState.movesLog.at(-1), localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB);
+            validSquares = getValidMoves(localGameState.board, unflippedRow, unflippedCol, isTile, myColor, false, localGameState.movesLog.at(-1), localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
 
             // also highlight the bottom left corner of the tile
             if (isTile) {
@@ -455,7 +521,7 @@ function handleClick(event: MouseEvent): void {
         } 
     } else {
         // try to move piece if we think it's valid. If it's not my turn or it's an invalid move, the server will reject it. Regardless, clear the highlight
-        if (validSquares?.some(square => square.toRow === unflippedRow && square.toCol === unflippedCol)) {
+        if (localGameState.rules.ruleIgnoreAll || validSquares?.some(square => square.toRow === unflippedRow && square.toCol === unflippedCol)) {
             requestMovePiece(selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile, checkPromotion(localGameState.board, selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile));
         }
         drawSquare(selectedSquare.row, selectedSquare.col, selectedSquare.isTile, null);
@@ -490,16 +556,15 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
     drawSquare(toRow, toCol, isTile, newPiece); // redraw destination
 
     // check if castling is still allowed
-    [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB);
+    [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
 
     // determine if the other player is now in check
     const check = inCheck(localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE, localGameState.board);
-    
-    // log the move and handle highlights
-    clearLastMoveHighlight();
-    localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
-    highlightLastMove();
 
+    // draw promotions
+    for (const promotion of promotions) {
+        drawSquare(promotion.row, promotion.col, false, null);
+    }
 
     // detect castle (king moves twice) and draw the rook
     const castling = newPiece.type === PieceType.KING && Math.abs(fromCol - toCol) === 2
@@ -508,17 +573,22 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         if (fromCol > toCol) {
             // queenside, move a
             drawSquare(castleRow, 0, false, null);
-            drawSquare(castleRow, 3, false, localGameState.board[castleRow][0]);
+            drawSquare(castleRow, 3, false, null);
         } else {
             drawSquare(castleRow, 7, false, null);
-            drawSquare(castleRow, 5, false, localGameState.board[castleRow][7]);
+            drawSquare(castleRow, 5, false, null);
         }
     }
+
+    // log the move and handle highlights
+    clearLastMoveHighlight();
+    localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
+    highlightLastMove();
 
     // check for checkmate/stalemate
     let checkmate = false;
     let stalemate = false;
-    if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1))) {
+    if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules)) {
         if (inCheck(myColor, localGameState.board)) {
             sendMessage({ type: MESSAGE_TYPES.CHAT,  message: "I'm in checkmate! :(" } satisfies ChatMessage);
             checkmate = true;
@@ -535,3 +605,4 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
 
     ctx.stroke();
 }
+updateRules(getRules()); // call this once to run the disabling logic

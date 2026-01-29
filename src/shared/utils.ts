@@ -1,4 +1,4 @@
-import { Piece, PieceColor, PieceType, Move } from '../shared/types.js'
+import { Piece, PieceColor, PieceType, Move, Rules } from '../shared/types.js'
 const knightMoves = [[-2, 1], [-1, 2], [1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1]];
 const bishopDirections = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
 const rookDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -127,7 +127,133 @@ export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
         }
     }
 
+    // check for pawn checks
+    const pawnAttackRow = kingRow + (playerColor === PieceColor.WHITE ? 1 : -1);
+    if (pawnAttackRow >= 0 && pawnAttackRow <= 7) {
+        const pawnAttackCols = [kingCol + 1, kingCol - 1];
+        for (const pawnAttackCol of pawnAttackCols) {
+            if (pawnAttackCol >= 0 && pawnAttackCol <= 7 && 
+                    board[pawnAttackRow][pawnAttackCol].type === PieceType.PAWN && 
+                    oppositeColor(playerColor, board[pawnAttackRow][pawnAttackCol].color)) {
+                return true;
+            }
+        }
+    }
+
     return false;
+}
+
+export function pawnOnHomeRow(color: PieceColor, row: number): boolean {
+    if (color === PieceColor.NONE) return false;
+    return row === (color === PieceColor.WHITE ? 1 : 6);
+}
+
+export function pieceCanMoveTo(fromRow: number, fromCol: number, toRow: number, toCol: number, board: Piece[][], lastMove: Move | undefined): boolean {
+    // this function ignores checks. Don't use it in getValidMoves() or the rules may cause an infinite loop!
+    const piece = board[fromRow][fromCol];
+
+    if (fromRow === toRow && fromCol === toCol) return true;
+
+    // make sure it's not your own piece!
+    if (board[toRow][toCol].color === piece.color) return false;
+
+    // quick check on direction and number of steps to rule out the obvious 
+    const steps = [Math.abs(fromRow - toRow), Math.abs(fromCol - toCol)].sort();
+    switch (piece.type) {
+        case PieceType.TILE:
+            console.error("Don't call pieceCanMoveTo() on tiles!");
+            return false;
+
+        case PieceType.PAWN:
+            const direction = (piece.color === PieceColor.WHITE) ? 1 : -1;
+            const dCol = Math.abs(fromCol - toCol);
+            // reject if it's not (1 row ahead and <=1 change in col OR 2 rows ahead in the same column if we're starting from the home row)
+            if (!(toRow === fromRow + direction && dCol <= 1
+                 || (toRow === fromRow + 2*direction && dCol === 0 && pawnOnHomeRow(piece.color, fromRow)))) return false;
+            break;
+
+        case PieceType.KNIGHT:
+            // must have [+-1, +-2]. Nothing to check after this
+            if (steps[0] !== 1 || steps[1] !== 2) return false;
+            else return true;
+
+        case PieceType.BISHOP:
+            if (steps[0] !== steps[1]) return false;
+            break;
+
+        case PieceType.ROOK:
+            if (steps[0] !== 0) return false;
+            break;
+
+        case PieceType.KING:
+            // 1 step in any direction, or 2 steps on the home row from column 4 to either 2 or 6
+            const kingHomeRow = piece.color === PieceColor.WHITE ? 0 : 7;
+            if (!(steps[1] === 1 || (steps[1] === 2 && fromRow === kingHomeRow && toRow === kingHomeRow && fromCol == 4 && [2, 6].includes(toCol)))) return false;
+            break;
+
+        case PieceType.QUEEN:
+            if (steps[0] !== steps[1] && steps[0] !== 0) return false;
+            break;
+
+        default:
+            console.error(`Invalid piece type ${PieceType[piece.type]} (from ${fromRow}, ${fromCol}) for pieceCanMoveTo()`);
+            return false;
+    }
+
+    // now we know that if we walk in the right direction, we'll eventually hit the target if nothing is in the way
+    if (piece.type === PieceType.PAWN) {
+        const direction = (piece.color === PieceColor.WHITE) ? 1 : -1;
+        
+        if (toRow === fromRow + direction) {
+            // one row forward, check moving forward or capturing diagonally
+            // moving: make sure it's empty
+            if (toRow === toCol && board[toRow][toCol].type !== PieceType.EMPTY) return false;
+
+            // direct captures
+            for (const colOffset of [-1, 1]) {
+                if (toCol === fromCol + colOffset && !oppositeColor(piece.color, board[toRow][toCol].color)) {
+                    // it was a diagonal move but it wasn't a direct capture, check for en passant
+                    // must be in the correct row (white: 5, black: 4), and there must have been a last move
+                    if (((piece.color === PieceColor.WHITE && fromRow !== 4) || (piece.color === PieceColor.BLACK && fromRow !== 3)) || !lastMove) return false;
+
+                    // the last pawn must be in an adjacent column, have moved two rows, and have moved to the correct row (white: 4, black: 5)
+                    if (lastMove.newPiece.type !== PieceType.PAWN || Math.abs(fromCol - lastMove.toCol) !== 1 || Math.abs(lastMove.fromRow - lastMove.toRow) !== 2 
+                            || ((lastMove.newPiece.color === PieceColor.WHITE && lastMove.toRow !== 3) || (lastMove.newPiece.color === PieceColor.BLACK && fromRow !== 4))) return false;
+                }
+            }
+
+                    
+        } else if (toRow === fromRow + 2*direction && fromCol === toCol){
+            // also check 2 squares forward if we're in the starting position and the next square is empty
+            // TODO: make pawn double move rule work
+            if (!pawnOnHomeRow(piece.color, fromRow)) return false;
+            if (board[toRow][fromCol].type !== PieceType.EMPTY) return false;
+            if (board[fromRow + direction][fromCol].type !== PieceType.EMPTY) return false;
+        } else {
+            console.error(`Messed up checking pawn move from (${fromRow}, ${fromCol}) to (${toRow}, ${toCol})`)
+            return false;
+        }
+        return true;
+    } else {
+        // bishop, rook, king, queen
+        const dirRow = Math.sign(toRow - fromRow);
+        const dirCol = Math.sign(toCol - fromCol);
+
+        for (let i = 1; i <= steps[1]; i++) {
+            const testRow = fromRow + i*dirRow;
+            const testCol = fromCol + i*dirCol;
+            if (testRow === toRow && testCol === toCol) return true;
+            if (board[testRow][testCol].type !== PieceType.EMPTY) return false;
+        }
+
+        console.error(`Error in pieceCanMoveTo: didn't walk into the target square... ${PieceType[piece.type]} from (${fromRow}, ${fromCol}) to (${toRow}, ${toCol})`);
+        return false;
+    }
+}
+
+export function pieceGivingCheck(kingColor: PieceColor, row: number, col: number, board: Piece[][]): boolean {
+    const [kingRow, kingCol] = findKing(kingColor, board);
+    return pieceCanMoveTo(row, col, kingRow, kingCol, board, undefined);  // don't care about en passant for this, so lastMove isn't needed
 }
 
 export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[], isCheck: boolean, enPassant: boolean): string {
@@ -164,7 +290,9 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
 }
 
 
-export function checkCastle(board: Piece[][], QW: boolean, KW: boolean, QB: boolean, KB: boolean): [boolean, boolean, boolean, boolean] {
+export function checkCastle(board: Piece[][], QW: boolean, KW: boolean, QB: boolean, KB: boolean, rules: Rules): [boolean, boolean, boolean, boolean] {
+    // TODO: make castling rules work
+
     // keep track of if castling is allowed by just checking if the pieces aren't there
     // call like this: 
     // [this.QW, this.KW, this.QB, this.KB] = this.checkCastle(this.board, this.QW, this.KW, this.QB, this.KB);
@@ -173,7 +301,7 @@ export function checkCastle(board: Piece[][], QW: boolean, KW: boolean, QB: bool
     if (board[0][4].type !== PieceType.KING || board[0][4].color !== PieceColor.WHITE) {QW = false; KW = false;}
     if (board[7][0].type !== PieceType.ROOK || board[7][0].color !== PieceColor.BLACK) QB = false;
     if (board[7][7].type !== PieceType.ROOK || board[7][7].color !== PieceColor.BLACK) KB = false;
-    if (board[0][4].type !== PieceType.KING || board[0][4].color !== PieceColor.WHITE) {QB = false; KB = false;}    
+    if (board[7][4].type !== PieceType.KING || board[7][4].color !== PieceColor.BLACK) {QB = false; KB = false;}    
 
     return [QW, KW, QB, KB];
 }
@@ -203,7 +331,9 @@ export function moveOnBoard(board: Piece[][], fromRow: number, fromCol: number, 
     });
 
     // detect en passant and remove the captured pawn
-    const enPassant = newPiece.type === PieceType.PAWN && fromCol !== toCol && oldPiece.type === PieceType.EMPTY
+    // Note: this will accidentally remove pawns in "ignore all rules" mode. Ignoring this for now because it's so niche, but I added a check to make sure that it's at least a pawn of the other color
+    const enPassant = newPiece.type === PieceType.PAWN && fromCol !== toCol && oldPiece.type === PieceType.EMPTY 
+                    && oppositeColor(newPiece.color, board[fromRow][toCol].color) && board[fromRow][toCol].type === PieceType.PAWN;
     if (enPassant){
         board[fromRow][toCol] = { type: PieceType.EMPTY, color: PieceColor.NONE };
     }
@@ -287,17 +417,44 @@ export function tileHasPieces(row: number, col: number, board: Piece[][]): boole
 }
 
 
-export function tileCanMove(row: number, col: number, board: Piece[][], enemyColor: PieceColor): boolean {
+export function tileCanMove(row: number, col: number, board: Piece[][], playerColor: PieceColor, isInCheck: boolean, rules: Rules): boolean {
+    // make sure we're targetting a tile
+    row -= row % 2;
+    col -= col % 2;
+
+    // TODO: make tile moving rules work
     const pieces = getPiecesOnTile(row, col, board);
-    return !pieces.some(tilePiece => tilePiece.type === PieceType.KING || oppositeColor(enemyColor, tilePiece.color));
+    for (const [idx, piece] of pieces.entries()) {
+        // disallow moving own king
+        if (rules.ruleMoveOwnKing && piece.type === PieceType.KING && sameColor(piece.color, playerColor)) return false;
+
+        // disallow moving own king but only in check
+        if (rules.ruleMoveOwnKingInCheck && isInCheck && piece.type === PieceType.KING && sameColor(piece.color, playerColor)) return false;
+
+        // disallow moving opponent pieces
+        if (rules.ruleMoveOpp && oppositeColor(piece.color, playerColor)) return false;
+
+        // disallow moving opponent's king
+        if (rules.ruleMoveOppKing && piece.type === PieceType.KING && oppositeColor(piece.color, playerColor)) return false;
+
+        // disallow moving a piece that's giving check
+        if (rules.ruleMoveOppCheck && oppositeColor(piece.color, playerColor)) {
+            // [0, 0], [1, 0], [1, 1], [0, 1]
+            const pieceRow = row + ([2, 3].includes(idx) ? 1 : 0);
+            const pieceCol = col + ([1, 2].includes(idx) ? 1 : 0);
+            if (pieceGivingCheck(playerColor, pieceRow, pieceCol, board)) return false;
+        }
+    }
+    return true;
 }
 
 
-export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number, isTile: boolean, tileColorFallback: PieceColor, returnFirst: boolean, lastMove: Move | undefined, QW: boolean, KW: boolean, QB: boolean, KB: boolean): { toRow: number, toCol: number, isTile: boolean }[] {
+export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number, isTile: boolean, tileColorFallback: PieceColor, returnFirst: boolean, lastMove: Move | undefined, QW: boolean, KW: boolean, QB: boolean, KB: boolean, rules: Rules): { toRow: number, toCol: number, isTile: boolean }[] {
     const piece = isTile ? { type: PieceType.TILE, color: tileColorFallback } : board[fromRow][fromCol];
     let validMoves: { toRow: number, toCol: number, isTile: boolean }[] = [];
 
     // need to check every possible move for if we'd be (still) in check afterwards
+    const isInCheck = inCheck(isTile ? tileColorFallback : piece.color, board);
     function pushValidIfNotCheck(toRow: number, toCol: number, isTile=false, markAsTile=false): void {
         if (!wouldBeInCheck(piece.color, board, fromRow, fromCol, toRow, toCol, isTile)) {
             validMoves.push({ toRow: toRow, toCol: toCol, isTile: markAsTile });
@@ -308,7 +465,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
         case PieceType.TILE:
             // first, check if we can move this piece at all (no kings or piece of different color)
             const hasPieces = tileHasPieces(fromRow, fromCol, board);
-            if (tileCanMove(fromRow, fromCol, board, tileColorFallback)) {
+            if (tileCanMove(fromRow, fromCol, board, tileColorFallback, isInCheck, rules)) {
                 // rotations of this tile
                 if (hasPieces) {
                     pushValidIfNotCheck(fromRow+1, fromCol, true, false);
@@ -320,7 +477,9 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                 for (const direction of rookDirections) {
                     const toRow = fromRow + 2*direction[0];
                     const toCol = fromCol + 2*direction[1];
-                    if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7 && (hasPieces || tileHasPieces(toRow, toCol, board)) && tileCanMove(toRow, toCol, board, tileColorFallback)) {
+                    if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7 
+                            && (hasPieces || tileHasPieces(toRow, toCol, board)) 
+                            && tileCanMove(toRow, toCol, board, tileColorFallback, isInCheck, rules)) {
                         pushValidIfNotCheck(toRow, toCol, true, true);
                     }
                 }
@@ -337,6 +496,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                 if (returnFirst && validMoves.length) {return validMoves}
 
                 // also check 2 squares forward if we're in the starting position and the next square is empty
+                // TODO: make pawn double move rule work
                 const toRow2 = fromRow + 2 * direction;
                 if (toRow2 >= 0 && toRow2 <= 7
                         && fromRow === (piece.color === PieceColor.WHITE ? 1 : 6)
@@ -406,6 +566,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
             }
 
             // check for castling
+            // TODO: make castling rules work
             if (piece.type === PieceType.KING) {
                 if (piece.color === PieceColor.WHITE) {
                     if (KW 
@@ -435,13 +596,13 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
             break;
 
         default:
-            console.error(`Invalid piece type ${PieceType[piece.type]} (from ${fromRow}, ${fromCol}) for validMoves()`);
+            console.error(`Invalid piece type ${PieceType[piece.type]} (from ${fromRow}, ${fromCol}) for getValidMoves()`);
             return [];
     }
     return validMoves;
 }
 
-export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMove: Move | undefined): boolean {
+export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMove: Move | undefined, rules: Rules): boolean {
     if (playerColor === PieceColor.NONE) {
         //console.error("Invalid player color for checking for moves")
         return true;
@@ -457,7 +618,7 @@ export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMov
         for (col = 0; col < 8; col++) {
             const piece = board[row][col];
             if (piece.color === playerColor) {
-                if (getValidMoves(board, row, col, false, playerColor, true, lastMove, false, false, false, false).length > 0) return true;
+                if (getValidMoves(board, row, col, false, playerColor, true, lastMove, false, false, false, false, rules).length > 0) return true;
             }
         }
     }
@@ -465,7 +626,7 @@ export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMov
     // tile moves
     for (row = 0; row < 8; row += 2) {
         for (col = 0; col < 8; col += 2) {
-            if (getValidMoves(board, row, col, true, playerColor, true, lastMove, false, false, false, false).length > 0) return true;
+            if (getValidMoves(board, row, col, true, playerColor, true, lastMove, false, false, false, false, rules).length > 0) return true;
         }
     }
 

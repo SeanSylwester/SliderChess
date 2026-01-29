@@ -1,6 +1,6 @@
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move } from '../shared/types.js';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
 import { ClientInfo } from './types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo } from '../shared/utils.js'
 
 export class Game {
     playerWhite: ClientInfo | null = null;
@@ -29,6 +29,20 @@ export class Game {
 
     drawWhite = false;
     drawBlack = false;
+
+    rules: Rules = {
+        ruleMoveOwnKing: true,
+        ruleMoveOwnKingInCheck: true,
+        ruleMoveOpp: true,
+        ruleMoveOppKing: true,
+        ruleMoveOppCheck: true,
+        ruleDoubleMovePawn: true,
+        ruleCastleNormal: false,
+        ruleCastleMoved: false,
+        ruleEnPassantTile: false,
+        ruleEnPassantTileHome: false,
+        ruleIgnoreAll: false,
+    }
 
     public constructor(public id: number) {
         this.id = id;
@@ -133,7 +147,6 @@ export class Game {
     }
 
     public sendMessageToAll<T extends Message>(message: T): void {
-        // TODO: make type checking work on data
         if (this.playerWhite !== null) {
             this.playerWhite.ws.send(JSON.stringify(message));
         }
@@ -238,7 +251,8 @@ export class Game {
             KB: this.KB,
             QB: this.QB,
             drawWhite: this.drawWhite,
-            drawBlack: this.drawBlack
+            drawBlack: this.drawBlack,
+            rules: this.rules
         };
         const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
         client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage));
@@ -254,6 +268,14 @@ export class Game {
         for (const spectator of this.spectators) {
             this.sendGameState(spectator);
         }
+    }
+
+    public updateRules(client: ClientInfo, rules: Rules): void {
+        if (JSON.stringify(rules) !== JSON.stringify(this.rules)) {
+            this.logChatMessage(`Rules changed by ${client.name}`);
+        }
+        this.rules = rules;
+        this.sendMessageToAll({ type: MESSAGE_TYPES.RULES, rules: this.rules } satisfies RulesMessage);
     }
 
     public draw(client: ClientInfo): void {
@@ -283,17 +305,14 @@ export class Game {
     }
 
     public changeTurn(applyIncrement: boolean): void {
-        // TODO: I don't like this, but applyIncrement===False takes increment time away from the opponent, for use with rewind()
         this.applyElapsedTime();
 
         // Add time increment and update the current turn
         if (this.currentTurn === PieceColor.WHITE) {
             if(applyIncrement) this.timeLeftWhite += this.incrementWhite;
-            else this.timeLeftBlack -= this.incrementBlack;
             this.currentTurn = PieceColor.BLACK;
         } else {
             if(applyIncrement) this.timeLeftBlack += this.incrementBlack;
-            else this.timeLeftWhite -= this.incrementWhite;
             this.currentTurn = PieceColor.WHITE;
         }
 
@@ -303,28 +322,37 @@ export class Game {
     }
 
     public move(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): boolean {
+        // bounds check
+        if (fromRow < 0 || fromRow > 7 || fromCol < 0 || fromCol > 7 || toRow < 0 || toRow > 7 || toCol < 0 || toCol > 7) return false;
+
         // reject a move to the same spot (they're probably just deselecting)
-        if (fromRow === toRow && fromCol === toCol) {
-            return false;
-        }
-        // Check if it's the player's turn
-        if (c !== (this.currentTurn === PieceColor.WHITE ? this.playerWhite : this.playerBlack)) {
-            return false;
-        }
-        // Check if there is a piece at the from position and if it belongs to the current player
-        if (!isTile && (this.board[fromRow][fromCol].type === PieceType.EMPTY || this.board[fromRow][fromCol].color !== this.currentTurn)) {
-            return false;
-        }
-        // Check if the move is valid
-        if (!this.isValidMove(fromRow, fromCol, toRow, toCol, isTile)) {
-            return false;
+        if (fromRow === toRow && fromCol === toCol) return false;
+
+        // reject if it's not the player's turn
+        if (c !== (this.currentTurn === PieceColor.WHITE ? this.playerWhite : this.playerBlack)) return false;
+
+        if (!this.rules.ruleIgnoreAll) {
+        // reject if the piece doesn't belong to the player
+            if (!isTile && !sameColor(this.board[fromRow][fromCol].color, this.currentTurn)) return false;
+
+            // reject if they'd be in check after
+            if (wouldBeInCheck(this.currentTurn, this.board, fromRow, fromCol, toRow, toCol, isTile)) return false;
+
+            // reject tile move if either tile is pinned
+            const currentlyInCheck = inCheck(this.currentTurn, this.board);
+            if (isTile && (!tileCanMove(fromRow, fromCol, this.board, this.currentTurn, currentlyInCheck, this.rules)
+                            || !tileCanMove(toRow, toCol, this.board, this.currentTurn, currentlyInCheck, this.rules))) return false;
+            
+            // reject piece move if it's impossible
+            if (!isTile && !pieceCanMoveTo(fromRow, fromCol, toRow, toCol, this.board, this.movesLog.at(-1))) return false;
         }
 
         // do the move!
         const {oldPiece, newPiece, enPassant} = moveOnBoard(this.board, fromRow, fromCol, toRow, toCol, isTile, promotions);
 
+
         // check if castling is still allowed
-        [this.QW, this.KW, this.QB, this.KB] = checkCastle(this.board, this.QW, this.KW, this.QB, this.KB);
+        [this.QW, this.KW, this.QB, this.KB] = checkCastle(this.board, this.QW, this.KW, this.QB, this.KB, this.rules);
         
         // determine if the other player is now in check
         const check = inCheck(this.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE, this.board);
@@ -360,17 +388,17 @@ export class Game {
         this.board = this.getDefaultBoard();
         for (const move of this.movesLog) {
             moveOnBoard(this.board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
-            [this.QW, this.KW, this.QB, this.KB] = checkCastle(this.board, this.QW, this.KW, this.QB, this.KB);
+            [this.QW, this.KW, this.QB, this.KB] = checkCastle(this.board, this.QW, this.KW, this.QB, this.KB, this.rules);
         }
 
-        // apply time and update the current turn (this will undo an end-of-game set to PieceColor.NONE)
+        // if it's currently a white turn, then we're undoing a black move, so black loses their increment
+        if (this.currentTurn === PieceColor.WHITE) this.timeLeftBlack -= this.incrementBlack;
+        else this.timeLeftWhite -= this.incrementWhite;
+
+        // update the current turn (this will undo an end-of-game set to PieceColor.NONE)
         this.changeTurn(false);
 
         // resend the game state
         this.sendGameStateToAll();
-    }
-
-    public isValidMove(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): boolean {
-        return true; // TODO
     }
 }

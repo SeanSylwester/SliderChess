@@ -1,16 +1,10 @@
-options to change game rules (chat controls for now?)
-    can you move a tile with enemy pieces
-        if so, can you move a tile "through check" i.e. such that if you only moved 1 of 2 squares, you'd be in check?
-    can you move a tile with a king on it
-    does moving the king/rook with tiles stop you from castling, even if you move it back? (right now it doesn't)
-    can you move a tile with a piece that's giving check? (I forgot to implement this)
-    can you double-move a pawn that gets moved onto the home row by a tile move
+implement special rules for castling
+implement special rules for en passant
 promotions choose piece other than queen
 surrender button
 createGame dialog box
 detect timer running out
 
-server-side valid move checking
 server-side confirmation of checkmate/stalemate
     then I'd only need to check for any valid moves when the client requests it, instead of every single move
 add password protection to servers

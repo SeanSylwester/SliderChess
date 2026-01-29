@@ -1,5 +1,5 @@
 import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage } from "../shared/types.js";
-import { flipBoard, move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime } from "./gameLogic.js";
+import { flipBoard, move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules } from "./gameLogic.js";
 import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
 let fromHistory = false;
@@ -34,6 +34,7 @@ function connectWebSocket(): void {
                 break;
             case MESSAGE_TYPES.JOIN_GAME:
                 showScreen(SCREENS.GAME_ROOM, message.gameId);
+                sendRules();
                 break;
             case MESSAGE_TYPES.QUIT_GAME:
                 clearLocalGameState();
@@ -47,6 +48,9 @@ function connectWebSocket(): void {
                 break;
             case MESSAGE_TYPES.TIME:
                 syncTime(message.clockRunning, message.timeLeftWhite, message.timeLeftBlack, message.initialTimeWhite, message.initialTimeBlack, message.incrementWhite, message.incrementBlack);
+                break;
+            case MESSAGE_TYPES.RULES:
+                updateRules(message.rules);
                 break;
             default:
                 console.error(`Unknown message type ${message.type}`);
