@@ -55,13 +55,13 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
         case MESSAGE_TYPES.CHANGE_NAME:
             const oldName = client.name;
-            client.name = message.newName;
+            client.name = message.name;
             console.log(`Client ${client.id} changed name from ${oldName} to ${client.name}`);
             updateGameList();
             break;
 
         case MESSAGE_TYPES.CHAT:
-            game!.logChatMessage(message, client);
+            game!.logChatMessage(message.message, client);
             break;
 
         case MESSAGE_TYPES.RULES:
