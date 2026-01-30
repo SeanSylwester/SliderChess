@@ -1,6 +1,6 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
 import { ClientInfo } from './types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, fileToCol0, rotateTileOnBoard, swapTilesOnBoard, pieceTypeFromChar, getPiecesThatCanReach, getDefaultBoard, getBoardFromMessage } from '../shared/utils.js'
 import { sendMessage } from './server.js';
 
 export class Game {
@@ -53,20 +53,24 @@ export class Game {
         this.logChatMessage(`Game ${this.id} created.`);
 
         // note: the column order looks flipped because the rows are upside down. a1 is the top left of this array, but ends up bottom left.
-        this.board = this.getDefaultBoard();
+        this.board = getDefaultBoard();
     }
 
-    public getDefaultBoard(): Piece[][] {
-        return [
-            [{ type: PieceType.ROOK, color: PieceColor.WHITE }, { type: PieceType.KNIGHT, color: PieceColor.WHITE }, { type: PieceType.BISHOP, color: PieceColor.WHITE }, { type: PieceType.QUEEN, color: PieceColor.WHITE }, { type: PieceType.KING, color: PieceColor.WHITE }, { type: PieceType.BISHOP, color: PieceColor.WHITE }, { type: PieceType.KNIGHT, color: PieceColor.WHITE }, { type: PieceType.ROOK, color: PieceColor.WHITE }],
-            [{ type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }],
-            [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
-            [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
-            [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
-            [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
-            [{ type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }],
-            [{ type: PieceType.ROOK, color: PieceColor.BLACK }, { type: PieceType.KNIGHT, color: PieceColor.BLACK }, { type: PieceType.BISHOP, color: PieceColor.BLACK }, { type: PieceType.QUEEN, color: PieceColor.BLACK }, { type: PieceType.KING, color: PieceColor.BLACK }, { type: PieceType.BISHOP, color: PieceColor.BLACK }, { type: PieceType.KNIGHT, color: PieceColor.BLACK }, { type: PieceType.ROOK, color: PieceColor.BLACK }],
-        ];
+    public setBoardFromMessage(notationString: string): string | void {
+        const newBoard = getDefaultBoard();
+        const ret = getBoardFromMessage(notationString, newBoard);
+        if (typeof ret === 'string') {
+            return ret;
+        } else {
+            this.movesLog = ret.movesLog;
+            this.currentTurn = ret.color;
+            this.QW = ret.QW;
+            this.KW = ret.KW;
+            this.QB = ret.QB;
+            this.KB = ret.KB;
+            this.board = newBoard;
+            this.sendGameStateToAll();
+        }
     }
 
     public addPlayer(player: ClientInfo, color = PieceColor.NONE): void {
@@ -162,40 +166,7 @@ export class Game {
         }
     }
 
-    public syncTime(): void {
-        this.sendMessageToAll({type: MESSAGE_TYPES.TIME, 
-                               initialTimeWhite: this.initialTimeWhite, initialTimeBlack: this.initialTimeBlack, 
-                               timeLeftWhite: this.timeLeftWhite, timeLeftBlack: this.timeLeftBlack, 
-                               incrementWhite: this.incrementWhite, incrementBlack: this.incrementBlack,
-                               clockRunning: this.clockRunning} satisfies TimeMessage);
-    }
-
-    public applyElapsedTime(): void {
-        const newTime = Date.now();
-        if (this.clockRunning) {
-            if (this.currentTurn === PieceColor.WHITE) this.timeLeftWhite -= (newTime - this.lastMoveTime) / 1000;
-            else if (this.currentTurn === PieceColor.BLACK) this.timeLeftBlack -= (newTime - this.lastMoveTime) / 1000;
-        }
-        this.lastMoveTime = newTime;
-    }
-
-    public applyTimeAndPause(): void {
-        this.applyElapsedTime();
-        this.clockRunning = false;
-        this.syncTime();
-    }
-
-    public logChatMessage(message: string, client?: ClientInfo): void {
-        if (client) {
-            this.chatLog.push(`${client.name}: ${message}`);
-        } else {
-            this.chatLog.push(message);
-        }
-
-        // push to players and spectators
-        this.sendMessageToAll({type: MESSAGE_TYPES.CHAT, message: this.chatLog[this.chatLog.length - 1] } satisfies ChatMessage);
-
-        // check for special timing messages
+    public setTimeFromMessage(message: string): boolean {
         const timingRe = /^t(?<colors>[wb]+)(?<time>\d*\.?\d*)(?<hasIncrement>\+?)(?<increment>\d*\.?\d*)/
         const match = timingRe.exec(message.toLowerCase());
         if (match !== null) {
@@ -221,16 +192,63 @@ export class Game {
                     this.incrementBlack = parseFloat(match.groups!.increment);
                 }
             }
-            this.logChatMessage('Updated time settings');
             this.syncTime();
+            return true;
         }
-        /*
-        const timingRe = /^t(?<colors>[wb]+)(?<time>\d*\.?\d*)(?<hasIncrement>\+?)(?<increment>\d*\.?\d*)/
-        const testMessages = ['Tw10+5', 'Tb+3.3', 'Tb30.1', 'Twb20', 'T b20+3.2', 'Tw20 3', 'TB2', 'Tx20+5', 'w10+5'];
-        for (message of testMessages) {
-            console.log(timingRe.exec(message.toLowerCase()));
+        return false;
+    }
+
+    public syncTime(): void {
+        this.sendMessageToAll({type: MESSAGE_TYPES.TIME, 
+                               initialTimeWhite: this.initialTimeWhite, initialTimeBlack: this.initialTimeBlack, 
+                               timeLeftWhite: this.timeLeftWhite, timeLeftBlack: this.timeLeftBlack, 
+                               incrementWhite: this.incrementWhite, incrementBlack: this.incrementBlack,
+                               clockRunning: this.clockRunning} satisfies TimeMessage);
+    }
+
+    public applyElapsedTime(): void {
+        const newTime = Date.now();
+        if (this.clockRunning) {
+            if (this.currentTurn === PieceColor.WHITE) this.timeLeftWhite -= (newTime - this.lastMoveTime) / 1000;
+            else if (this.currentTurn === PieceColor.BLACK) this.timeLeftBlack -= (newTime - this.lastMoveTime) / 1000;
         }
-        */
+        this.lastMoveTime = newTime;
+    }
+
+    public applyTimeAndPause(): void {
+        this.applyElapsedTime();
+        this.clockRunning = false;
+        this.syncTime();
+    }
+
+    public logChatMessage(message: string, client?: ClientInfo): void {
+        // check for special timing messages
+        if (message.trim().startsWith('t') && this.setTimeFromMessage(message)) {
+            message = 'updated times';
+        }
+        
+        // check for special load-from-notation message
+        if (message.trim().startsWith('1.')) {
+            const error = this.setBoardFromMessage(message);
+            if (error) {
+                if (client) {
+                    sendMessage(client, {type: MESSAGE_TYPES.CHAT, message: error} satisfies ChatMessage);
+                } else {
+                    console.error(error);
+                }
+                return;
+            }
+            message = 'loaded board from notation';
+        }
+
+        if (client) {
+            this.chatLog.push(`${client.name}${client === this.playerWhite ? ' (White)' : (client === this.playerBlack ? ' (Black)' : ' (Spectator)')}: ${message}`);
+        } else {
+            this.chatLog.push(message);
+        }
+
+        // push to players and spectators
+        this.sendMessageToAll({type: MESSAGE_TYPES.CHAT, message: this.chatLog[this.chatLog.length - 1] } satisfies ChatMessage);
     }
 
     public sendGameState(client: ClientInfo): void {
@@ -415,7 +433,7 @@ export class Game {
         this.QW = true;
         this.KB = true;
         this.QB = true;
-        this.board = this.getDefaultBoard();
+        this.board = getDefaultBoard();
         for (const move of this.movesLog) {
             moveOnBoard(this.board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
             [this.QW, this.KW, this.QB, this.KB] = checkCastle(this.board, this.QW, this.KW, this.QB, this.KB, this.rules);

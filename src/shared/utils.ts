@@ -7,17 +7,266 @@ const kingQueenDirections = bishopDirections.concat(rookDirections);
 export function formatMinSec(time: number, decimals=0): string {
     return `${Math.floor(time/60)}:${(time % 60).toFixed(decimals).padStart(decimals === 0 ? 2 : 3 + decimals, '0')}`
 }
-export function oppositeColor(c1: PieceColor, c2: PieceColor) {
+export function oppositeColor(c1: PieceColor, c2: PieceColor): boolean {
     // returns true if one is black and the other is white. False if either is empty
     return (c1 === PieceColor.WHITE && c2 === PieceColor.BLACK) || (c1 === PieceColor.BLACK && c2 === PieceColor.WHITE)
 }
-export function sameColor(c1: PieceColor, c2: PieceColor) {
+export function sameColor(c1: PieceColor, c2: PieceColor): boolean {
     // returns true if they're both black or both white. False if either is empty
     // !sameColor returns true if it's empty, or if they're opposite colors (capture)
     return (c1 !== PieceColor.NONE && c1 === c2)
 }
-export function col0ToFile(colNum0: number) {
+export function col0ToFile(colNum0: number): string {
     return String.fromCharCode(97 + colNum0);
+}
+export function fileToCol0(file: string): number {
+    return file.charCodeAt(0) - 97;
+}
+export function pieceTypeFromChar(char: string): PieceType {
+    switch (char) {
+        case 'N':
+            return PieceType.KNIGHT;
+        case 'B':
+            return PieceType.BISHOP;
+        case 'R':
+            return PieceType.ROOK;
+        case 'Q':
+            return PieceType.QUEEN;
+        case 'K':
+            return PieceType.KING;
+        case 'T':
+            return PieceType.TILE;
+    }
+    if (char.match(/[a-h]/)) return PieceType.PAWN;
+
+    return PieceType.EMPTY;
+}
+
+export function getDefaultBoard(): Piece[][] {
+    return [
+        [{ type: PieceType.ROOK, color: PieceColor.WHITE }, { type: PieceType.KNIGHT, color: PieceColor.WHITE }, { type: PieceType.BISHOP, color: PieceColor.WHITE }, { type: PieceType.QUEEN, color: PieceColor.WHITE }, { type: PieceType.KING, color: PieceColor.WHITE }, { type: PieceType.BISHOP, color: PieceColor.WHITE }, { type: PieceType.KNIGHT, color: PieceColor.WHITE }, { type: PieceType.ROOK, color: PieceColor.WHITE }],
+        [{ type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }, { type: PieceType.PAWN, color: PieceColor.WHITE }],
+        [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
+        [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
+        [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
+        [{ type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }, { type: PieceType.EMPTY, color: PieceColor.NONE }],
+        [{ type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }, { type: PieceType.PAWN, color: PieceColor.BLACK }],
+        [{ type: PieceType.ROOK, color: PieceColor.BLACK }, { type: PieceType.KNIGHT, color: PieceColor.BLACK }, { type: PieceType.BISHOP, color: PieceColor.BLACK }, { type: PieceType.QUEEN, color: PieceColor.BLACK }, { type: PieceType.KING, color: PieceColor.BLACK }, { type: PieceType.BISHOP, color: PieceColor.BLACK }, { type: PieceType.KNIGHT, color: PieceColor.BLACK }, { type: PieceType.ROOK, color: PieceColor.BLACK }],
+    ];
+}
+
+export function getMovesFromNotation(notationString: string): string[] | string {
+    // this will try to skip numbers (like 1.) and will fail on any other notation it doesn't recognize
+    // first, replace newlines with spaces
+    const noN = notationString.trim().replace(/\n/g, ' ');
+
+    // then split by spaces
+    const movesAndNums = noN.split(' ');
+
+    // then, walk through trying to parse each move
+    const moveRe = /^(?<move>[a-h1-8xTKQRBNO=-]+)[+#]?$/;
+    const numRe = /^\d*\.?/
+    const moves: string[] = [];
+    for (const moveOrNum of movesAndNums) {
+        const match = moveRe.exec(moveOrNum.trim());
+        if (match === null) {
+            if (!numRe.exec(moveOrNum.trim())) {
+                return `Notation parsing failed, and it does not seem to be a move number: ${moveOrNum}`;
+            } else {
+                continue
+            }
+        }
+        moves.push(match.groups!.move);
+    }
+
+    return moves
+}
+
+export function getBoardFromMessage(notationString: string, newBoard: Piece[][]): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean} | string {
+    const moves = getMovesFromNotation(notationString);
+    if (typeof(moves) === 'string') {
+        return moves;
+    }
+
+    let QW = true;
+    let KW = true;
+    let QB = true;
+    let KB = true;
+    let movesLog: Move[] = [];
+
+    // now do all the moves on a new board with no movement rules
+    const rules: Rules = {
+        ruleMoveOwnKing: true,
+        ruleMoveOwnKingInCheck: true,
+        ruleMoveOpp: true,
+        ruleMoveOppKing: true,
+        ruleMoveOppCheck: true,
+        ruleDoubleMovePawn: true,
+        ruleCastleNormal: false,
+        ruleCastleMoved: false,
+        ruleEnPassantTile: false,
+        ruleEnPassantTileHome: false,
+        ruleIgnoreAll: true,  // ignore all rules and hope for the best
+    }
+
+    const promoRe = /=(?<piece>[QRBN])/;
+    const tilePromoRe = /(?<col>[a-h])=(?<piece>[QRBN])/g;  // there could be 2
+    const tileRe = /^T(?<fromCol>[a-h])(?<fromRow>[1-8])(?<toCol>[a-h])(?<toRow>[1-8])/
+    const pieceToRe = /(?<col>[a-h])(?<row>[1-8])$/; // always the last 2
+    const pieceFromRe = /[NBRQK]?(?<col>[a-h]?)(?<row>[1-8]?)$/; // x and last 2 characters removed first!
+    let color = PieceColor.WHITE;
+    // TODO: en passant
+    for (const move of moves) {
+        if (move[0] === 'O') {
+            const row = color === PieceColor.WHITE ? 0 : 7;
+            let rookFromCol: number;
+            let rookToCol: number;
+            let kingFromCol = 4;
+            let kingToCol: number;
+            if (move === 'O-O') {
+                rookFromCol = 7;
+                rookToCol = 5;
+                kingToCol = 6;
+            } else if (move === 'O-O-O') {
+                rookFromCol = 0;
+                rookToCol = 3;
+                kingToCol = 4;
+            } else {
+                return `Failed to parse castle: ${move}`;
+            }
+            newBoard[row][kingFromCol] = { type: PieceType.EMPTY, color: PieceColor.NONE };
+            newBoard[row][rookFromCol] = { type: PieceType.EMPTY, color: PieceColor.NONE };
+            newBoard[row][kingToCol] = { type: PieceType.KING, color: color };
+            newBoard[row][rookToCol] = { type: PieceType.ROOK, color: color };
+            movesLog.push({oldPiece: { type: PieceType.EMPTY, color: PieceColor.NONE },
+                           newPiece: { type: PieceType.KING, color: color },
+                           fromRow: row, fromCol: 4, toRow: row, toCol: kingToCol, notation: move, isTile: false, promotions: []});
+        } else if (move[0] === 'T') {
+            // guaranteed to be like Ta1c1 or Ta1b1, possibly with promotion
+            const matchTile = tileRe.exec(move);
+            if (!matchTile) {
+                return `Failed to parse tile move: ${move}`;
+            }
+            // all are required, so if there's a match then all of these will be here
+            const fromCol = fileToCol0(matchTile.groups!.fromCol);
+            const fromRow = Number(matchTile.groups!.fromRow) - 1;
+            const toCol = fileToCol0(matchTile.groups!.toCol);
+            const toRow = Number(matchTile.groups!.toRow) - 1;
+
+            if (Math.max(fromCol, fromRow, toCol, toRow) > 7 || Math.min(fromCol, fromRow, toCol, toRow) < 0 || fromRow % 2 || fromCol % 2) {
+                return `Parsed tile move invalid: ${move}`;
+            }
+
+            // do the move
+            if (toRow % 2 || toCol % 2) {
+                rotateTileOnBoard(fromRow, fromCol, toRow, toCol, newBoard, false);
+            } else {
+                swapTilesOnBoard(fromRow, fromCol, toRow, toCol, newBoard);
+            }
+
+            // handle promotions (could be 2)
+            const promotions: {row: number, col: number, piece: Piece}[] = [];
+            if (move.includes('=')) {
+                const promos = [...move.matchAll(tilePromoRe)];
+                if (!promos) {
+                    return `Failed to parse tile move with promotion: ${move}`;
+                }
+                for (const promo of promos) {
+                    const promoRow = ((toRow - toRow % 2) === 6 || fromRow === 6) ? 7 : 0;
+                    const promoCol = fileToCol0(promo.groups!.col)
+                    newBoard[promoRow][promoCol] = {type: pieceTypeFromChar(promo.groups!.piece), color: color};
+                    promotions.push({ row: promoRow, col: promoCol, piece: newBoard[promoRow][promoCol] })
+                }
+            }
+            movesLog.push({oldPiece: { type: PieceType.TILE, color: PieceColor.NONE },
+                           newPiece: { type: PieceType.TILE, color: PieceColor.NONE },
+                           fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: move, isTile: true, promotions: promotions});
+        } else {
+            const pieceType = pieceTypeFromChar(move[0]);
+            // can ignore the capture completely
+            let moveNoX = move.replace(/x/g, '');
+
+            // strip out the promotion for now, read it from move later
+            if (moveNoX.includes('=')) {
+                moveNoX = moveNoX.substring(0, moveNoX.indexOf('='))
+            }
+            // Ng1f3 Ngf3 N1f3 Nf3 
+            // e5 ed5
+            
+            // destination is always the last 2
+            const matchTo = moveNoX.match(pieceToRe);
+            let toRow: number;
+            let toCol: number;
+            if (matchTo) {
+                toRow = Number(matchTo.groups!.row) - 1;
+                toCol = fileToCol0(matchTo.groups!.col);
+            } else {
+                return `Failed to parse piece move destination: ${move}`;
+            }
+
+            // parse what we can from the string before the destination
+            // Ng1 Ng N1 N
+            // '' e
+            let parsedFromCol: number | null = null;
+            let parsedFromRow: number | null = null;
+            if (pieceType === PieceType.PAWN) {
+                if (moveNoX.length === 3) {
+                    parsedFromCol = fileToCol0(moveNoX[0]);
+                } else if (moveNoX.length !== 2) {
+                    return `Failed to parse pawn move: ${move}`;
+                }
+            } else {
+                const matchFrom = moveNoX.substring(0, moveNoX.length-2).match(pieceFromRe);
+                if (!matchFrom) {
+                    return `Failed to parse piece move source: ${move}`;
+                }
+                parsedFromCol = matchFrom.groups!.col ? fileToCol0(matchFrom.groups!.col) : null;
+                parsedFromRow = matchFrom.groups!.row ? Number(matchFrom.groups!.row) - 1 : null;    
+            }
+
+
+            // find pieces that can move here
+            const possiblePieces = getPiecesThatCanReach(toRow, toCol, pieceType, color, newBoard, undefined);
+            if (!possiblePieces) {
+                return `Couldn't find a valid piece to move to this spot ${move}`;
+            }
+
+            let foundOne = false;
+            let fromRow: number;
+            let fromCol: number;
+            for (const possiblePiece of possiblePieces) {
+                if (foundOne) {
+                    return `Found 2 or more pieces that could move to this spot ${move}`;
+                }
+                if ((parsedFromRow && parsedFromRow !== possiblePiece.fromRow) || (parsedFromCol && parsedFromCol !== possiblePiece.fromCol)) {
+                    continue
+                }
+                foundOne = true;
+                fromRow = possiblePiece.fromRow;
+                fromCol = possiblePiece.fromCol;
+            }
+            if (!foundOne) {
+                return `None of the possible pieces match the notation ${move}`;
+            }
+            const oldPiece = newBoard[fromRow!][fromCol!];
+            newBoard[fromRow!][fromCol!] = { type: PieceType.EMPTY, color: PieceColor.NONE };
+            newBoard[toRow][toCol] =  {type: pieceType, color: color};
+
+            // handle promotion
+            const matchPromo = promoRe.exec(move);
+            let promotions: {row: number, col: number, piece: Piece}[] = [];
+            if (matchPromo) {
+                newBoard[toRow][toCol] = { type: pieceTypeFromChar(matchPromo.groups!.piece), color: color };
+                promotions.push({ row: toRow, col: toCol, piece: newBoard[toRow][toCol] });
+            }
+            movesLog.push({oldPiece: oldPiece, newPiece: newBoard[toRow][toCol], fromRow: fromRow!, fromCol: fromCol!, 
+                           toRow: toRow, toCol: toCol, notation: move, isTile: false, promotions: promotions});
+        }
+        color = color === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
+        [QW, KW, QB, KB] = checkCastle(newBoard, QW, KW, QB, KB, rules);
+    }
+
+    return {movesLog, color, QW, KW, QB, KB};
 }
 
 export function findKing(playerColor: PieceColor, board: Piece[][]): [row: number, col: number] {
@@ -208,7 +457,7 @@ export function pieceCanMoveTo(fromRow: number, fromCol: number, toRow: number, 
         if (toRow === fromRow + direction) {
             // one row forward, check moving forward or capturing diagonally
             // moving: make sure it's empty
-            if (toRow === toCol && board[toRow][toCol].type !== PieceType.EMPTY) return false;
+            if (fromCol === toCol && board[toRow][toCol].type !== PieceType.EMPTY) return false;
 
             // direct captures
             for (const colOffset of [-1, 1]) {
@@ -250,6 +499,20 @@ export function pieceCanMoveTo(fromRow: number, fromCol: number, toRow: number, 
         console.error(`Error in pieceCanMoveTo: didn't walk into the target square... ${PieceType[piece.type]} from (${fromRow}, ${fromCol}) to (${toRow}, ${toCol})`);
         return false;
     }
+}
+
+export function getPiecesThatCanReach(toRow: number, toCol: number, pieceType: PieceType, color: PieceColor, board: Piece[][], lastMove: Move | undefined): {fromRow: number, fromCol: number}[] {
+    const spots: {fromRow: number, fromCol: number}[] = [];
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const piece = board[row][col];
+            if (piece.type === pieceType && piece.color === color && pieceCanMoveTo(row, col, toRow, toCol, board, lastMove)) {
+                spots.push({ fromRow: row, fromCol: col });
+            }
+        }
+    }
+
+    return spots;
 }
 
 export function pieceGivingCheck(kingColor: PieceColor, row: number, col: number, board: Piece[][]): boolean {
