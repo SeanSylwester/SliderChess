@@ -38,6 +38,7 @@ let clientIdCounter = 1;
 // Store list of games
 const games = new Map<number, Game>();
 let gameList = Array.from(games.values()).map((game) => ({
+    hasPassword: game.password !== '',
     gameId: game.id, playerWhite: game.playerWhite?.name || null,
     playerBlack: game.playerBlack?.name || null, numberOfSpectators: game.spectators.length,
     timeLeftWhite: game.timeLeftWhite, timeLeftBlack: game.timeLeftBlack
@@ -54,6 +55,7 @@ export function sendMessage<T extends Message>(client: ClientInfo, message: T): 
 export function updateGameList() {
     // TODO: probably don't need to recreate the whole array each time...
     gameList = Array.from(games.values()).map((game) => ({
+        hasPassword: game.password !== '',
         gameId: game.id, playerWhite: game.playerWhite?.name || null,
         playerBlack: game.playerBlack?.name || null, numberOfSpectators: game.spectators.length,
         timeLeftWhite: game.timeLeftWhite, timeLeftBlack: game.timeLeftBlack
@@ -75,12 +77,12 @@ export function pushGameList(): void {
 }
 
 // functions to force a client to change screens to a game room (by JOIN_GAME), or the lobby (by QUIT_GAME)
-export function serveGameRoom(client: ClientInfo): void {
+export function serveGameRoom(client: ClientInfo, password: string): void {
     if (!client.gameId) {
         console.error(`Client ${client.id} is missing gameId, cannot assign to room`);
         return;
     }
-    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId } satisfies JoinGameMessage));
+    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId, password: password } satisfies JoinGameMessage));
 }
 
 export function serveLobby(client: ClientInfo): void {

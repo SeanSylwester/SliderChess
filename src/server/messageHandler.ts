@@ -8,7 +8,8 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
     // lookup the game that the client is in for most message types
     let game: Game | undefined;
     if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.MOVE_PIECE, MESSAGE_TYPES.REWIND, MESSAGE_TYPES.DRAW, 
-         MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER].includes(message.type)) {
+         MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER,
+         MESSAGE_TYPES.GAME_PASSWORD].includes(message.type)) {
         if (client.gameId === undefined) {
             console.error(`Client ${client.id} is not in a game.`);
             return;
@@ -26,7 +27,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             break;
 
         case MESSAGE_TYPES.JOIN_GAME:
-            handleJoinGame(client, message.gameId, games);
+            handleJoinGame(client, message.gameId, message.password, games);
             break;
 
         case MESSAGE_TYPES.CHANGE_POSITION:
@@ -39,7 +40,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             break;
 
         case MESSAGE_TYPES.MOVE_PIECE:
-            game!.move(client,  message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, message.promotions); 
+            game!.move(client, message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, message.promotions); 
             break;
 
         case MESSAGE_TYPES.REWIND:
@@ -79,6 +80,11 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             handleAdminCommand(client, message.command, message.data);
             break;
         
+        case MESSAGE_TYPES.GAME_PASSWORD:
+            game!.setPassword(client, message.password);
+            updateGameList();
+            break;
+        
         default:
             console.error(`Unknown message type ${message.type}`);
             console.error(message);
@@ -90,11 +96,11 @@ function handleCreateGame(client: ClientInfo, games: Map<number, Game>): void {
     console.log(`Creating game for client ${client.id}`);
     const newGame = new Game(gameIdCounter++);
     games.set(newGame.id, newGame);
-    handleJoinGame(client, newGame.id, games); // note: this will updateGameList() when the client is assigned to a position
+    handleJoinGame(client, newGame.id, '', games); // note: this will updateGameList() when the client is assigned to a position
     pushGameList();
 }
 
-function handleJoinGame(client: ClientInfo, gameId: number, games: Map<number, Game>): void {
+function handleJoinGame(client: ClientInfo, gameId: number, password: string, games: Map<number, Game>): void {
     if (client.gameId !== undefined) {
         console.error(`Client ${client.id} is already in a game (${client.gameId}), cannot join another.`);
         return;
@@ -102,10 +108,12 @@ function handleJoinGame(client: ClientInfo, gameId: number, games: Map<number, G
 
     const game = games.get(gameId);
     if (game) {
-        game.addPlayer(client);
-        client.gameId = gameId;
-        updateGameList();
-        serveGameRoom(client);
+        if (client.isAdmin || password === game.password) {
+            game.addPlayer(client);
+            client.gameId = gameId;
+            updateGameList();
+            serveGameRoom(client, game.password);
+        }
     } else {
         console.error(`Game with ID ${gameId} not found for client ${client.id}. Sending them to the lobby.`);
         serveLobby(client);

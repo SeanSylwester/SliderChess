@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage, AdminMessage, ADMIN_COMMANDS } from "../shared/types.js";
+import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage, AdminMessage, ADMIN_COMMANDS, GamePasswordMessage } from "../shared/types.js";
 import { flipBoard, move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules } from "./gameLogic.js";
 import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
@@ -15,7 +15,7 @@ function connectWebSocket(url: string): void {
         console.log('Connected to WebSocket server');
         if (!isNaN(gameId)) {
             fromHistory = true;
-            ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: gameId } satisfies JoinGameMessage));
+            requestJoinGameById(gameId);
         }
     };
 
@@ -33,12 +33,12 @@ function connectWebSocket(url: string): void {
                 initLocalGameState(message.gameState, message.yourColor);
                 break;
             case MESSAGE_TYPES.JOIN_GAME:
-                showScreen(SCREENS.GAME_ROOM, message.gameId);
+                showGame(message.gameId, message.password);
                 sendRules();
                 break;
             case MESSAGE_TYPES.QUIT_GAME:
                 clearLocalGameState();
-                showScreen(SCREENS.LOBBY);
+                showLobby();
                 break;
             case MESSAGE_TYPES.MOVE_PIECE:
                 move(message.fromRow, message.fromCol, message.toRow, message.toCol, message.notation, message.isTile, message.promotions);
@@ -55,6 +55,9 @@ function connectWebSocket(url: string): void {
             case MESSAGE_TYPES.LOG_MESSAGE:
                 console.log(message.log);
                 break;
+            case MESSAGE_TYPES.GAME_PASSWORD:
+                updatePassword(message.password);
+                break
             default:
                 console.error(`Unknown message type ${message.type}`);
                 console.error(message);
@@ -94,22 +97,19 @@ export function admin(command: ADMIN_COMMANDS, data={}): void {
 (window as any).AC = ADMIN_COMMANDS;
 
 
-function showScreen(screenId: typeof SCREENS[keyof typeof SCREENS], gameId?: number): void {
-    const lobbyScreen = document.getElementById('lobby-screen');
-    const gameScreen = document.getElementById('game-screen');
-    const url = new URL(window.location.href);
-    switch (screenId) {
-        case SCREENS.LOBBY:
-            lobbyScreen!.style.display = 'block';
-            gameScreen!.style.display = 'none';
-            if (!fromHistory) window.history.pushState({}, '', window.location.origin);
-            break;
-        case SCREENS.GAME_ROOM:
-            lobbyScreen!.style.display = 'none';
-            gameScreen!.style.display = 'block';
-            if (!fromHistory) window.history.pushState({}, '', window.location.origin + `/${gameId}`);
-            break;
-    }
+const lobbyScreen = document.getElementById('lobby-screen');
+const gameScreen = document.getElementById('game-screen');
+function showGame(gameId: number, password: string): void {
+    lobbyScreen!.style.display = 'none';
+    gameScreen!.style.display = 'block';
+    updatePassword(password);
+    if (!fromHistory) window.history.pushState({}, '', window.location.origin + `/${gameId}`);
+    fromHistory = false;
+}
+function showLobby(): void {
+    lobbyScreen!.style.display = 'block';
+    gameScreen!.style.display = 'none';
+    if (!fromHistory) window.history.pushState({}, '', window.location.origin);
     fromHistory = false;
 }
 
@@ -128,6 +128,20 @@ playerNameEntry!.addEventListener('keypress', function (event) {
     }
 });
 
+function requestJoinGame(game: GameInfo): void {
+    let password = '';
+    if (game.hasPassword) {
+        const input = prompt('Input the password for the game room', '');
+        if (input) password = input;
+    }
+    sendMessage({ type: MESSAGE_TYPES.JOIN_GAME, gameId: game.gameId, password: password } satisfies JoinGameMessage)
+}
+let waitingForGameList = 0;  // holds gameId while we wait for a new game list
+function requestJoinGameById(gameId: number): void {
+    waitingForGameList = gameId;
+    ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: gameId, password: '' } satisfies JoinGameMessage));
+}
+
 function updateGameList(gameList: GameInfo[]): void {
     const gameListElement = document.getElementById('gameList');
     if (gameListElement) {
@@ -138,17 +152,28 @@ function updateGameList(gameList: GameInfo[]): void {
 
             const gameButton = document.createElement('button');
             gameButton.textContent = "Join";
-            gameButton.addEventListener('click', () => {
-                sendMessage({ type: MESSAGE_TYPES.JOIN_GAME, gameId: game.gameId } satisfies JoinGameMessage);
-            });
+            gameButton.addEventListener('click', () => requestJoinGame(game));
             gameItem.appendChild(gameButton);
 
+            if (game.hasPassword) {
+                const lock = document.createElement('span');
+                lock.textContent = ' 🔒';
+                gameItem.appendChild(lock);
+            }
+
             const gameText = document.createElement('span');
-            gameText.textContent = `${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
+            gameText.textContent = ` ${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
             gameItem.appendChild(gameText);
 
             gameListElement.appendChild(gameItem);
         });
+    }
+    if (waitingForGameList) {
+        const game = gameList.find(el => el.gameId === waitingForGameList);
+        waitingForGameList = 0;
+        if (game) {
+            requestJoinGame(game);
+        }
     }
 }
 const refreshGameListButton = document.getElementById('refreshGameList');
@@ -159,7 +184,7 @@ createGame!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CR
 
 
 // game screen
-const sendChatButton = document.getElementById('sendChat');
+const sendChatButton = document.getElementById('sendChat') as HTMLButtonElement;
 const chatEntry = document.getElementById('chatEntry') as HTMLInputElement;
 sendChatButton!.addEventListener('click', () => {
     if (chatEntry.value.trim() !== '') {
@@ -172,6 +197,22 @@ chatEntry!.addEventListener('keypress', function (event) {
         sendChatButton?.click();
     }
 });
+
+const updatePasswordButton = document.getElementById('updateGamePassword') as HTMLButtonElement;
+const passwordEntry = document.getElementById('gamePassword') as HTMLInputElement;
+updatePasswordButton!.addEventListener('click', () => {
+    if (passwordEntry.value.trim() !== '') {
+        sendMessage({ type: MESSAGE_TYPES.GAME_PASSWORD,  password: passwordEntry.value } satisfies GamePasswordMessage);
+    }
+});
+passwordEntry!.addEventListener('keypress', function (event) {
+    if (event.key === "Enter") {
+        updatePasswordButton?.click();
+    }
+});
+function updatePassword(password: string): void {
+    passwordEntry!.value = password;
+}
 
 const quitGameButton = document.getElementById('quitGame');
 quitGameButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.QUIT_GAME }));
@@ -206,6 +247,6 @@ window.addEventListener("popstate", (event) => {
     if (isNaN(gameId)) {
         sendMessage({ type: MESSAGE_TYPES.QUIT_GAME });
     } else {
-        sendMessage({ type: MESSAGE_TYPES.JOIN_GAME, gameId: gameId } satisfies JoinGameMessage);
+        requestJoinGameById(gameId);
     }
 });

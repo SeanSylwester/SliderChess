@@ -50,6 +50,7 @@ export interface Rules {
 }
 
 export interface GameInfo {
+    hasPassword: boolean;
     gameId: number;
     playerWhite: string | null;
     playerBlack: string | null;
@@ -116,6 +117,7 @@ export const MESSAGE_TYPES = {
     GAME_OVER: 'gameOver',
     ADMIN_MESSAGE: 'adminMessage',
     LOG_MESSAGE: 'logMessage',
+    GAME_PASSWORD: 'gamePassword',
 } as const;
 
 // Message type definitions
@@ -130,6 +132,7 @@ export interface ChangeNameMessage extends Message {
 export interface JoinGameMessage extends Message {
     type: typeof MESSAGE_TYPES.JOIN_GAME;
     gameId: number;
+    password: string;
 }
 export interface ChangePositionMessage extends Message {
     type: typeof MESSAGE_TYPES.CHANGE_POSITION;
@@ -180,4 +183,8 @@ export interface AdminMessage extends Message {
 export interface LogMessage extends Message {
     type: typeof MESSAGE_TYPES.LOG_MESSAGE;
     log: any;
+}
+export interface GamePasswordMessage extends Message {
+    type: typeof MESSAGE_TYPES.GAME_PASSWORD;
+    password: string;
 }

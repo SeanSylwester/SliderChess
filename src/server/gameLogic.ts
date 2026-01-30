@@ -37,6 +37,8 @@ export class Game {
 
     mapFEN: Map<string, number>;
 
+    password = '';
+
     rules: Rules = {
         ruleMoveOwnKing: true,
         ruleMoveOwnKingInCheck: true,
@@ -59,6 +61,12 @@ export class Game {
         this.board = getDefaultBoard();
         this.mapFEN = new Map<string, number>();
         this.updateFEN();
+    }
+
+    public setPassword(client: ClientInfo, password: string): void {
+        this.password = password;
+        this.sendMessageToAll({ type: MESSAGE_TYPES.GAME_PASSWORD, password: password });
+        this.logChatMessage('has changed the password', client);
     }
 
     public updateFEN(): void {

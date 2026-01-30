@@ -2,8 +2,6 @@ implement special rules for castling
 implement special rules for en passant
 promotions choose piece other than queen
 createGame dialog box
-server power to kick zombie players
 
 gameover screen
-add password protection to servers
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)
