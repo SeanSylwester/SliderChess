@@ -34,6 +34,8 @@ export class Game {
     confirmSurrenderWhite = false;
     confirmSurrenderBlack = false;
 
+    halfmoveClock = 0;
+
     rules: Rules = {
         ruleMoveOwnKing: true,
         ruleMoveOwnKingInCheck: true,
@@ -376,6 +378,9 @@ export class Game {
         // reject a move to the same spot (they're probably just deselecting)
         if (fromRow === toRow && fromCol === toCol) return false;
 
+        // reject if the game is over
+        if (this.currentTurn === PieceColor.NONE) return false;
+
         // reject if it's not the player's turn
         if (c !== (this.currentTurn === PieceColor.WHITE ? this.playerWhite : this.playerBlack)) return false;
 
@@ -410,6 +415,16 @@ export class Game {
 
         // log the move
         this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
+
+        // keep track of half-moves for 50-fold repetition if no capture or pawn move
+        if (oldPiece.type !== PieceType.EMPTY || newPiece.type === PieceType.PAWN) {
+            this.halfmoveClock = 0;
+        } else {
+            this.halfmoveClock += 1;
+            if (this.halfmoveClock >= 100) {
+                this.endGame('Draw by 50-fold repetition!');
+            }
+        }
 
         // Send move to all players and spectators
         this.sendMessageToAll({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions } satisfies MovePieceMessage);
