@@ -1,18 +1,29 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
 import { Game } from './gameLogic.js';
-import { ClientInfo } from './types.js';
 import { handleMessage, handleQuitGame } from './messageHandler.js';
-import { MESSAGE_TYPES, GameListMessage, JoinGameMessage, ChangeNameMessage, Message } from '../shared/types.js';
+import { MESSAGE_TYPES, GameListMessage, JoinGameMessage, ChangeNameMessage, Message, ADMIN_COMMANDS } from '../shared/types.js';
+
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+export interface ClientInfo {
+    id: number;
+    name: string;
+    ws: WebSocket;
+    isAdmin: boolean;
+    ip: string | undefined;
+    req: http.IncomingMessage;
+    gameId?: number;
+}
 
 // Create HTTP server
 const server = http.createServer(app);
@@ -77,10 +88,61 @@ export function serveLobby(client: ClientInfo): void {
     client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.QUIT_GAME }));
 }
 
+function sendLog(client: ClientInfo, data: any): void {
+    sendMessage(client, { type: MESSAGE_TYPES.LOG_MESSAGE, log: data });
+}
+
+export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, data: any): void {
+    if (!admin.isAdmin) {
+        console.error('Someone tried and failed to send an admin command');
+        console.log(admin.ip);
+        return;
+    }
+    console.log(`Executing admin command ${ADMIN_COMMANDS[command]} with data:`);
+    console.log(data);
+
+    // lookup the game that the client is in for most message types
+    let game: Game | undefined;
+    if ([ADMIN_COMMANDS.GAME_DELETE, ADMIN_COMMANDS.GAME_GET_IDS, ADMIN_COMMANDS.GAME_KICK_PLAYER].includes(command)) {
+        game = games.get(data.gameId);
+        if (game === undefined) {
+            console.error(`Game with ID ${data.gameId} not found`);
+            return;
+        }
+    }
+    switch (command) {
+        case ADMIN_COMMANDS.GAME_DELETE:
+            game!.logChatMessage('Server is killing this game. You can stay here but the connection will be broken');
+            for (const client of game!.allClients()) {
+                client.gameId = undefined;
+            }
+            games.delete(data.gameId);
+            pushGameList();
+            break;
+
+        case ADMIN_COMMANDS.GAME_GET_IDS:
+            sendLog(admin, game!.allClients());
+            break;
+        
+        case ADMIN_COMMANDS.GAME_KICK_PLAYER:
+            const kickedPlayer = game!.allClients().find(el => el.id === data.clientId);
+            if (kickedPlayer) {
+                game!.logChatMessage(`Server is kicking ${kickedPlayer.name}`);
+                handleQuitGame(kickedPlayer, games);
+                sendLog(admin, `Kicked ${kickedPlayer.name} (${kickedPlayer.id}) from game ${game!.id}`);
+            } else {
+                sendLog(admin, `Couldn't find ${data.clientId} in game ${game!.id}`);
+            }
+
+        default:
+            sendLog(admin, `Command ${ADMIN_COMMANDS[command]} (${command}) not found, or handler not implemented`);
+    }
+}
+
 // Handle WebSocket connections
-wss.on('connection', (ws: WebSocket) => {
+wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     const clientId = clientIdCounter++;
-    const clientInfo: ClientInfo = { id: clientId, name: `Player ${clientId}`, ws: ws };
+    const clientInfo: ClientInfo = { id: clientId, name: `Player ${clientId}`, ws: ws, isAdmin: false, ip: req.socket.remoteAddress, req: req };
     clients.set(ws, clientInfo);
     console.log(`Client connected: ${clientId}`);
 

@@ -1,7 +1,6 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
-import { ClientInfo } from './types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish } from '../shared/utils.js'
-import { sendMessage } from './server.js';
+import { sendMessage, ClientInfo } from './server.js';
 
 export class Game {
     playerWhite: ClientInfo | null = null;
@@ -72,6 +71,19 @@ export class Game {
         } else {
             this.mapFEN.set(fen, 1);
         }
+    }
+
+    public allClients(): ClientInfo[] {
+        let clients: ClientInfo[] = [];
+        if (this.playerWhite !== null) {
+            clients.push(this.playerWhite);
+        }
+        if (this.playerBlack !== null) {
+            clients.push(this.playerBlack);
+        }
+        clients.push(...this.spectators);
+
+        return clients;
     }
 
     public setBoardFromMessage(notationString: string): string | void {
@@ -173,14 +185,8 @@ export class Game {
     }
 
     public sendMessageToAll<T extends Message>(message: T): void {
-        if (this.playerWhite !== null) {
-            sendMessage(this.playerWhite, message);
-        }
-        if (this.playerBlack !== null) {
-            sendMessage(this.playerBlack, message);
-        }
-        for (const spectator of this.spectators) {
-            sendMessage(spectator, message);
+        for (const client of this.allClients()) {
+            sendMessage(client, message);
         }
     }
 
@@ -299,14 +305,8 @@ export class Game {
     }
 
     public sendGameStateToAll(): void {
-        if (this.playerWhite !== null) {
-            this.sendGameState(this.playerWhite);
-        }
-        if (this.playerBlack !== null) {
-            this.sendGameState(this.playerBlack);
-        }
-        for (const spectator of this.spectators) {
-            this.sendGameState(spectator);
+        for (const client of this.allClients()) {
+            this.sendGameState(client);
         }
     }
 

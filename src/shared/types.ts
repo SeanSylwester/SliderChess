@@ -88,6 +88,13 @@ export const SCREENS = {
     GAME_ROOM: 'gameRoom'
 };
 
+
+export enum ADMIN_COMMANDS {
+    GAME_DELETE,
+    GAME_GET_IDS,
+    GAME_KICK_PLAYER,
+}
+
 // Message types as constants
 export const MESSAGE_TYPES = {
     CHANGE_NAME: 'changeName',
@@ -107,6 +114,8 @@ export const MESSAGE_TYPES = {
     GAME_LIST: 'serverList',
     RULES: 'rules',
     GAME_OVER: 'gameOver',
+    ADMIN_MESSAGE: 'adminMessage',
+    LOG_MESSAGE: 'logMessage',
 } as const;
 
 // Message type definitions
@@ -162,4 +171,13 @@ export interface GameListMessage extends Message {
 export interface RulesMessage extends Message {
     type: typeof MESSAGE_TYPES.RULES;
     rules: Rules;
+}
+export interface AdminMessage extends Message {
+    type: typeof MESSAGE_TYPES.ADMIN_MESSAGE;
+    command: ADMIN_COMMANDS;
+    data: any;
+}
+export interface LogMessage extends Message {
+    type: typeof MESSAGE_TYPES.LOG_MESSAGE;
+    log: any;
 }

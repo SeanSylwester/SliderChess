@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage } from "../shared/types.js";
+import { MESSAGE_TYPES, SCREENS, GameInfo, Message, JoinGameMessage, ChatMessage, ChangePositionMessage, PieceColor, ChangeNameMessage, AdminMessage, ADMIN_COMMANDS } from "../shared/types.js";
 import { flipBoard, move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules } from "./gameLogic.js";
 import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
@@ -52,6 +52,9 @@ function connectWebSocket(url: string): void {
             case MESSAGE_TYPES.RULES:
                 updateRules(message.rules);
                 break;
+            case MESSAGE_TYPES.LOG_MESSAGE:
+                console.log(message.log);
+                break;
             default:
                 console.error(`Unknown message type ${message.type}`);
                 console.error(message);
@@ -80,6 +83,17 @@ export function sendMessage<T extends Message>(message: T): void {
     }
 }
 
+export function admin(command: ADMIN_COMMANDS, data={}): void {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: MESSAGE_TYPES.ADMIN_MESSAGE, command: command, data: data } satisfies AdminMessage));
+    } else {
+        console.error('WebSocket is not connected');
+    }
+}
+(window as any).admin = admin;
+(window as any).AC = ADMIN_COMMANDS;
+
+
 function showScreen(screenId: typeof SCREENS[keyof typeof SCREENS], gameId?: number): void {
     const lobbyScreen = document.getElementById('lobby-screen');
     const gameScreen = document.getElementById('game-screen');
@@ -101,12 +115,12 @@ function showScreen(screenId: typeof SCREENS[keyof typeof SCREENS], gameId?: num
 
 
 // lobby screen
+const playerNameEntry = document.getElementById('playerName') as HTMLInputElement;
 function updateName(): void {
-    const nameInput = document.getElementById('playerName') as HTMLInputElement;
-    sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: nameInput.value } satisfies ChangeNameMessage);
+    sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: playerNameEntry.value } satisfies ChangeNameMessage);
+    playerNameEntry.value = '';
 }
 const updateNameButton = document.getElementById('updateName');
-const playerNameEntry = document.getElementById('playerName') as HTMLInputElement;
 updateNameButton!.addEventListener('click', updateName);
 playerNameEntry!.addEventListener('keypress', function (event) {
     if (event.key === "Enter") {
