@@ -2,7 +2,6 @@ implement special rules for castling
 implement special rules for en passant
 promotions choose piece other than queen
 createGame dialog box
-3 fold repetition and related rules
 server power to kick zombie players
 
 gameover screen

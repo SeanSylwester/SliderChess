@@ -41,6 +41,64 @@ export function pieceTypeFromChar(char: string): PieceType {
 
     return PieceType.EMPTY;
 }
+export function charFromPieceType(pieceType: PieceType): string {
+    switch (pieceType) {
+        case PieceType.PAWN:
+            return 'P'
+        case PieceType.KNIGHT:
+            return 'N';
+        case PieceType.BISHOP:
+            return 'B';
+        case PieceType.ROOK:
+            return 'R';
+        case PieceType.QUEEN:
+            return 'Q';
+        case PieceType.KING:
+            return 'K';
+        case PieceType.TILE:
+            return 'T';
+    }
+    return '';
+}
+
+export function getFENish(board: Piece[][], currentTurn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean ): string {
+    let s = '';
+    let spaces = 0;
+    let piece: Piece;
+    let pieceChar: string;
+    for (let row = 7; row >= 0; row--) {
+        for (let col = 0; col < 8; col++) {
+            piece = board[row][col];
+            if (piece.type === PieceType.EMPTY) {
+                spaces++;
+            } else {
+                if (spaces) {
+                    s += spaces.toString();
+                }
+                spaces = 0;
+                
+                pieceChar = charFromPieceType(piece.type);
+                s += piece.color === PieceColor.WHITE ? pieceChar : pieceChar.toLowerCase();
+            }
+        }
+        if (spaces) {
+            s += spaces.toString();
+        }
+        spaces = 0;
+        if (row) {
+            s += '/'
+        }
+    }
+
+    s += ` ${currentTurn === PieceColor.WHITE ? 'w' : 'b'} `
+
+    if (KW) s += 'K';
+    if (QW) s += 'Q';
+    if (KB) s += 'k';
+    if (QB) s += 'q';
+
+    return s
+}
 
 export function getDefaultBoard(): Piece[][] {
     return [

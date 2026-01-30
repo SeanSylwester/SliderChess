@@ -1,6 +1,6 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
 import { ClientInfo } from './types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, fileToCol0, rotateTileOnBoard, swapTilesOnBoard, pieceTypeFromChar, getPiecesThatCanReach, getDefaultBoard, getBoardFromMessage } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish } from '../shared/utils.js'
 import { sendMessage } from './server.js';
 
 export class Game {
@@ -36,6 +36,8 @@ export class Game {
 
     halfmoveClock = 0;
 
+    mapFEN: Map<string, number>;
+
     rules: Rules = {
         ruleMoveOwnKing: true,
         ruleMoveOwnKingInCheck: true,
@@ -56,6 +58,20 @@ export class Game {
 
         // note: the column order looks flipped because the rows are upside down. a1 is the top left of this array, but ends up bottom left.
         this.board = getDefaultBoard();
+        this.mapFEN = new Map<string, number>();
+        this.updateFEN();
+    }
+
+    public updateFEN(): void {
+        const fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB)
+        if (this.mapFEN.has(fen)) {
+            this.mapFEN.set(fen, this.mapFEN.get(fen)! + 1)
+            if (this.mapFEN.get(fen)! >= 3) {
+                this.endGame('Draw by 3-fold repetition')
+            }
+        } else {
+            this.mapFEN.set(fen, 1);
+        }
     }
 
     public setBoardFromMessage(notationString: string): string | void {
@@ -422,7 +438,7 @@ export class Game {
         } else {
             this.halfmoveClock += 1;
             if (this.halfmoveClock >= 100) {
-                this.endGame('Draw by 50-fold repetition!');
+                this.endGame('Draw by 50-move rule!');
             }
         }
 
@@ -431,6 +447,9 @@ export class Game {
 
         // change turns and handle clock
         this.changeTurn(true);
+
+        // keep track of the number of times we've been in each position for 3 fold repetition
+        this.updateFEN();      
 
         return true;
     }
