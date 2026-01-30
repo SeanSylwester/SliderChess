@@ -406,8 +406,12 @@ function highlightLastMove(): void {
     }
     
     const localLastMove = localGameState.movesLog.at(-1)!;
-    highlightSquare(localLastMove.fromRow, localLastMove.fromCol, "rgb(0 255 0 / 75%)", localLastMove.isTile);
+    highlightSquare(localLastMove.fromRow, localLastMove.fromCol, "rgb(0 255 0 / 25%)", localLastMove.isTile);
     highlightSquare(localLastMove.toRow, localLastMove.toCol, "rgb(0 255 0 / 75%)", localLastMove.isTile);
+    if (localLastMove.isTile) {
+        highlightSquare(localLastMove.fromRow, localLastMove.fromCol, "rgb(0 255 0 / 25%)", false);
+        highlightSquare(localLastMove.toRow, localLastMove.toCol, "rgb(0 255 0 / 75%)", false);
+    }
 }
 
 function clearLastMoveHighlight(): void {
