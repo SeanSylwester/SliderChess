@@ -113,7 +113,7 @@ export function updateChat(message: string): void {
     chatLogElement.scrollTop = chatLogElement.scrollHeight;
 }
 
-function appendToMovesLog(notation: string, checkmate: boolean, stalemate: boolean): void {
+function appendToMovesLog(notation: string): void {
     if (!localGameState) {
         console.error("No local game state to log move to");
         return;
@@ -125,14 +125,6 @@ function appendToMovesLog(notation: string, checkmate: boolean, stalemate: boole
     } 
 
     movesLogElement.value += notation;
-
-    // add stalemate/checkmate character
-    if (checkmate) {
-        // replace the check that the server adds
-        movesLogElement.value = movesLogElement.value.slice(0, -1) + '#';
-    } else if (stalemate) {
-        movesLogElement.value += '$';
-    }
 
     // add space or newline to prep for next note
     if (localGameState.movesLog.length % 2 === 0) {
@@ -610,7 +602,7 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
 
 
     // update the move log text
-    appendToMovesLog(notation, checkmate, stalemate);
+    appendToMovesLog(notation);
     
     // Update the current turn
     localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);

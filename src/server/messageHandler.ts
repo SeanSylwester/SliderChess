@@ -73,7 +73,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             break;
 
         case MESSAGE_TYPES.GAME_OVER:
-            game!.gameOver();
+            game!.checkGameOver();
             break;
 
         case MESSAGE_TYPES.GAME_LIST:

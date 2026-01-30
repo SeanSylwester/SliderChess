@@ -450,19 +450,30 @@ export class Game {
         this.sendGameStateToAll();
     }
 
-    public gameOver(): void {
+    public checkGameOver(): void {
         if (!anyValidMoves(this.currentTurn, this.board, this.movesLog.at(-1), this.rules)) {
+            const playerName = this.currentTurn === PieceColor.WHITE ? this.playerWhite?.name : this.playerBlack?.name;
             if (inCheck(this.currentTurn, this.board)) {
-                this.logChatMessage(`${PieceColor[this.currentTurn]} is in checkmate!`);
+                this.endGame(`${playerName} (${PieceColor[this.currentTurn]}) is in checkmate!`);
+                if (this.movesLog.at(-1)) {
+                    if (this.movesLog.at(-1)!.notation.endsWith('+')) {
+                        this.movesLog.at(-1)!.notation = this.movesLog.at(-1)!.notation.slice(0, -1) + '#';
+                    }
+                    else {
+                        this.movesLog.at(-1)!.notation += '#';
+                    }
+                }
             } else {
-                this.logChatMessage(`${PieceColor[this.currentTurn]} is in stalemate!`);
+                this.endGame(`${playerName} (${PieceColor[this.currentTurn]}) is in stalemate!`);
+                if (this.movesLog.at(-1)) this.movesLog.at(-1)!.notation += '$';
             }
+            this.sendGameStateToAll();
         }
         if (this.timeLeftBlack < 0) {
-            this.logChatMessage(`BLACK has run out of time!`);
+            this.endGame(`${this.playerBlack?.name} (BLACK) has run out of time!`);
         }
         if (this.timeLeftWhite < 0) {
-            this.logChatMessage(`WHITE has run out of time!`);
+            this.endGame(`${this.playerWhite?.name} (WHITE) has run out of time!`);
         }
     }
 }
