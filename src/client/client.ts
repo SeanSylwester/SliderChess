@@ -4,12 +4,11 @@ import { formatMinSec } from '../shared/utils.js'
 let ws: WebSocket;
 let fromHistory = false;
 
-function connectWebSocket(url: string): void {
+function connectWebSocket(): void {
     // Extract game ID from URL, if available
     const gameId = parseInt(window.location.pathname.slice(1)); // Remove leading '/'
 
-    ws = new WebSocket(url);
-    ws = new WebSocket('ws://localhost:10000');
+    ws = new WebSocket('wss://sliderchess.onrender.com');
 
     ws.onopen = () => {
         console.log('Connected to WebSocket server');
@@ -67,10 +66,6 @@ function connectWebSocket(url: string): void {
 
     ws.onerror = (error: Event) => {
         console.log('WebSocket error:', error);
-        if (url !== 'ws://localhost:10000') {
-            console.log('Trying to connect at localhost instead...');
-            ws = new WebSocket('ws://localhost:10000');
-        }
     };
 
     ws.onclose = () => {
@@ -238,7 +233,7 @@ claimSpectatorButton!.addEventListener('click', () => sendMessage({ type: MESSAG
 
 
 // Connect when page loads
-window.addEventListener('DOMContentLoaded', () => {connectWebSocket('wss://sliderchess.onrender.com');});
+window.addEventListener('DOMContentLoaded', () => {connectWebSocket();});
 
 // handle back/forward
 window.addEventListener("popstate", (event) => {
