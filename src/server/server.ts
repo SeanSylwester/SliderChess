@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 
 import { Game } from './gameLogic.js';
 import { handleMessage, handleQuitGame } from './messageHandler.js';
-import { MESSAGE_TYPES, GameListMessage, JoinGameMessage, ChangeNameMessage, Message, ADMIN_COMMANDS } from '../shared/types.js';
+import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, ChangeNameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage } from '../shared/types.js';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -37,12 +37,7 @@ let clientIdCounter = 1;
 
 // Store list of games
 const games = new Map<number, Game>();
-let gameList = Array.from(games.values()).map((game) => ({
-    hasPassword: game.password !== '',
-    gameId: game.id, playerWhite: game.playerWhite?.name || null,
-    playerBlack: game.playerBlack?.name || null, numberOfSpectators: game.spectators.length,
-    timeLeftWhite: game.timeLeftWhite, timeLeftBlack: game.timeLeftBlack
-}));
+let gameList: GameInfo[] = [];
 
 export function sendMessage<T extends Message>(client: ClientInfo, message: T): void {
     if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
@@ -54,16 +49,22 @@ export function sendMessage<T extends Message>(client: ClientInfo, message: T): 
 
 export function updateGameList() {
     // TODO: probably don't need to recreate the whole array each time...
-    gameList = Array.from(games.values()).map((game) => ({
-        hasPassword: game.password !== '',
-        gameId: game.id, playerWhite: game.playerWhite?.name || null,
-        playerBlack: game.playerBlack?.name || null, numberOfSpectators: game.spectators.length,
-        timeLeftWhite: game.timeLeftWhite, timeLeftBlack: game.timeLeftBlack
-    }));
+    gameList = [];
+    for (const game of games.values()) {
+        gameList.push({
+            hasPassword: game.password !== '',
+            gameId: game.id, 
+            playerWhite: game.playerWhite?.name || null,
+            playerBlack: game.playerBlack?.name || null, 
+            numberOfSpectators: game.spectators.length,
+            timeLeftWhite: game.timeLeftWhite, 
+            timeLeftBlack: game.timeLeftBlack
+        });
+    }
 }
 
-export function sendGameList(client: ClientInfo,): void {
-    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.GAME_LIST,  gameList: gameList } satisfies GameListMessage));
+export function sendGameList(client: ClientInfo): void {
+    sendMessage(client, { type: MESSAGE_TYPES.GAME_LIST,  gameList: gameList } satisfies gameListMessage)
 }
 
 export function pushGameList(): void {
@@ -82,16 +83,16 @@ export function serveGameRoom(client: ClientInfo, password: string): void {
         console.error(`Client ${client.id} is missing gameId, cannot assign to room`);
         return;
     }
-    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId, password: password } satisfies JoinGameMessage));
+    sendMessage(client, { type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId, password: password } satisfies JoinGameMessage);
 }
 
 export function serveLobby(client: ClientInfo): void {
     sendGameList(client);
-    client.ws.send(JSON.stringify({ type: MESSAGE_TYPES.QUIT_GAME }));
+    sendMessage(client, { type: MESSAGE_TYPES.QUIT_GAME } satisfies Message)
 }
 
 function sendLog(client: ClientInfo, data: any): void {
-    sendMessage(client, { type: MESSAGE_TYPES.LOG_MESSAGE, log: data });
+    sendMessage(client, { type: MESSAGE_TYPES.LOG_MESSAGE, log: data } satisfies LogMessage);
 }
 
 export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, data: any): void {
@@ -149,7 +150,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     console.log(`Client connected: ${clientId}`);
 
     // Send welcome message to new client
-    ws.send(JSON.stringify({ type: MESSAGE_TYPES.CHANGE_NAME, name: clientInfo.name } satisfies ChangeNameMessage));
+    sendMessage(clientInfo, { type: MESSAGE_TYPES.CHANGE_NAME, name: clientInfo.name } satisfies ChangeNameMessage);
 
     // send current game list
     sendGameList(clientInfo);

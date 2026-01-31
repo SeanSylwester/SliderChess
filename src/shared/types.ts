@@ -51,6 +51,7 @@ export interface Rules {
 
 export interface GameInfo {
     hasPassword: boolean;
+    password?: string;  // client will store known passwords here
     gameId: number;
     playerWhite: string | null;
     playerBlack: string | null;
@@ -112,12 +113,13 @@ export const MESSAGE_TYPES = {
     TIME: 'time',
     CHAT: 'chat',
     GAME_STATE: 'gameState',
-    GAME_LIST: 'serverList',
+    GAME_LIST: 'gameList',
     RULES: 'rules',
     GAME_OVER: 'gameOver',
     ADMIN_MESSAGE: 'adminMessage',
     LOG_MESSAGE: 'logMessage',
     GAME_PASSWORD: 'gamePassword',
+    REJECT_JOIN_GAME: 'rejectJoin',
 } as const;
 
 // Message type definitions
@@ -167,9 +169,9 @@ export interface GameStateMessage extends Message {
     gameState: GameState;
     yourColor: PieceColor;
 }
-export interface GameListMessage extends Message {
+export interface gameListMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_LIST;
-    gameList: GameInfo[];
+    gameList?: GameInfo[];  // only sent back from the server
 }
 export interface RulesMessage extends Message {
     type: typeof MESSAGE_TYPES.RULES;
@@ -187,4 +189,8 @@ export interface LogMessage extends Message {
 export interface GamePasswordMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_PASSWORD;
     password: string;
+}
+export interface RejectJoinGameMessage extends Message {
+    type: typeof MESSAGE_TYPES.REJECT_JOIN_GAME;
+    gameId: number;
 }

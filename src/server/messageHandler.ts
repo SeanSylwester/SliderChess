@@ -1,6 +1,6 @@
 import { Game } from './gameLogic.js';
-import { updateGameList, sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList } from './server.js';
-import { MESSAGE_TYPES } from '../shared/types.js';
+import { updateGameList as updateGameList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList } from './server.js';
+import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage } from '../shared/types.js';
 
 export function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): void {
     const message = JSON.parse(data.toString());
@@ -82,7 +82,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
         
         case MESSAGE_TYPES.GAME_PASSWORD:
             game!.setPassword(client, message.password);
-            updateGameList();
+            pushGameList();
             break;
         
         default:
@@ -93,7 +93,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
 let gameIdCounter = 1;
 function handleCreateGame(client: ClientInfo, games: Map<number, Game>): void {
-    console.log(`Creating game for client ${client.id}`);
+    console.log(`Creating game ${gameIdCounter} for client ${client.id}`);
     const newGame = new Game(gameIdCounter++);
     games.set(newGame.id, newGame);
     handleJoinGame(client, newGame.id, '', games); // note: this will updateGameList() when the client is assigned to a position
@@ -108,11 +108,14 @@ function handleJoinGame(client: ClientInfo, gameId: number, password: string, ga
 
     const game = games.get(gameId);
     if (game) {
-        if (client.isAdmin || password === game.password) {
+        // allow join to admins, unlocked games, or locked games if the provided password matches
+        if (client.isAdmin || !game.password || (password && password === game.password)) {
             game.addPlayer(client);
             client.gameId = gameId;
             updateGameList();
             serveGameRoom(client, game.password);
+        } else {
+            sendMessage(client, { type: MESSAGE_TYPES.REJECT_JOIN_GAME, gameId: gameId } satisfies RejectJoinGameMessage);
         }
     } else {
         console.error(`Game with ID ${gameId} not found for client ${client.id}. Sending them to the lobby.`);
@@ -145,16 +148,16 @@ function handleChangeName(client: ClientInfo, name: string): void {
             client.isAdmin = true;
             client.name = 'admin';
             console.log('Someone logged in as admin')
-            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name })
+            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name } satisfies ChangeNameMessage)
         } else {
             console.error('Someone tried and failed to login as admin');
-            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: 'naughty boy' })
+            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: 'naughty boy' } satisfies ChangeNameMessage)
         }
         console.log(client.ip);
     } else if (name !== 'admin') {
         client.name = name;
         console.log(`Client ${client.id} changed name from ${oldName} to ${client.name}`);
         updateGameList();
-        sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name });
+        sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name } satisfies ChangeNameMessage);
     }
 }
