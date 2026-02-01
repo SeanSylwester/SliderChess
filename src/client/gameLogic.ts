@@ -421,13 +421,14 @@ function clearLastMoveHighlight(): void {
 // game logic stuff
 const drawButton = document.getElementById('draw') as HTMLButtonElement;
 const surrenderButton = document.getElementById('surrender') as HTMLButtonElement;
-let localGameState: GameState | null = null;
+export let localGameState: GameState | undefined = undefined;
 let myColor = PieceColor.NONE;
 let selectedSquare: {row: number, col: number, isTile: boolean} | null = null;
 let validSquares: ReturnType<typeof getValidMoves> | null;
 
 export function initLocalGameState(gameState: GameState, yourColor: PieceColor): void {
     localGameState = gameState;
+    localGameState.mapFEN = new Map(Object.entries(localGameState.mapFEN));
     myColor = yourColor;
     if (myColor === PieceColor.WHITE) {
         flip = false;
@@ -453,7 +454,7 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
 }
 
 export function clearLocalGameState(): void {
-    localGameState = null;
+    localGameState = undefined;
     myColor = PieceColor.NONE;
     selectedSquare = null;
     flip = false;

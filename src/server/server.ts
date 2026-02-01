@@ -9,8 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 import { Game } from './gameLogic.js';
-import { handleMessage, handleQuitGame } from './messageHandler.js';
-import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, ChangeNameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor } from '../shared/types.js';
+import { handleMessage, handleQuitGame, handleCreateGameFromState } from './messageHandler.js';
+import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState } from '../shared/types.js';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -183,12 +183,16 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     });
 });
 
-export function handleReconnect(client: ClientInfo, clientOldId: number): void {
+export function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState): void {
+    // if the client says that they're in a game, then try to reconnect them based on lastPosition
+    //   if we don't have the lastPosition and/or the indicated game (e.g. on server restart), then load from the client's gameState
     const lastPosition = clientLastKnownPosition.get(clientOldId);
     if (lastPosition) {
-        console.log(`Reconnecting new client ${client.id} to ${clientOldId} (${lastPosition.name})`);
+        // we were aware of the client disconnecting and have data ready to reconnect them
+        console.log(`Reconnecting new client ${client.id} to stored client ${clientOldId} (${lastPosition.name})`);
         clientLastKnownPosition.delete(clientOldId);
         client.id = clientOldId;
+        clientIdCounter = Math.max(clientIdCounter, clientOldId+1);
         client.name = lastPosition.name
         
         const game = games.get(lastPosition.gameId);
@@ -196,6 +200,27 @@ export function handleReconnect(client: ClientInfo, clientOldId: number): void {
             console.log(` and also trying to connect client ${client.id} to game ${lastPosition.gameId} as ${PieceColor[lastPosition.position]}`);
             client.gameId = lastPosition.gameId;
             game.addPlayer(client, lastPosition.position);
+        } else if (gameState) {
+            // recreate the game with the same gameId if the game is lost for some reason
+            handleCreateGameFromState(client, games, lastPosition.gameId, gameState);
+        } else {
+            console.log(` but couldn't reconnect client to their game (${lastPosition.gameId}) nor recreate it from a client-provided state`);
+        }
+    } else {
+        // server doesn't know anything! fill in with the provided info, if possible
+        console.log(`Reconnecting new unknown client ${client.id} to ${clientOldId} (${clientOldName})`);
+        if (!clientOldId || [...clients.values()].some(el => el.id === clientOldId)) {
+            // id 0 or in use, generate a new one
+            client.id = clientIdCounter++;
+        } else {
+            client.id = clientOldId;
+            clientIdCounter = Math.max(clientIdCounter, clientOldId+1);
+        }
+        client.name = clientOldName;
+        
+        // recreate the game if they were in one. Make sure we don't clobber it later!
+        if (gameState) {
+            handleCreateGameFromState(client, games, gameState.id, gameState);
         }
     }
 }

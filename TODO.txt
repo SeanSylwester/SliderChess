@@ -1,14 +1,21 @@
-reconnect
-
+notation disambiguation
+offline play
+    flag on lobby to disconnect from server, then run a game locally controlling black and white
 promotions choose piece other than queen
-save game button
+
+database to store games?
+    this could happen automatically if the game is completed and the last user disconnects?
+    games in progress stored when the server exits gracefully?
+    clients could load a locked game into a new game?
+credits page for SVG attribution
+
+implement special rules for castling
+implement special rules for en passant
 
 refactor to not recreate gameList on every change
 refactor to just send the whole game state every move, minus the notation and chat logs
 refactor to just redraw the whole board each move
 
-implement special rules for castling
-implement special rules for en passant
 
 gameover screen
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)

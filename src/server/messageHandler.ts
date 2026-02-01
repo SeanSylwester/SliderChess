@@ -1,6 +1,6 @@
 import { Game } from './gameLogic.js';
 import { updateGameList as updateGameList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect } from './server.js';
-import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor } from '../shared/types.js';
+import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState } from '../shared/types.js';
 
 export function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): void {
     const message = JSON.parse(data.toString());
@@ -86,7 +86,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             break;
 
         case MESSAGE_TYPES.RECONNECT:
-            handleReconnect(client, message.clientId);
+            handleReconnect(client, message.clientId, message.clientName, message.gameState);
             break;
 
         default:
@@ -105,7 +105,34 @@ function handleCreateGame(client: ClientInfo, games: Map<number, Game>, initialT
     pushGameList();
 }
 
-function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): void {
+export function handleCreateGameFromState(client: ClientInfo, games: Map<number, Game>, gameId: number, gameState: GameState): void {
+    if (!gameId) {
+        // client maliciously creating a game with ID 0 would break a lot of stuff... 
+        gameId = gameIdCounter++;
+        console.log(` assigning new game ID ${gameId}`);
+    } 
+
+    let game: Game;
+    if (games.has(gameId)) {
+        console.log(` game ${gameId} already existing, connecting client to game instead of loading from state`)
+        game = games.get(gameId)!;
+    } else {
+        console.log(` and recreating from client state`);
+        game = new Game(gameId, 10, 10, '');
+        game.loadFromState(gameState)
+        games.set(game.id, game);
+        gameIdCounter = Math.max(gameIdCounter, gameId + 1);  // put the counter above this one so that we don't clobber this later
+    }
+
+    handleJoinGame(client, games, gameId, gameState.password); // note: this will updateGameList() when the client is assigned to a position
+
+    // try to assign color based on name match
+    if (gameState.playerWhiteName === client.name) game.changePosition(client, PieceColor.WHITE);
+    else if (gameState.playerBlackName === client.name) game.changePosition(client, PieceColor.BLACK);
+    pushGameList();
+}
+
+export function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): void {
     if (client.gameId) {
         console.error(`Client ${client.id} is already in a game (${client.gameId}), cannot join another.`);
         return;

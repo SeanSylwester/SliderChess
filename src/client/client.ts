@@ -1,5 +1,5 @@
-import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS } from "../shared/types.js";
-import { move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules } from "./gameLogic.js";
+import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage } from "../shared/types.js";
+import { move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules, localGameState } from "./gameLogic.js";
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry } from './lobbyScreen.js'
 import { showGame, updatePassword } from './gameScreen.js'
 let ws: WebSocket;
@@ -22,11 +22,12 @@ function connectWebSocket(): void {
         (window as any).ws = ws;
         if (reconnectAttempts) {
             console.log('Successfully reconnected to the WebSocket server!');
+            if (localGameState) console.log('Trying to reconnect to my game');
             reconnectAttempts = 0;
-            sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: myClientId });
+            sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: myClientId, clientName: playerNameEntry.value, gameState: localGameState } satisfies ReconnectMessage);
         } else {
             console.log('Connected to WebSocket server');
-            sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: '' });  // sync my name with the server
+            sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: '' } satisfies ChangeNameMessage);  // sync my name with the server
             if (!isNaN(gameId)) {
                 fromHistory = true;
                 requestJoinGame(gameId);
@@ -93,8 +94,10 @@ function connectWebSocket(): void {
     };
 
     ws.onclose = () => {
-        updateChat('Disconnected from server');
-        console.log('Disconnected from server');
+        if (!reconnectAttempts) {
+            updateChat('Disconnected from server. Attempting to reconnect...');
+            console.log('Disconnected from server');
+        }
         tryReconnect();
     };
 }
@@ -141,7 +144,7 @@ window.addEventListener("popstate", (event) => {
     const gameId = parseInt(window.location.pathname.slice(1)); // Remove leading '/'
     fromHistory = true;
     if (isNaN(gameId)) {
-        sendMessage({ type: MESSAGE_TYPES.QUIT_GAME });
+        sendMessage({ type: MESSAGE_TYPES.QUIT_GAME } satisfies Message);
     } else {
         requestJoinGame(gameId);
     }

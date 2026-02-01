@@ -15,6 +15,7 @@ export interface GameState {
     playerBlackName: string | null;
     spectatorNames: string[];
     id: number;
+    password: string;
     board: Piece[][];
     chatLog: string[];
     movesLog: Move[];
@@ -33,6 +34,18 @@ export interface GameState {
     drawWhite: boolean;
     drawBlack: boolean;
     rules: Rules;
+    halfmoveClock: number;
+    mapFEN: any; // Map<string, number>;
+}
+export interface GameInfo {
+    hasPassword: boolean;
+    password?: string;  // client will store known passwords here
+    gameId: number;
+    playerWhite: string | null;
+    playerBlack: string | null;
+    numberOfSpectators: number;
+    timeLeftWhite: number; // in seconds
+    timeLeftBlack: number; // in seconds
 }
 
 export interface Rules {
@@ -49,16 +62,6 @@ export interface Rules {
     ruleIgnoreAll: boolean;
 }
 
-export interface GameInfo {
-    hasPassword: boolean;
-    password?: string;  // client will store known passwords here
-    gameId: number;
-    playerWhite: string | null;
-    playerBlack: string | null;
-    numberOfSpectators: number;
-    timeLeftWhite: number; // in seconds
-    timeLeftBlack: number; // in seconds
-}
 
 // order matches svg columns
 export enum PieceType {
@@ -206,4 +209,6 @@ export interface RejectJoinGameMessage extends Message {
 export interface ReconnectMessage extends Message {
     type: typeof MESSAGE_TYPES.RECONNECT;
     clientId: number;
+    clientName: string;
+    gameState?: GameState;  // sent from the client to use when the server can't reload the game
 }

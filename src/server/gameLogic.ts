@@ -6,9 +6,9 @@ export class Game {
     id: number;
     password = '';
 
-    playerWhite: ClientInfo | null = null;
-    playerBlack: ClientInfo | null = null;
-    spectators: ClientInfo[] = [];
+    playerWhite: ClientInfo | null = null;   // string name sent to client
+    playerBlack: ClientInfo | null = null;  // string name sent to client
+    spectators: ClientInfo[] = [];  // string name sent to client
 
     board: Piece[][];
     chatLog: string[] = [];
@@ -23,7 +23,7 @@ export class Game {
     timeLeftBlack: number; // in seconds
     clockRunning = false;
 
-    lastMoveTime = 0;
+    lastMoveTime = 0;  // not sent to client
 
     KW = true;
     QW = true;
@@ -69,6 +69,31 @@ export class Game {
         this.board = getDefaultBoard();
         this.mapFEN = new Map<string, number>();
         this.updateFEN();
+    }
+
+    public loadFromState(gameState: GameState): void {
+        this.id = gameState.id;
+        this.password = gameState.password;
+        this.board = gameState.board;
+        this.chatLog = gameState.chatLog;
+        this.movesLog = gameState.movesLog;
+        this.currentTurn = gameState.currentTurn;
+        this.initialTimeWhite = gameState.initialTimeWhite;
+        this.initialTimeBlack = gameState.initialTimeBlack;
+        this.incrementWhite = gameState.incrementWhite;
+        this.incrementBlack = gameState.incrementBlack;
+        this.timeLeftWhite = gameState.timeLeftWhite;
+        this.timeLeftBlack = gameState.timeLeftBlack;
+        this.clockRunning = false;
+        this.KW = gameState.KW;
+        this.QW = gameState.QW;
+        this.KB = gameState.KB;
+        this.QB = gameState.QB;
+        this.drawWhite = false;
+        this.drawBlack = false;
+        this.rules = gameState.rules;
+        this.halfmoveClock = gameState.halfmoveClock;
+        this.mapFEN = new Map(Object.entries(gameState.mapFEN));
     }
 
     public setPassword(password: string, client?: ClientInfo): void {
@@ -142,7 +167,7 @@ export class Game {
 
     public changePosition(c: ClientInfo, position: PieceColor): void {
         if (c.gameId !== this.id) {
-            console.error(`Client ${c} (${c.name}) is in game ${c.gameId}, not ${this.id}`);
+            console.error(`Client ${c.id} (${c.name}) is in game ${c.gameId}, not ${this.id}`);
             return;
         }
 
@@ -309,6 +334,7 @@ export class Game {
             playerBlackName: this.playerBlack?.name ?? null,
             spectatorNames: this.spectators.map(s => s.name),
             id: this.id,
+            password: this.password,
             board: this.board,
             chatLog: this.chatLog,
             movesLog: this.movesLog,
@@ -326,7 +352,9 @@ export class Game {
             QB: this.QB,
             drawWhite: this.drawWhite,
             drawBlack: this.drawBlack,
-            rules: this.rules
+            rules: this.rules,
+            halfmoveClock: this.halfmoveClock,
+            mapFEN: Object.fromEntries(this.mapFEN)
         };
         const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
         sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage);
