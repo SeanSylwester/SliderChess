@@ -120,6 +120,7 @@ export const MESSAGE_TYPES = {
     LOG_MESSAGE: 'logMessage',
     GAME_PASSWORD: 'gamePassword',
     REJECT_JOIN_GAME: 'rejectJoin',
+    RECONNECT: 'reconnect',
 } as const;
 
 // Message type definitions
@@ -136,6 +137,7 @@ export interface CreateGameMessage extends Message {
 export interface ChangeNameMessage extends Message {
     type: typeof MESSAGE_TYPES.CHANGE_NAME;
     name: string;
+    clientId?: number;
 }
 export interface JoinGameMessage extends Message {
     type: typeof MESSAGE_TYPES.JOIN_GAME;
@@ -199,4 +201,8 @@ export interface GamePasswordMessage extends Message {
 export interface RejectJoinGameMessage extends Message {
     type: typeof MESSAGE_TYPES.REJECT_JOIN_GAME;
     gameId: number;
+}
+export interface ReconnectMessage extends Message {
+    type: typeof MESSAGE_TYPES.RECONNECT;
+    clientId: number;
 }

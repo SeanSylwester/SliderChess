@@ -1,6 +1,6 @@
 import { Game } from './gameLogic.js';
-import { updateGameList as updateGameList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList } from './server.js';
-import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage } from '../shared/types.js';
+import { updateGameList as updateGameList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect } from './server.js';
+import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor } from '../shared/types.js';
 
 export function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): void {
     const message = JSON.parse(data.toString());
@@ -10,7 +10,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
     if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.MOVE_PIECE, MESSAGE_TYPES.REWIND, MESSAGE_TYPES.DRAW, 
          MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER,
          MESSAGE_TYPES.GAME_PASSWORD].includes(message.type)) {
-        if (client.gameId === undefined) {
+        if (!client.gameId) {
             console.error(`Client ${client.id} is not in a game.`);
             return;
         }
@@ -84,7 +84,11 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             game!.setPassword(message.password, client);
             pushGameList();
             break;
-        
+
+        case MESSAGE_TYPES.RECONNECT:
+            handleReconnect(client, message.clientId);
+            break;
+
         default:
             console.error(`Unknown message type ${message.type}`);
             console.error(message);
@@ -102,7 +106,7 @@ function handleCreateGame(client: ClientInfo, games: Map<number, Game>, initialT
 }
 
 function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): void {
-    if (client.gameId !== undefined) {
+    if (client.gameId) {
         console.error(`Client ${client.id} is already in a game (${client.gameId}), cannot join another.`);
         return;
     }
@@ -125,7 +129,7 @@ function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: nu
 }
 
 export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): void {
-    if (client.gameId === undefined) {
+    if (!client.gameId) {
         console.error(`Client ${client.id} is not in a game, cannot quit. Sending them to the lobby`);
         serveLobby(client);
         return;
@@ -134,7 +138,8 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
     const game = games.get(client.gameId);
     if (game) {
         game.removePlayer(client);
-        client.gameId = undefined;
+        client.gameId = 0;
+        client.gamePosition = PieceColor.NONE;
         updateGameList();
         serveLobby(client);
     } else {
@@ -145,6 +150,7 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
 function handleChangeName(client: ClientInfo, name: string): void {
     const oldName = client.name;
     if (name.startsWith('admin|')) {
+        // try to login as admin, with the password after the pipe
         if (name.substring(6) === process.env.ADMIN_SECRET) {
             client.isAdmin = true;
             client.name = 'admin';
@@ -155,7 +161,11 @@ function handleChangeName(client: ClientInfo, name: string): void {
             sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: 'naughty boy' } satisfies ChangeNameMessage)
         }
         console.log(client.ip);
+    } else if (name === '') {
+        // new connection asking for their name and clientId
+        sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name, clientId: client.id } satisfies ChangeNameMessage);
     } else if (name !== 'admin') {
+        // normal name change request
         client.name = name;
         console.log(`Client ${client.id} changed name from ${oldName} to ${client.name}`);
         updateGameList();

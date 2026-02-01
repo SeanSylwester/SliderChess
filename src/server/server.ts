@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 
 import { Game } from './gameLogic.js';
 import { handleMessage, handleQuitGame } from './messageHandler.js';
-import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, ChangeNameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage } from '../shared/types.js';
+import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, ChangeNameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor } from '../shared/types.js';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -22,7 +22,8 @@ export interface ClientInfo {
     isAdmin: boolean;
     ip: string | undefined;
     req: http.IncomingMessage;
-    gameId?: number;
+    gameId: number;
+    gamePosition: PieceColor;
 }
 
 // Create HTTP server
@@ -33,6 +34,7 @@ const wss = new WebSocketServer({ server });
 
 // Store connected clients
 const clients = new Map<WebSocket, ClientInfo>();
+const clientLastKnownPosition = new Map<number, { name: string, gameId: number, position: PieceColor }>();
 let clientIdCounter = 1;
 
 // Store list of games
@@ -117,7 +119,7 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
         case ADMIN_COMMANDS.GAME_DELETE:
             game!.logChatMessage('Server is killing this game. You can stay here but the connection will be broken');
             for (const client of game!.allClients()) {
-                client.gameId = undefined;
+                client.gameId = 0;
             }
             games.delete(data.gameId);
             pushGameList();
@@ -145,12 +147,9 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
 // Handle WebSocket connections
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     const clientId = clientIdCounter++;
-    const clientInfo: ClientInfo = { id: clientId, name: `Player ${clientId}`, ws: ws, isAdmin: false, ip: req.socket.remoteAddress, req: req };
+    const clientInfo: ClientInfo = { id: clientId, name: `Player ${clientId}`, ws: ws, isAdmin: false, ip: req.socket.remoteAddress, req: req, gameId: 0, gamePosition: PieceColor.NONE };
     clients.set(ws, clientInfo);
     console.log(`Client connected: ${clientId}`);
-
-    // Send welcome message to new client
-    sendMessage(clientInfo, { type: MESSAGE_TYPES.CHANGE_NAME, name: clientInfo.name } satisfies ChangeNameMessage);
 
     // send current game list
     sendGameList(clientInfo);
@@ -167,6 +166,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
     // Handle client disconnect
     ws.on('close', () => {
+        clientLastKnownPosition.set(clientInfo.id, { name: clientInfo.name, gameId: clientInfo.gameId, position: clientInfo.gamePosition })
         clients.delete(ws);
         console.log(`Client disconnected: ${clientId}`);
         handleQuitGame(clientInfo, games);
@@ -176,6 +176,23 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         console.error(`WebSocket error from ${clientId}:`, error);
     });
 });
+
+export function handleReconnect(client: ClientInfo, clientOldId: number): void {
+    const lastPosition = clientLastKnownPosition.get(clientOldId);
+    if (lastPosition) {
+        console.log(`Reconnecting new client ${client.id} to ${clientOldId} (${lastPosition.name})`);
+        clientLastKnownPosition.delete(clientOldId);
+        client.id = clientOldId;
+        client.name = lastPosition.name
+        
+        const game = games.get(lastPosition.gameId);
+        if (game) {
+            console.log(` and also trying to connect client ${client.id} to game ${lastPosition.gameId} as ${PieceColor[lastPosition.position]}`);
+            client.gameId = lastPosition.gameId;
+            game.addPlayer(client, lastPosition.position);
+        }
+    }
+}
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '../../public')));

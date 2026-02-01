@@ -120,15 +120,24 @@ export class Game {
     }
 
     public addPlayer(player: ClientInfo, color = PieceColor.NONE): void {
-        if (color === PieceColor.WHITE) {
+        const bumped = ((color === PieceColor.WHITE && this.playerWhite) || (color === PieceColor.BLACK && this.playerBlack));
+        if (color === PieceColor.WHITE && !this.playerWhite) {
             this.playerWhite = player;
-        } else if (color === PieceColor.BLACK) {
+            player.gamePosition = PieceColor.WHITE
+        } else if (color === PieceColor.BLACK && !this.playerBlack) {
             this.playerBlack = player;
+            player.gamePosition = PieceColor.BLACK
         } else {
             this.spectators.push(player);
+            player.gamePosition = PieceColor.NONE
         }
         this.sendGameStateToAll();
-        this.logChatMessage(`Player ${player.name} has joined as ${color === PieceColor.NONE ? 'a spectator' : PieceColor[color]}.`);
+
+        if (bumped) {
+            this.logChatMessage(`Player ${player.name} tried to join as ${PieceColor[color]}, but that position was already filled.`);
+        } else {
+            this.logChatMessage(`Player ${player.name} has joined as ${color === PieceColor.NONE ? 'a spectator' : PieceColor[color]}.`);
+        }
     }
 
     public changePosition(c: ClientInfo, position: PieceColor): void {
@@ -151,12 +160,15 @@ export class Game {
         switch (position) {
             case PieceColor.WHITE:
                 this.playerWhite = c;
+                c.gamePosition = PieceColor.WHITE
                 break;
             case PieceColor.BLACK:
                 this.playerBlack = c;
+                c.gamePosition = PieceColor.BLACK
                 break;
             case PieceColor.NONE:
                 this.spectators.push(c);
+                c.gamePosition = PieceColor.NONE
                 break;
         }
         switch (originalPosition) {

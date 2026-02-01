@@ -5,7 +5,8 @@ import { showGame, updatePassword } from './gameScreen.js'
 let ws: WebSocket;
 let reconnectAttempts = 0;
 let reconnectMax = 10;
-export let myGameId = -1;
+export let myGameId = 0;
+export let myClientId = 0;
 export let fromHistory = false;
 let debugClient = false;
 (window as any).debugClient = debugClient
@@ -22,9 +23,10 @@ function connectWebSocket(): void {
         if (reconnectAttempts) {
             console.log('Successfully reconnected to the WebSocket server!');
             reconnectAttempts = 0;
-            // TODO: try to reconnect to a game if we were in one
+            sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: myClientId });
         } else {
             console.log('Connected to WebSocket server');
+            sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: '' });  // sync my name with the server
             if (!isNaN(gameId)) {
                 fromHistory = true;
                 requestJoinGame(gameId);
@@ -38,6 +40,7 @@ function connectWebSocket(): void {
         switch (message.type) {
             case MESSAGE_TYPES.CHANGE_NAME:
                 playerNameEntry.value = message.name;
+                if (message.clientId) myClientId = message.clientId;
                 break;
             case MESSAGE_TYPES.GAME_LIST:
                 updateGameList(message.gameList);
@@ -57,7 +60,7 @@ function connectWebSocket(): void {
             case MESSAGE_TYPES.QUIT_GAME:
                 clearLocalGameState();
                 showLobby();
-                myGameId = -1;
+                myGameId = 0;
                 fromHistory = false;
                 break;
             case MESSAGE_TYPES.MOVE_PIECE:
