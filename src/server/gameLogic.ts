@@ -66,7 +66,7 @@ export class Game {
     public setPassword(client: ClientInfo, password: string): void {
         this.password = password;
         this.sendMessageToAll({ type: MESSAGE_TYPES.GAME_PASSWORD, password: password });
-        this.logChatMessage('has changed the password', client);
+        this.logChatMessage(`has ${password !== '' ? 'updated' : 'removed'} the password`, client);
     }
 
     public updateFEN(): void {
