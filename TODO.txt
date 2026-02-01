@@ -2,8 +2,8 @@ reconnect
 
 promotions choose piece other than queen
 save game button
-createGame dialog box
 
+refactor to not recreate gameList on every change
 refactor to just send the whole game state every move, minus the notation and chat logs
 refactor to just redraw the whole board each move
 

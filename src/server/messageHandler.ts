@@ -23,11 +23,11 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
     switch (message.type) {
         case MESSAGE_TYPES.CREATE_GAME:
-            handleCreateGame(client, games);
+            handleCreateGame(client, games, message.initialTime, message.increment, message.password);
             break;
 
         case MESSAGE_TYPES.JOIN_GAME:
-            handleJoinGame(client, message.gameId, message.password, games);
+            handleJoinGame(client, games, message.gameId, message.password, );
             break;
 
         case MESSAGE_TYPES.CHANGE_POSITION:
@@ -81,7 +81,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             break;
         
         case MESSAGE_TYPES.GAME_PASSWORD:
-            game!.setPassword(client, message.password);
+            game!.setPassword(message.password, client);
             pushGameList();
             break;
         
@@ -92,15 +92,16 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 }
 
 let gameIdCounter = 1;
-function handleCreateGame(client: ClientInfo, games: Map<number, Game>): void {
+function handleCreateGame(client: ClientInfo, games: Map<number, Game>, initialTime: number, increment: number, password: string): void {
     console.log(`Creating game ${gameIdCounter} for client ${client.id}`);
-    const newGame = new Game(gameIdCounter++);
+    const newGame = new Game(gameIdCounter++, initialTime, increment, password);
     games.set(newGame.id, newGame);
-    handleJoinGame(client, newGame.id, '', games); // note: this will updateGameList() when the client is assigned to a position
+
+    handleJoinGame(client, games, newGame.id, password); // note: this will updateGameList() when the client is assigned to a position
     pushGameList();
 }
 
-function handleJoinGame(client: ClientInfo, gameId: number, password: string, games: Map<number, Game>): void {
+function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): void {
     if (client.gameId !== undefined) {
         console.error(`Client ${client.id} is already in a game (${client.gameId}), cannot join another.`);
         return;

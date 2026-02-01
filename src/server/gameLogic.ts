@@ -3,6 +3,9 @@ import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeIn
 import { sendMessage, ClientInfo } from './server.js';
 
 export class Game {
+    id: number;
+    password = '';
+
     playerWhite: ClientInfo | null = null;
     playerBlack: ClientInfo | null = null;
     spectators: ClientInfo[] = [];
@@ -12,12 +15,12 @@ export class Game {
     movesLog: Move[] = [];
     currentTurn: PieceColor = PieceColor.WHITE;
 
-    initialTimeWhite = 600; // in seconds
-    initialTimeBlack = 600; // in seconds
-    incrementWhite = 5;   // in seconds
-    incrementBlack = 5;   // in seconds
-    timeLeftWhite = this.initialTimeWhite; // in seconds
-    timeLeftBlack = this.initialTimeBlack; // in seconds
+    initialTimeWhite: number; // in seconds
+    initialTimeBlack: number; // in seconds
+    incrementWhite: number;   // in seconds
+    incrementBlack: number;   // in seconds
+    timeLeftWhite: number; // in seconds
+    timeLeftBlack: number; // in seconds
     clockRunning = false;
 
     lastMoveTime = 0;
@@ -37,8 +40,6 @@ export class Game {
 
     mapFEN: Map<string, number>;
 
-    password = '';
-
     rules: Rules = {
         ruleMoveOwnKing: true,
         ruleMoveOwnKingInCheck: true,
@@ -53,20 +54,27 @@ export class Game {
         ruleIgnoreAll: false,
     }
 
-    public constructor(public id: number) {
+    public constructor(id: number, initialTime: number, increment: number, password: string) {
         this.id = id;
         this.logChatMessage(`Game ${this.id} created.`);
 
-        // note: the column order looks flipped because the rows are upside down. a1 is the top left of this array, but ends up bottom left.
+        this.initialTimeWhite = initialTime;
+        this.initialTimeBlack = initialTime;
+        this.timeLeftWhite = initialTime;
+        this.timeLeftBlack = initialTime;
+        this.incrementWhite = increment;
+        this.incrementBlack = increment;
+        this.setPassword(password);
+
         this.board = getDefaultBoard();
         this.mapFEN = new Map<string, number>();
         this.updateFEN();
     }
 
-    public setPassword(client: ClientInfo, password: string): void {
+    public setPassword(password: string, client?: ClientInfo): void {
         this.password = password;
         this.sendMessageToAll({ type: MESSAGE_TYPES.GAME_PASSWORD, password: password });
-        this.logChatMessage(`has ${password !== '' ? 'updated' : 'removed'} the password`, client);
+        if (client) this.logChatMessage(`has ${password !== '' ? 'updated' : 'removed'} the password`, client);
     }
 
     public updateFEN(): void {

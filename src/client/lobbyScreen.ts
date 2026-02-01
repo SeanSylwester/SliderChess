@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage } from "../shared/types.js";
+import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage } from "../shared/types.js";
 import { formatMinSec } from '../shared/utils.js'
 import { sendMessage, fromHistory } from './client.js'
 
@@ -67,6 +67,11 @@ playerNameEntry!.addEventListener('keypress', function (event) {
 
 
 // game list
+// gamesInfo is replaced each call to updateGameList after transferring over any locally stored data
+export let gameList: GameInfo[] = [];
+export function getGame(gameId: number): GameInfo | undefined {
+    return gameList.find(el => el.gameId === gameId);
+}
 const gameListElement = document.getElementById('gameList')!;
 export function updateGameList(newGameList: GameInfo[]): void {
     gameListElement.innerHTML = ''; // Clear existing list
@@ -99,17 +104,26 @@ export function updateGameList(newGameList: GameInfo[]): void {
     gameList = newGameList
 }
 
-// gamesInfo is replaced each call to updateGameList after transferring over any locally stored data
-export let gameList: GameInfo[] = [];
-export function getGame(gameId: number): GameInfo | undefined {
-    return gameList.find(el => el.gameId === gameId);
-}
-
 
 // refresh button
 const refreshGameListButton = document.getElementById('refreshGameList');
 refreshGameListButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.GAME_LIST } satisfies Message));
 
-// create game button
-const createGame = document.getElementById('createGame');
-createGame!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CREATE_GAME }));
+// create game
+const createGameDialog = document.getElementById('createGameDialog') as HTMLDialogElement;
+const createGameButton = document.getElementById('createGame');
+createGameButton!.addEventListener('click', () => createGameDialog.showModal());
+
+const createTimeInput = document.getElementById('createTimeInput') as HTMLInputElement;
+const createIncrementInput = document.getElementById('createIncrementInput') as HTMLInputElement;
+const createPasswordInput = document.getElementById('createPasswordInput') as HTMLInputElement;
+
+const createConfirmButton = document.getElementById('createConfirmButton');
+createConfirmButton!.addEventListener('click', (event) => {
+    event.preventDefault();
+    sendMessage({ type: MESSAGE_TYPES.CREATE_GAME, 
+                  initialTime: 60*parseFloat(createTimeInput.value),
+                  increment: parseFloat(createIncrementInput.value),
+                  password: createPasswordInput.value } satisfies CreateGameMessage);
+    createGameDialog.close();
+});

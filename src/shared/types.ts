@@ -127,6 +127,12 @@ export interface Message {
     type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYPES];
 }
 
+export interface CreateGameMessage extends Message {
+    type: typeof MESSAGE_TYPES.CREATE_GAME;
+    initialTime: number;
+    increment: number;
+    password: string;
+}
 export interface ChangeNameMessage extends Message {
     type: typeof MESSAGE_TYPES.CHANGE_NAME;
     name: string;

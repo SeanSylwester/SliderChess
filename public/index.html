@@ -17,6 +17,29 @@
         <ol id="gameList"></ol>
     </div>
 
+    <dialog id="createGameDialog">
+        <form>
+            <p>
+                <label for="createTimeInput">Time:</label>
+                <input type="text" id="createTimeInput" name="createTimeInput" value="10">
+                <label for="createTimeInput"> (min)</label>
+            </p>
+            <p>
+                <label for="createIncrementInput">Increment:</label>
+                <input type="text" id="createIncrementInput" name="createIncrementInput" value="0">
+                <label for="createIncrementInput"> (sec)</label>
+            </p>
+            <p>
+                <label for="createPasswordInput">Password:</label>
+                <input type="text" id="createPasswordInput" name="createPasswordInput">
+            </p>
+            <div>
+                <button id="createCancelButton" type="button">Cancel</button>
+                <button id="createConfirmButton" type="submit">Confirm</button>
+            </div>
+        </form>
+    </dialog>
+
     <div id="game-screen" style="display: none;">
         <h1>Game Room #<span id="gameIdDisplay"></span></h1>
         <span>Game password:<input type="text" id="gamePassword"/> <button id="updateGamePassword">Update</button></span> </br>
