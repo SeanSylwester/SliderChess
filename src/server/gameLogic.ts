@@ -1,5 +1,5 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish, getMoveDisambiguationStr } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
 export class Game {
@@ -472,6 +472,9 @@ export class Game {
             if (!isTile && !pieceCanMoveTo(fromRow, fromCol, toRow, toCol, this.board, this.movesLog.at(-1))) return false;
         }
 
+        // before moving, grab the disambiguation info
+        const disambiguation = isTile ? '' : getMoveDisambiguationStr(fromRow, fromCol, toRow, toCol, this.board[fromRow][fromCol].type, this.currentTurn, this.board);
+
         // do the move!
         const {oldPiece, newPiece, enPassant} = moveOnBoard(this.board, fromRow, fromCol, toRow, toCol, isTile, promotions);
 
@@ -483,7 +486,7 @@ export class Game {
         const check = inCheck(this.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE, this.board);
 
         // get move notation
-        const notation = moveNotation(oldPiece, newPiece, fromRow, fromCol, toRow, toCol, isTile, promotions, check, enPassant);
+        const notation = moveNotation(oldPiece, newPiece, fromRow, fromCol, toRow, toCol, disambiguation, isTile, promotions, check, enPassant);
 
         // log the move
         this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});

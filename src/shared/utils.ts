@@ -564,6 +564,7 @@ export function getPiecesThatCanReach(toRow: number, toCol: number, pieceType: P
     const spots: {fromRow: number, fromCol: number}[] = [];
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
+            if (row === toRow && col === toCol) continue
             const piece = board[row][col];
             if (piece.type === pieceType && piece.color === color && pieceCanMoveTo(row, col, toRow, toCol, board, lastMove)) {
                 spots.push({ fromRow: row, fromCol: col });
@@ -579,7 +580,30 @@ export function pieceGivingCheck(kingColor: PieceColor, row: number, col: number
     return pieceCanMoveTo(row, col, kingRow, kingCol, board, undefined);  // don't care about en passant for this, so lastMove isn't needed
 }
 
-export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[], isCheck: boolean, enPassant: boolean): string {
+export function getMoveDisambiguationStr(fromRow: number, fromCol: number, toRow: number, toCol: number, pieceType: PieceType, pieceColor: PieceColor, board: Piece[][]): string {
+    let sameRow = false;
+    let sameCol = false;
+    const otherFroms = getPiecesThatCanReach(toRow, toCol, pieceType, pieceColor, board, undefined);
+    if (otherFroms.length <= 1) return '';  // no disambiguation needed
+
+    for (const otherFrom of otherFroms) {
+        // skip the piece that's moving
+        if (otherFrom.fromRow === fromRow && otherFrom.fromCol === fromCol) continue;
+
+        if (otherFrom.fromRow === fromRow) sameRow = true;
+        if (otherFrom.fromCol === fromCol) sameCol = true;
+    }
+    // if different column than all others, use that
+    // if column matches, but we have a unique row, then use that
+    // if all else fails, use both
+    const disambiguation = (!sameCol) ? `${col0ToFile(fromCol)}`
+                         : (!sameRow) ? `${fromRow+1}` 
+                         : `${col0ToFile(fromCol)}${fromRow+1}`;
+
+    return disambiguation;
+}
+
+export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, fromCol: number, toRow: number, toCol: number, disambiguation: string, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[], isCheck: boolean, enPassant: boolean): string {
     // check notation
     const check = isCheck ? '+' : '';
     
@@ -606,7 +630,7 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
     } else {
         const capture = (!enPassant && oldPiece.type === PieceType.EMPTY) ? '' : 'x';
         const pieceChar = getPieceChar(newPiece, capture === 'x', fromCol);
-        notation = castle === '' ? `${pieceChar}${capture}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}` : castle;
+        notation = castle === '' ? `${pieceChar}${disambiguation}${capture}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}` : castle;
     }
 
     return notation;

@@ -1,4 +1,3 @@
-notation disambiguation
 offline play
     flag on lobby to disconnect from server, then run a game locally controlling black and white
 promotions choose piece other than queen
