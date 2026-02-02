@@ -418,6 +418,80 @@ function clearLastMoveHighlight(): void {
 
 
 
+
+
+
+// promotion selector
+const promoPadding = 8;
+const promoPieceSize = pitch - 2 * promoPadding;
+const promoPiecesOrder = [PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT];
+const promoBoxWidth = pitch - 2 * promoPadding;
+const promoBoxHeight = 4 * pitch - 2 * promoPadding;
+const promoDy = promoPieceSize + promoPadding;
+const promoBackground = "#d2b08c";
+let promoX = 0;
+let promoY = 0;
+function drawPromotionSelector(unflippedRow: number, unflippedCol: number) {
+    const color = unflippedRow === 0 ? PieceColor.BLACK : PieceColor.WHITE
+    const {x, y} = getXY(unflippedRow, unflippedCol, flip);
+    promoX = x;
+    promoY = y;
+
+    const direction = (unflippedRow === 0 && !flip || unflippedRow === 7 && flip) ? -1 : 1
+    
+    // Draw background box
+    ctx.fillStyle = promoBackground;
+    ctx.strokeStyle = '#000000';
+    if (direction === 1) {
+        ctx.fillRect(promoX + promoPadding, promoY + promoPadding, promoBoxWidth, promoBoxHeight);
+        ctx.strokeRect(promoX + promoPadding, promoY + promoPadding, promoBoxWidth, promoBoxHeight);
+    } else {
+        ctx.fillRect(promoX + promoPadding, promoY + pitch - promoPadding, promoBoxWidth, -promoBoxHeight);
+        ctx.strokeRect(promoX + promoPadding, promoY + pitch - promoPadding, promoBoxWidth, -promoBoxHeight);
+    }
+    
+    // Draw each promotion option
+    promoPiecesOrder.forEach((pieceType, idx) => {
+        const promoYi = promoY + promoPadding + direction * idx * pitch;
+        
+        // this relies on the piece.type and piece.color enums being ordered to match the svg
+        ctx.drawImage(piecesImg, 45*pieceType, 45*color, 45, 45, promoX + promoPadding, promoYi, promoPieceSize, promoPieceSize);
+    });
+}
+
+
+function waitForPromo(): Promise<PieceType> {
+    return new Promise(resolve => {
+        // Handle click on the promotion selector
+        function handleClickPromotion(event: MouseEvent): void {
+            canvas.removeEventListener('click', handleClickPromotion);
+            canvas.addEventListener('click', handleClick);
+
+            const top = promoY !== lineSpace;
+            
+            // Check if click is within the selector box
+            if (event.offsetX < promoX || event.offsetX > promoX + pitch
+                || ( top && (event.offsetY > (promoY + pitch) || event.offsetY < promoY - 3 * pitch))
+                || (!top && (event.offsetY < promoY || event.offsetY > promoY + 4 * pitch))) {
+                // clicked outside of box: return empty
+                resolve(PieceType.EMPTY);
+            } else {
+                if (top) resolve(promoPiecesOrder[Math.floor((promoY + pitch - event.offsetY) / pitch)]);
+                else resolve(promoPiecesOrder[Math.floor((event.offsetY - promoY) / promoDy)]);
+            }
+            
+        }
+
+        canvas.removeEventListener('click', handleClick);
+        canvas.addEventListener('click', handleClickPromotion);
+    });
+}
+
+
+
+
+
+
 // game logic stuff
 const drawButton = document.getElementById('draw') as HTMLButtonElement;
 const surrenderButton = document.getElementById('surrender') as HTMLButtonElement;
@@ -428,7 +502,6 @@ let validSquares: ReturnType<typeof getValidMoves> | null;
 
 export function initLocalGameState(gameState: GameState, yourColor: PieceColor): void {
     localGameState = gameState;
-    localGameState.mapFEN = new Map(Object.entries(localGameState.mapFEN));
     myColor = yourColor;
     if (myColor === PieceColor.WHITE) {
         flip = false;
@@ -463,7 +536,7 @@ export function clearLocalGameState(): void {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function handleClick(event: MouseEvent): void {
+async function handleClick(event: MouseEvent): Promise<void> {
     if (!localGameState) {
         console.error("No board to get piece from");
         return;
@@ -522,10 +595,26 @@ function handleClick(event: MouseEvent): void {
             })
         } 
     } else {
-        // try to move piece if we think it's valid. If it's not my turn or it's an invalid move, the server will reject it. Regardless, clear the highlight
-        if (localGameState.rules.ruleIgnoreAll || validSquares?.some(square => square.toRow === unflippedRow && square.toCol === unflippedCol)) {
-            requestMovePiece(selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile, checkPromotion(localGameState.board, selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile));
+        // try to move piece if we think it's valid. If it's an invalid move, the server will reject it. 
+        if (localGameState.rules.ruleIgnoreAll || (myColor === localGameState.currentTurn && validSquares?.some(square => square.toRow === unflippedRow && square.toCol === unflippedCol))) {
+            // if promotion(s) detected, show the dialog(s) and wait for the user to click
+            const promoLocations = checkPromotion(localGameState.board, selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile);
+            let promos: {row: number; col: number, piece: Piece}[] = [];
+            if (promoLocations.length) {
+                for (const promo of promoLocations) {
+                    drawPromotionSelector(promo.row, promo.col);
+                    const pieceType: PieceType = await waitForPromo();
+                    console.log(PieceType[pieceType]);
+                    if (pieceType !== PieceType.EMPTY) promos.push({row: promo.row, col: promo.col, piece: {type: pieceType, color: myColor}});
+                }
+                renderFullBoard();
+            }
+            if (promos.length === promoLocations.length) {
+                requestMovePiece(selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile, promos);
+            }
         }
+
+        // regardless, clear the highlight
         drawSquare(selectedSquare.row, selectedSquare.col, selectedSquare.isTile, null);
         if (validSquares) {
             validSquares.forEach(square => {

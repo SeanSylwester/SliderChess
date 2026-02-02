@@ -1,6 +1,5 @@
 offline play
     flag on lobby to disconnect from server, then run a game locally controlling black and white
-promotions choose piece other than queen
 
 database to store games?
     this could happen automatically if the game is completed and the last user disconnects?

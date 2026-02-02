@@ -703,10 +703,10 @@ export function moveOnBoard(board: Piece[][], fromRow: number, fromCol: number, 
     return {oldPiece: oldPiece, newPiece: newPiece, enPassant: enPassant};
 }
 
-export function checkPromotion(board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): {row: number, col: number, piece: Piece}[] {
+export function checkPromotion(board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): {row: number, col: number}[] {
     const piece = isTile ? { type: PieceType.TILE, color: PieceColor.NONE } : board[fromRow][fromCol];
 
-    let promotions: {row: number, col: number, piece: Piece}[] = [];
+    let promotions: { row: number, col: number }[] = [];
     if (isTile) {
         const isRotation = toRow % 2 || toCol % 2;
         if ([0, 6].includes(fromRow) || (!isRotation && [0, 6].includes(toRow))) {
@@ -717,7 +717,7 @@ export function checkPromotion(board: Piece[][], fromRow: number, fromCol: numbe
                 const testRow = (fromRow === 0 || toRow === 0) ? 0 : 7;
                 const piece = board[testRow][testCol];
                 if (piece.type === PieceType.PAWN && piece.color === (testRow === 0 ? PieceColor.BLACK : PieceColor.WHITE)) {
-                    promotions.push({row: testRow, col: testCol, piece: {type: PieceType.QUEEN, color: piece.color}});
+                    promotions.push({ row: testRow, col: testCol });
                 }
             }
             
@@ -726,7 +726,7 @@ export function checkPromotion(board: Piece[][], fromRow: number, fromCol: numbe
         }
     } else if (piece.type === PieceType.PAWN && ((piece.color === PieceColor.WHITE && toRow === 7) || (piece.color === PieceColor.BLACK && toRow === 0))) {
         // TODO: choose piece type to promote to
-        promotions.push({row: toRow, col: toCol, piece: {type: PieceType.QUEEN, color: piece.color}});
+        promotions.push({ row: toRow, col: toCol });
     }
 
     return promotions;
@@ -787,8 +787,8 @@ export function tileCanMove(row: number, col: number, board: Piece[][], playerCo
         // disallow moving a piece that's giving check
         if (rules.ruleMoveOppCheck && oppositeColor(piece.color, playerColor)) {
             // [0, 0], [1, 0], [1, 1], [0, 1]
-            const pieceRow = row + ([2, 3].includes(idx) ? 1 : 0);
-            const pieceCol = col + ([1, 2].includes(idx) ? 1 : 0);
+            const pieceRow = row + ([1, 2].includes(idx) ? 1 : 0);
+            const pieceCol = col + ([2, 3].includes(idx) ? 1 : 0);
             if (pieceGivingCheck(playerColor, pieceRow, pieceCol, board)) return false;
         }
     }

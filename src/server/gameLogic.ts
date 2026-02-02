@@ -93,7 +93,9 @@ export class Game {
         this.drawBlack = false;
         this.rules = gameState.rules;
         this.halfmoveClock = gameState.halfmoveClock;
-        this.mapFEN = new Map(Object.entries(gameState.mapFEN));
+
+        this.mapFEN = new Map<string, number>();
+        for (const fen of gameState.mapFEN) this.updateFEN(fen);
     }
 
     public setPassword(password: string, client?: ClientInfo): void {
@@ -102,8 +104,9 @@ export class Game {
         if (client) this.logChatMessage(`has ${password !== '' ? 'updated' : 'removed'} the password`, client);
     }
 
-    public updateFEN(): void {
-        const fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB)
+    public updateFEN(fen?: string): void {
+        if (fen === undefined) fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB);
+
         if (this.mapFEN.has(fen)) {
             this.mapFEN.set(fen, this.mapFEN.get(fen)! + 1)
             if (this.mapFEN.get(fen)! >= 3) {
@@ -329,6 +332,13 @@ export class Game {
     }
 
     public sendGameState(client: ClientInfo): void {
+        const arrayFEN = [];
+        for (const [fen, num] of this.mapFEN) {
+            for (let i = 0; i < num; i++) {
+                arrayFEN.push(fen);
+            }
+        }
+
         const gameState: GameState = {
             playerWhiteName: this.playerWhite?.name ?? null,
             playerBlackName: this.playerBlack?.name ?? null,
@@ -354,7 +364,7 @@ export class Game {
             drawBlack: this.drawBlack,
             rules: this.rules,
             halfmoveClock: this.halfmoveClock,
-            mapFEN: Object.fromEntries(this.mapFEN)
+            mapFEN: arrayFEN
         };
         const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
         sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage);
@@ -519,7 +529,15 @@ export class Game {
             //console.log('Ignoring rewind with no moves played yet');
             return;
         }
+        // set the turn by counting the moves rather than this.currentTurn, because this.currentTurn may have been set to PieceColor.NONE by this.endGame
+        this.currentTurn = this.movesLog.length % 2 ? PieceColor.BLACK : PieceColor.WHITE;
         const lastMove = this.movesLog.pop()!;
+
+        // undo draw conditions
+        this.halfmoveClock -= 1;
+        const fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB);
+        this.mapFEN.set(fen, this.mapFEN.get(fen)! - 1);
+
 
         // loop through all the moves and keep track of castling
         this.KW = true;

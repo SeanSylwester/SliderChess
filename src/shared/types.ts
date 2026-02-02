@@ -35,7 +35,7 @@ export interface GameState {
     drawBlack: boolean;
     rules: Rules;
     halfmoveClock: number;
-    mapFEN: any; // Map<string, number>;
+    mapFEN: string[];  // converted from Map<string, number> to string[], with each copy of string being copied number times
 }
 export interface GameInfo {
     hasPassword: boolean;
