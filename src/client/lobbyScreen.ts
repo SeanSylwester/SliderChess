@@ -73,6 +73,16 @@ export function getGame(gameId: number): GameInfo | undefined {
     return gameList.find(el => el.gameId === gameId);
 }
 const gameListElement = document.getElementById('gameList')!;
+function formatDateTime(datems: number) {
+    const date = new Date(datems);
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-based
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
 export function updateGameList(newGameList: GameInfo[]): void {
     gameListElement.innerHTML = ''; // Clear existing list
     for (const game of newGameList){
@@ -96,10 +106,10 @@ export function updateGameList(newGameList: GameInfo[]): void {
         }
 
         const gameText = document.createElement('span');
-        gameText.textContent = ` ${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
+        gameText.textContent = ` [${formatDateTime(game.creationTime)}] ${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
         gameItem.appendChild(gameText);
 
-        gameListElement.appendChild(gameItem);
+        gameListElement.prepend(gameItem);
     }
     gameList = newGameList
 }

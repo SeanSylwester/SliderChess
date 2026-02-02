@@ -60,7 +60,8 @@ export function updateGameList() {
             playerBlack: game.playerBlack?.name || null, 
             numberOfSpectators: game.spectators.length,
             timeLeftWhite: game.timeLeftWhite, 
-            timeLeftBlack: game.timeLeftBlack
+            timeLeftBlack: game.timeLeftBlack,
+            creationTime: game.creationTime
         });
     }
 }

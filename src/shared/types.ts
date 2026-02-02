@@ -36,6 +36,7 @@ export interface GameState {
     rules: Rules;
     halfmoveClock: number;
     mapFEN: string[];  // converted from Map<string, number> to string[], with each copy of string being copied number times
+    creationTime: number;
 }
 export interface GameInfo {
     hasPassword: boolean;
@@ -46,6 +47,7 @@ export interface GameInfo {
     numberOfSpectators: number;
     timeLeftWhite: number; // in seconds
     timeLeftBlack: number; // in seconds
+    creationTime: number;
 }
 
 export interface Rules {

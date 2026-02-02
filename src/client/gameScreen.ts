@@ -26,7 +26,8 @@ export function showGame(gameId: number, password: string): void {
             playerBlack: '?',
             numberOfSpectators: 0,
             timeLeftWhite: 0,
-            timeLeftBlack: 0
+            timeLeftBlack: 0,
+            creationTime: 0
         });
         sendMessage({ type: MESSAGE_TYPES.GAME_LIST } satisfies Message);
     }

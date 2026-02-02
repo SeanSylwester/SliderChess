@@ -24,6 +24,7 @@ export class Game {
     clockRunning = false;
 
     lastMoveTime = 0;  // not sent to client
+    creationTime: number;
 
     KW = true;
     QW = true;
@@ -69,6 +70,7 @@ export class Game {
         this.board = getDefaultBoard();
         this.mapFEN = new Map<string, number>();
         this.updateFEN();
+        this.creationTime = Date.now();
     }
 
     public loadFromState(gameState: GameState): void {
@@ -93,6 +95,7 @@ export class Game {
         this.drawBlack = false;
         this.rules = gameState.rules;
         this.halfmoveClock = gameState.halfmoveClock;
+        this.creationTime = gameState.creationTime;
 
         this.mapFEN = new Map<string, number>();
         for (const fen of gameState.mapFEN) this.updateFEN(fen);
@@ -364,7 +367,8 @@ export class Game {
             drawBlack: this.drawBlack,
             rules: this.rules,
             halfmoveClock: this.halfmoveClock,
-            mapFEN: arrayFEN
+            mapFEN: arrayFEN,
+            creationTime: this.creationTime
         };
         const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
         sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage);

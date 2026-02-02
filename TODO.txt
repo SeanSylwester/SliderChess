@@ -1,6 +1,3 @@
-offline play
-    flag on lobby to disconnect from server, then run a game locally controlling black and white
-
 database to store games?
     this could happen automatically if the game is completed and the last user disconnects?
     games in progress stored when the server exits gracefully?
@@ -17,3 +14,6 @@ refactor to just redraw the whole board each move
 
 gameover screen
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)
+
+offline play
+    flag on lobby to disconnect from server, then run a game locally controlling black and white
