@@ -1,4 +1,5 @@
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage } from '../shared/types.js';
+import { QueryResult } from 'pg';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore } from '../shared/types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish, getMoveDisambiguationStr } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
@@ -55,6 +56,12 @@ export class Game {
         ruleIgnoreAll: false,
     }
 
+    // database stuff
+    result = GameResultCause.ONGOING;
+    lastWhiteName = '';
+    lastBlackName = '';
+    isActive = true;
+
     public constructor(id: number, initialTime: number, increment: number, password: string) {
         this.id = id;
         this.logChatMessage(`Game ${this.id} created.`);
@@ -101,6 +108,97 @@ export class Game {
         for (const fen of gameState.mapFEN) this.updateFEN(fen);
     }
 
+    public loadFromDB(row: any) {
+        this.id = row.id;
+        this.password = row.password;
+        this.board = getDefaultBoard();
+
+        this.creationTime = new Date(row.creation_timestamp).getTime();
+        this.clockRunning = false;
+        this.drawWhite = false;
+        this.drawBlack = false;
+
+        // these fields may be missing if it was saved incorrectly
+        try {
+            this.lastWhiteName = row.white;
+            this.lastBlackName = row.black;
+            this.chatLog = row.chat_log.split('|');
+            const boardRes = getBoardFromMessage(row.moves_log, this.board);
+            if (typeof boardRes === 'string') {
+                console.log('failed to parse board from DB notation');
+                return
+            }
+            this.movesLog = boardRes.movesLog;
+            this.currentTurn = boardRes.color;
+            this.KW = boardRes.KW;
+            this.QW = boardRes.QW;
+            this.KB = boardRes.KB;
+            this.QB = boardRes.QB;
+            // TODO
+            /*
+            this.halfmoveClock = boardRes.halfmoveClock;
+            this.mapFEN = boardRes.mapFEN;
+            */
+
+            this.rules = JSON.parse(row.rules);
+
+            this.initialTimeWhite = row.initial_time_white;
+            this.initialTimeBlack = row.initial_time_black;
+            this.incrementWhite = row.increment_white;
+            this.incrementBlack = row.increment_black;
+            this.timeLeftWhite = row.time_left_white;
+            this.timeLeftBlack = row.time_left_black;
+            this.result = GameResultCause[row.cause as GameResultCause];
+            this.isActive = row.is_active;
+        } catch (err) {
+            console.log('Failed to load game from DB state', err);
+            console.log(row);
+        }
+    }
+
+    public getDBStr(): string {
+        const cols = ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 
+                      'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 
+                      'rules', 'result', 'cause', 'is_active'];
+
+        let movesLogStr = '';
+        for (let i = 0; i < this.movesLog.length; i++) {
+            if (i % 2 === 0) movesLogStr += `${i / 2 + 1}. `;
+            movesLogStr += `${this.movesLog[i].notation} `;
+        }
+
+        let chatLogStr = '';
+        for (let i = 0; i < this.chatLog.length; i++) {
+            if (i) chatLogStr += ', ';
+            chatLogStr += this.chatLog[i].replace('\n', '|');
+        }
+
+        const vals = [this.password, this.lastWhiteName, this.lastBlackName, chatLogStr, movesLogStr, this.currentTurn === PieceColor.WHITE,
+                      this.initialTimeWhite, this.initialTimeBlack, this.incrementWhite, this.incrementBlack, this.timeLeftWhite, this.timeLeftBlack,
+                      JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive];
+
+        let colEqVal = '';
+        for (let i = 0; i < cols.length; i++) {
+            if (i) colEqVal += ', ';
+            if (typeof vals[i] === 'string') {
+                colEqVal += `${cols[i]} = '${vals[i]}'`;
+            } else if (typeof vals[i] === 'boolean') {
+                colEqVal += `${cols[i]} = ${vals[i] ? 'TRUE' : 'FALSE'}`;
+            } else if (vals[i] === undefined) {
+                console.log(cols[i], vals[i]);
+            } else {
+                colEqVal += `${cols[i]} = ${vals[i]}`;
+            }
+        }
+
+        return colEqVal;
+    }
+
+    public updateLastNames(): void {
+        if (this.playerWhite) this.lastWhiteName = this.playerWhite.name;
+        if (this.playerBlack) this.lastBlackName = this.playerBlack.name;
+    }
+
     public setPassword(password: string, client?: ClientInfo): void {
         this.password = password;
         this.sendMessageToAll({ type: MESSAGE_TYPES.GAME_PASSWORD, password: password });
@@ -113,7 +211,7 @@ export class Game {
         if (this.mapFEN.has(fen)) {
             this.mapFEN.set(fen, this.mapFEN.get(fen)! + 1)
             if (this.mapFEN.get(fen)! >= 3) {
-                this.endGame('Draw by 3-fold repetition')
+                this.endGame(GameResultCause.THREEFOLD_REPETITION, 'Draw by 3-fold repetition')
             }
         } else {
             this.mapFEN.set(fen, 1);
@@ -150,7 +248,24 @@ export class Game {
         }
     }
 
+    public getPlayer(color: PieceColor): ClientInfo | undefined {
+        if (color === PieceColor.WHITE && this.playerWhite) return this.playerWhite;
+        else if (color === PieceColor.BLACK && this.playerBlack) return this.playerBlack;
+        else return undefined;
+    }
+
+    public getColor(client: ClientInfo): PieceColor {
+        return client === this.playerWhite ? PieceColor.WHITE : (client === this.playerBlack ? PieceColor.BLACK : PieceColor.NONE);
+    }
+
     public addPlayer(player: ClientInfo, color = PieceColor.NONE): void {
+        // figure out if we're reconnecting someone and try to put them in the right spot
+        if (color === PieceColor.NONE) {
+            if (!this.playerWhite && this.lastWhiteName === player.name) color = PieceColor.WHITE;
+            else if (!this.playerBlack && this.lastBlackName === player.name) color = PieceColor.BLACK;
+        }
+
+        // if the player spot is already filled, then make them a spectator and log a message
         const bumped = ((color === PieceColor.WHITE && this.playerWhite) || (color === PieceColor.BLACK && this.playerBlack));
         if (color === PieceColor.WHITE && !this.playerWhite) {
             this.playerWhite = player;
@@ -169,6 +284,7 @@ export class Game {
         } else {
             this.logChatMessage(`Player ${player.name} has joined as ${color === PieceColor.NONE ? 'a spectator' : PieceColor[color]}.`);
         }
+        this.updateLastNames();
     }
 
     public changePosition(c: ClientInfo, position: PieceColor): void {
@@ -177,7 +293,7 @@ export class Game {
             return;
         }
 
-        const originalPosition = c === this.playerWhite ? PieceColor.WHITE : (c === this.playerBlack ? PieceColor.BLACK : PieceColor.NONE);
+        const originalPosition = this.getColor(c);
         if (originalPosition === position) {
             console.log(`Ignoring swap for Client ${c} (${c.name}) to same position ${position} in game ${this.id}`)
             return;
@@ -222,9 +338,11 @@ export class Game {
         this.logChatMessage(`${c.name} has moved from position ${originalPosition === PieceColor.NONE ? 'spectator' : PieceColor[originalPosition]} to ${position === PieceColor.NONE ? 'spectator' : PieceColor[position]}.`);
 
         this.sendGameStateToAll();
+        this.updateLastNames();
     }
 
     public removePlayer(player: ClientInfo): void {
+        this.updateLastNames();
         if (this.playerWhite === player) {
             this.playerWhite = null;
             this.logChatMessage(`White player ${player.name} has disconnected.`);
@@ -370,7 +488,7 @@ export class Game {
             mapFEN: arrayFEN,
             creationTime: this.creationTime
         };
-        const clientColor = (client === this.playerWhite) ? PieceColor.WHITE : (client === this.playerBlack) ? PieceColor.BLACK : PieceColor.NONE;
+        const clientColor = this.getColor(client);
         sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage);
     }
 
@@ -388,7 +506,9 @@ export class Game {
         this.sendMessageToAll({ type: MESSAGE_TYPES.RULES, rules: this.rules } satisfies RulesMessage);
     }
 
-    public endGame(chatMessage: string): void {
+    public endGame(result: GameResultCause, chatMessage: string): void {
+        this.updateLastNames();
+        this.result = result;
         this.logChatMessage(chatMessage);
         this.clockRunning = false;
         this.syncTime();
@@ -408,7 +528,7 @@ export class Game {
         }
         
         if (this.drawWhite && this.drawBlack) {
-            this.endGame('Draw accepted. Game over!')
+            this.endGame(GameResultCause.DRAW, 'Draw accepted. Game over!')
         }
 
     }
@@ -416,14 +536,14 @@ export class Game {
     public surrender(client: ClientInfo): void {
         if (client === this.playerWhite) {
             if (this.confirmSurrenderWhite) {
-                this.endGame(`${client.name} (WHITE) has surrendered. Game over!`)
+                this.endGame(GameResultCause.WHITE_RESIGN, `${client.name} (WHITE) has surrendered. Game over!`)
             } else {
                 this.confirmSurrenderWhite = true;
                 sendMessage(client, {type: MESSAGE_TYPES.CHAT, message: 'Click surrender again to confirm'} satisfies ChatMessage);
             }
         } else if (client === this.playerBlack) {
             if (this.confirmSurrenderBlack) {
-                this.endGame(`${client.name} (BLACK) has surrendered. Game over!`)
+                this.endGame(GameResultCause.BLACK_RESIGN, `${client.name} (BLACK) has surrendered. Game over!`)
             } else {
                 this.confirmSurrenderBlack = true;
                 sendMessage(client, {type: MESSAGE_TYPES.CHAT, message: 'Click surrender again to confirm'} satisfies ChatMessage);
@@ -468,7 +588,7 @@ export class Game {
         if (this.currentTurn === PieceColor.NONE) return false;
 
         // reject if it's not the player's turn
-        if (c !== (this.currentTurn === PieceColor.WHITE ? this.playerWhite : this.playerBlack)) return false;
+        if (c !== this.getPlayer(this.currentTurn)) return false;
 
         if (!this.rules.ruleIgnoreAll) {
         // reject if the piece doesn't belong to the player
@@ -511,7 +631,7 @@ export class Game {
         } else {
             this.halfmoveClock += 1;
             if (this.halfmoveClock >= 100) {
-                this.endGame('Draw by 50-move rule!');
+                this.endGame(GameResultCause.FIFTY_MOVE, 'Draw by 50-move rule!');
             }
         }
 
@@ -522,7 +642,10 @@ export class Game {
         this.changeTurn(true);
 
         // keep track of the number of times we've been in each position for 3 fold repetition
-        this.updateFEN();      
+        this.updateFEN();    
+
+        // usually players check if they're in checkmate themselves. If the next player is absent, we need to check ourselves
+        if (!this.getPlayer(this.currentTurn)) this.checkGameOver();
 
         return true;
     }
@@ -569,7 +692,12 @@ export class Game {
         if (!anyValidMoves(this.currentTurn, this.board, this.movesLog.at(-1), this.rules)) {
             const playerName = this.currentTurn === PieceColor.WHITE ? this.playerWhite?.name : this.playerBlack?.name;
             if (inCheck(this.currentTurn, this.board)) {
-                this.endGame(`${playerName} (${PieceColor[this.currentTurn]}) is in checkmate!`);
+                if (this.currentTurn === PieceColor.WHITE) {
+                    this.endGame(GameResultCause.WHITE_IN_CHECKMATE, `${playerName} (White) is in checkmate!`);
+                } else {
+                    this.endGame(GameResultCause.BLACK_IN_CHECKMATE, `${playerName} (Black) is in checkmate!`);
+                }
+
                 if (this.movesLog.at(-1)) {
                     if (this.movesLog.at(-1)!.notation.endsWith('+')) {
                         this.movesLog.at(-1)!.notation = this.movesLog.at(-1)!.notation.slice(0, -1) + '#';
@@ -579,16 +707,20 @@ export class Game {
                     }
                 }
             } else {
-                this.endGame(`${playerName} (${PieceColor[this.currentTurn]}) is in stalemate!`);
+                if (this.currentTurn === PieceColor.WHITE) {
+                    this.endGame(GameResultCause.WHITE_IN_STALEMATE, `${playerName} (White) is in stalemate!`);
+                } else {
+                    this.endGame(GameResultCause.BLACK_IN_STALEMATE, `${playerName} (Black) is in stalemate!`);
+                }
                 if (this.movesLog.at(-1)) this.movesLog.at(-1)!.notation += '$';
             }
             this.sendGameStateToAll();
         }
         if (this.timeLeftBlack < 0) {
-            this.endGame(`${this.playerBlack?.name} (BLACK) has run out of time!`);
+            this.endGame(GameResultCause.BLACK_TIMEOUT, `${this.playerBlack?.name} (BLACK) has run out of time!`);
         }
         if (this.timeLeftWhite < 0) {
-            this.endGame(`${this.playerWhite?.name} (WHITE) has run out of time!`);
+            this.endGame(GameResultCause.WHITE_TIMEOUT, `${this.playerWhite?.name} (WHITE) has run out of time!`);
         }
     }
 }

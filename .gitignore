@@ -11,6 +11,7 @@ savedGames/
 .env
 .env.local
 .env.*.local
+*.pem
 
 # Logs
 *.log

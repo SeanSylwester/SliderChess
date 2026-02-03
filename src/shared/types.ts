@@ -48,7 +48,40 @@ export interface GameInfo {
     timeLeftWhite: number; // in seconds
     timeLeftBlack: number; // in seconds
     creationTime: number;
+    result: GameResultCause;
+    isActive: boolean;
 }
+
+export enum GameResultCause {
+    DRAW = 'DRAW',
+    WHITE_RESIGN = 'WHITE_RESIGN',
+    BLACK_RESIGN = 'BLACK_RESIGN',
+    WHITE_TIMEOUT = 'WHITE_TIMEOUT',
+    BLACK_TIMEOUT = 'BLACK_TIMEOUT',
+    WHITE_IN_CHECKMATE = 'WHITE_IN_CHECKMATE',
+    BLACK_IN_CHECKMATE = 'BLACK_IN_CHECKMATE',
+    WHITE_IN_STALEMATE = 'WHITE_IN_STALEMATE',
+    BLACK_IN_STALEMATE = 'BLACK_IN_STALEMATE',
+    THREEFOLD_REPETITION = 'THREEFOLD_REPETITION',
+    FIFTY_MOVE = 'FIFTY_MOVE',
+    INSUFFICIENT_MATERIAL = 'INSUFFICIENT_MATERIAL', // todo
+    ONGOING = 'ONGOING',
+}
+export const GameScore = new Map<GameResultCause, string>([
+    [GameResultCause.DRAW, '1/2-1/2'],
+    [GameResultCause.WHITE_RESIGN, '0-1'],
+    [GameResultCause.BLACK_RESIGN, '1-0'],
+    [GameResultCause.WHITE_TIMEOUT, '0-1'],
+    [GameResultCause.BLACK_TIMEOUT, '1-0'],
+    [GameResultCause.WHITE_IN_CHECKMATE, '0-1'],
+    [GameResultCause.BLACK_IN_CHECKMATE, '1-0'],
+    [GameResultCause.WHITE_IN_STALEMATE, '1/2-1/2'],
+    [GameResultCause.BLACK_IN_STALEMATE, '1/2-1/2'],
+    [GameResultCause.THREEFOLD_REPETITION, '1/2-1/2'],
+    [GameResultCause.FIFTY_MOVE, '1/2-1/2'],
+    [GameResultCause.INSUFFICIENT_MATERIAL, '1/2-1/2'],  // TODO
+    [GameResultCause.ONGOING, '-']
+])
 
 export interface Rules {
     ruleMoveOwnKing: boolean;

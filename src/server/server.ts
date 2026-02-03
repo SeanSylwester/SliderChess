@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import http from 'http';
+import https from 'https';
+import fs from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -9,11 +11,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 import { Game } from './gameLogic.js';
-import { handleMessage, handleQuitGame, handleCreateGameFromState } from './messageHandler.js';
+import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGame } from './messageHandler.js';
 import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState } from '../shared/types.js';
+import * as db from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+
 
 export interface ClientInfo {
     id: number;
@@ -27,14 +32,23 @@ export interface ClientInfo {
 }
 
 // Create HTTP server
-const server = http.createServer(app);
+let server;
+if (process.env.LOCAL) {
+    // created with mkcert
+    const options = {
+        key: fs.readFileSync('./localhost-key.pem'), // Replace with your key file path
+        cert: fs.readFileSync('./localhost.pem')  // Replace with your cert file path
+    };
+    server = https.createServer(options, app);
+} else {
+    server = http.createServer(app);
+}
 
 // Create WebSocket server
 const wss = new WebSocketServer({ server });
 
 // Store connected clients
 const clients = new Map<WebSocket, ClientInfo>();
-const clientLastKnownPosition = new Map<number, { name: string, gameId: number, position: PieceColor }>();
 let clientIdCounter = 1;
 
 // Store list of games
@@ -56,12 +70,14 @@ export function updateGameList() {
         gameList.push({
             hasPassword: game.password !== '',
             gameId: game.id, 
-            playerWhite: game.playerWhite?.name || null,
-            playerBlack: game.playerBlack?.name || null, 
+            playerWhite: game.playerWhite?.name || game.lastWhiteName,
+            playerBlack: game.playerBlack?.name || game.lastBlackName, 
             numberOfSpectators: game.spectators.length,
             timeLeftWhite: game.timeLeftWhite, 
             timeLeftBlack: game.timeLeftBlack,
-            creationTime: game.creationTime
+            creationTime: game.creationTime,
+            result: game.result,
+            isActive: game.isActive
         });
     }
 }
@@ -173,10 +189,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
     // Handle client disconnect
     ws.on('close', () => {
-        clientLastKnownPosition.set(clientInfo.id, { name: clientInfo.name, gameId: clientInfo.gameId, position: clientInfo.gamePosition })
         clients.delete(ws);
         console.log(`Client disconnected: ${clientId}`);
-        handleQuitGame(clientInfo, games);
+        if (clientInfo.gameId) handleQuitGame(clientInfo, games);
     });
 
     ws.on('error', (error) => {
@@ -184,46 +199,27 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     });
 });
 
-export function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState): void {
-    // if the client says that they're in a game, then try to reconnect them based on lastPosition
-    //   if we don't have the lastPosition and/or the indicated game (e.g. on server restart), then load from the client's gameState
-    const lastPosition = clientLastKnownPosition.get(clientOldId);
-    if (lastPosition) {
-        // we were aware of the client disconnecting and have data ready to reconnect them
-        console.log(`Reconnecting new client ${client.id} to stored client ${clientOldId} (${lastPosition.name})`);
-        clientLastKnownPosition.delete(clientOldId);
-        client.id = clientOldId;
-        clientIdCounter = Math.max(clientIdCounter, clientOldId+1);
-        client.name = lastPosition.name
-        
-        const game = games.get(lastPosition.gameId);
-        if (game) {
-            console.log(` and also trying to connect client ${client.id} to game ${lastPosition.gameId} as ${PieceColor[lastPosition.position]}`);
-            client.gameId = lastPosition.gameId;
-            game.addPlayer(client, lastPosition.position);
-        } else if (gameState) {
-            // recreate the game with the same gameId if the game is lost for some reason
-            handleCreateGameFromState(client, games, lastPosition.gameId, gameState);
-        } else {
-            console.log(` but couldn't reconnect client to their game (${lastPosition.gameId}) nor recreate it from a client-provided state`);
-        }
+export function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState | undefined): void {
+    // wait until we've heard from the DB to do any reconnections
+    if (!loadedFromDB) setTimeout(() => handleReconnect(client, clientOldId, clientOldName, gameState), 1000);
+
+    // try to reconnect client to old id and name
+    console.log(`Reconnecting client ${client.id} (was ${clientOldId}) to their old name (${clientOldName})`);
+    client.name = clientOldName;
+    
+    if (!gameState || !gameState.id) return;
+
+    // if the client says that they're in a game, then try to reconnect them
+    //   if we don't have the indicated game, then make a new game and load from the client's gameState
+    const game = games.get(gameState.id);
+    if (game) {
+        console.log(` and also connecting client ${client.id} to game ${gameState.id}, if they have the right password`);
+        handleJoinGame(client, games, gameState.id, gameState.password);
     } else {
-        // server doesn't know anything! fill in with the provided info, if possible
-        console.log(`Reconnecting new unknown client ${client.id} to ${clientOldId} (${clientOldName})`);
-        if (!clientOldId || [...clients.values()].some(el => el.id === clientOldId)) {
-            // id 0 or in use, generate a new one
-            client.id = clientIdCounter++;
-        } else {
-            client.id = clientOldId;
-            clientIdCounter = Math.max(clientIdCounter, clientOldId+1);
-        }
-        client.name = clientOldName;
-        
-        // recreate the game if they were in one. Make sure we don't clobber it later!
-        if (gameState) {
-            handleCreateGameFromState(client, games, gameState.id, gameState);
-        }
-    }
+        // recreate the game with a new id if it wasn't found on the DB at startup
+        console.log(` but we couldn't find their game (${gameState.id}), so we're recreating from client state with a new ID`);
+        handleCreateGameFromState(client, games, gameState);
+    } 
 }
 
 // Serve static files
@@ -237,6 +233,57 @@ app.get('/:gameId', (req, res) => {
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
+    console.log(`Server is running at https://localhost:${PORT}`);
     console.log(`WebSocket server is ready for connections`);
 });
+
+// get games from DB and update the games map
+export let loadedFromDB = false;
+async function getGamesFromDB() {
+    const db_rows = await db.gamesFromDB();
+    if(db_rows) {
+        for (let i = 0; i < db_rows.rows.length; i++) {
+            const db_row: any = db_rows.rows[i];
+            const game = new Game(db_row.id, 0, 0, '');
+            game.loadFromDB(db_row);
+            games.set(db_row.id, game);
+            updateGameList();
+        }
+    }
+    pushGameList();
+    loadedFromDB = true;  // set this even if it failed
+}
+getGamesFromDB();
+
+
+// this line from gemini, not sure if needed :
+// Begin reading from stdin so the process does not exit immediately
+// Note: This is necessary in some cases (like when the event loop is empty)
+// to keep the process running so it can receive signals.
+process.stdin.resume();
+
+process.on('SIGINT', () => {
+  console.log('Caught interrupt signal (SIGINT). Performing cleanup...');
+  gracefulExit();
+});
+
+async function gracefulExit() {
+  // stop accepting new clients
+  wss.close();
+  
+  // save all games
+  const promises = [];
+  for (const [gameId, game] of games) {
+    if (game.isActive) {
+        game.logChatMessage('SERVER SHUTTING DOWN! Trying to save game to database...|  Keep this tab open just in case the DB write fails to avoid losing your game');
+        promises.push(db.saveToDB(game));
+    }
+  }
+  await Promise.all(promises);
+  console.log('Games saved...');
+
+  // disconnect all existing connections
+  for (const [client_ws, client_info] of clients) {
+    client_ws.close();
+  }
+}

@@ -1,6 +1,8 @@
 import { Game } from './gameLogic.js';
-import { updateGameList as updateGameList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect } from './server.js';
-import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState } from '../shared/types.js';
+import { updateGameList as updateGameList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect, loadedFromDB } from './server.js';
+import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState, GameResultCause } from '../shared/types.js';
+import { saveToDB, storeNewGame } from './db.js';
+
 
 export function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): void {
     const message = JSON.parse(data.toString());
@@ -95,41 +97,30 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
     }
 }
 
-let gameIdCounter = 1;
-function handleCreateGame(client: ClientInfo, games: Map<number, Game>, initialTime: number, increment: number, password: string): void {
-    console.log(`Creating game ${gameIdCounter} for client ${client.id}`);
-    const newGame = new Game(gameIdCounter++, initialTime, increment, password);
-    games.set(newGame.id, newGame);
+async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, initialTime: number, increment: number, password: string): Promise<Game | undefined> {
+    console.log(`Creating game for client ${client.id}`);
 
-    handleJoinGame(client, games, newGame.id, password); // note: this will updateGameList() when the client is assigned to a position
-    pushGameList();
+    // store new game in the DB and get the ID
+    const gameId = await storeNewGame();
+    if (gameId) {
+        // only make the Game object if we were successful with the DB
+        const newGame = new Game(gameId, initialTime, increment, password);
+        games.set(newGame.id, newGame);
+
+        handleJoinGame(client, games, newGame.id, password); // note: this will updateGameList() when the client is assigned to a position
+        pushGameList();
+        return newGame;
+    } else {
+        console.error('Failed to create new game');
+    }
 }
 
-export function handleCreateGameFromState(client: ClientInfo, games: Map<number, Game>, gameId: number, gameState: GameState): void {
-    if (!gameId) {
-        // client maliciously creating a game with ID 0 would break a lot of stuff... 
-        gameId = gameIdCounter++;
-        console.log(` assigning new game ID ${gameId}`);
-    } 
-
-    let game: Game;
-    if (games.has(gameId)) {
-        console.log(` game ${gameId} already existing, connecting client to game instead of loading from state`)
-        game = games.get(gameId)!;
-    } else {
-        console.log(` and recreating from client state`);
-        game = new Game(gameId, 10, 10, '');
-        game.loadFromState(gameState)
-        games.set(game.id, game);
-        gameIdCounter = Math.max(gameIdCounter, gameId + 1);  // put the counter above this one so that we don't clobber this later
+export async function handleCreateGameFromState(client: ClientInfo, games: Map<number, Game>, gameState: GameState): Promise<void> {
+    const game = await handleCreateGame(client, games, gameState.initialTimeWhite, gameState.incrementWhite, gameState.password);
+    if (game) {
+        game.loadFromState(gameState);
+        pushGameList();
     }
-
-    handleJoinGame(client, games, gameId, gameState.password); // note: this will updateGameList() when the client is assigned to a position
-
-    // try to assign color based on name match
-    if (gameState.playerWhiteName === client.name) game.changePosition(client, PieceColor.WHITE);
-    else if (gameState.playerBlackName === client.name) game.changePosition(client, PieceColor.BLACK);
-    pushGameList();
 }
 
 export function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): void {
@@ -169,6 +160,13 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
         client.gamePosition = PieceColor.NONE;
         updateGameList();
         serveLobby(client);
+
+        if (game.isEmpty() && game.isActive) {
+            // last player leaves and there's some result on the game -> game is no longer active;
+            if (game.result !== GameResultCause.ONGOING) game.isActive = false;
+
+            saveToDB(game);
+        }
     } else {
         console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
     }

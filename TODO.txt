@@ -1,8 +1,15 @@
-database to store games?
-    this could happen automatically if the game is completed and the last user disconnects?
-    games in progress stored when the server exits gracefully?
-    clients could load a locked game into a new game?
+database
+    sanitize inputs
 credits page for SVG attribution
+
+make draw condition trackers work on load from notation
+pause button
+way to make a game without time control
+time control suggestions on new game creation
+way to view game, allowing undo/redo without changing the moves
+make server check for gameover if nobody is the next player's turn
+bug report button
+
 
 implement special rules for castling
 implement special rules for en passant

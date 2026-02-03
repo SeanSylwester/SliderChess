@@ -15,7 +15,7 @@ function connectWebSocket(): void {
     // Extract game ID from URL, if available
     const gameId = parseInt(window.location.pathname.slice(1)); // Remove leading '/'
 
-    const wsUrl = window.location.hostname === 'localhost' ? 'ws://localhost:10000' : 'wss://sliderchess.onrender.com';
+    const wsUrl = window.location.hostname === 'localhost' ? 'wss://localhost:10000' : 'wss://sliderchess.onrender.com';
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {

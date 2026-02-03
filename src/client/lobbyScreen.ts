@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage } from "../shared/types.js";
+import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage, GameScore, GameResultCause } from "../shared/types.js";
 import { formatMinSec } from '../shared/utils.js'
 import { sendMessage, fromHistory } from './client.js'
 
@@ -95,18 +95,22 @@ export function updateGameList(newGameList: GameInfo[]): void {
         gameItem.value = game.gameId;
 
         const gameButton = document.createElement('button');
-        gameButton.textContent = "Join";
+        gameButton.textContent = game.isActive ? 'Join' : 'View';
         gameButton.addEventListener('click', () => requestJoinGame(game.gameId));
         gameItem.appendChild(gameButton);
 
-        if (game.hasPassword) {
+        if (game.hasPassword && game.isActive) {
             const lock = document.createElement('span');
             lock.textContent = ' 🔒';
             gameItem.appendChild(lock);
         }
 
         const gameText = document.createElement('span');
-        gameText.textContent = ` [${formatDateTime(game.creationTime)}] ${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
+        if (game.isActive) {
+            gameText.textContent = ` [${formatDateTime(game.creationTime)}] ${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
+        } else {
+            gameText.textContent = ` [${formatDateTime(game.creationTime)}] ${game.playerWhite || 'None'} vs ${game.playerBlack || 'None'}: ${GameScore.get(game.result)}(${game.result})`;
+        }
         gameItem.appendChild(gameText);
 
         gameListElement.prepend(gameItem);

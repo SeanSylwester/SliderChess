@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage } from "../shared/types.js";
+import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause } from "../shared/types.js";
 import { flipBoard } from "./gameLogic.js";
 import { sendMessage, fromHistory, myGameId } from "./client.js";
 import { getGame, gameList } from "./lobbyScreen.js"
@@ -27,7 +27,9 @@ export function showGame(gameId: number, password: string): void {
             numberOfSpectators: 0,
             timeLeftWhite: 0,
             timeLeftBlack: 0,
-            creationTime: 0
+            creationTime: 0,
+            result: GameResultCause.ONGOING,
+            isActive: true
         });
         sendMessage({ type: MESSAGE_TYPES.GAME_LIST } satisfies Message);
     }
