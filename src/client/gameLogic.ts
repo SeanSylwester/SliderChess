@@ -5,16 +5,57 @@ import { col0ToFile, inCheck, formatMinSec, checkCastle, moveOnBoard, checkPromo
 
 // init canvas
 const canvas = document.getElementById("board") as HTMLCanvasElement;
-canvas.addEventListener('click', handleClick);
-canvas.addEventListener('mousemove', handleHover);
-canvas.addEventListener('contextmenu', (event) => {
-    event.preventDefault();
-    handleClick(event);
-});
-
 const ctx = canvas.getContext("2d")!;
 ctx.font = "24px Arial";
 ctx.lineWidth = 2;
+
+// click events
+function handleClickEvent(event: MouseEvent): void {
+    event.preventDefault();
+    handleClick(event.offsetX, event.offsetY, false);
+}
+function handleRightClickEvent(event: MouseEvent): void {
+    event.preventDefault();
+    handleClick(event.offsetX, event.offsetY, true);
+}
+function handleMouseMoveEvent(event: MouseEvent): void {
+    handleHover(event.offsetX, event.offsetY)
+}
+canvas.addEventListener('click', handleClickEvent);
+canvas.addEventListener('mousemove', handleMouseMoveEvent);
+canvas.addEventListener('contextmenu', handleRightClickEvent);
+
+let touchTimer: undefined | NodeJS.Timeout = undefined;
+function cancelTouchTimer(): void {
+    clearTimeout(touchTimer);
+    touchTimer = undefined;
+}
+function handleTouch(touch: Touch, isRightClick: boolean, callback: Function): void {
+    const bcr = canvas.getBoundingClientRect();
+    const x = touch.clientX - bcr.x;
+    const y = touch.clientY - bcr.y;
+    callback(x, y, isRightClick);
+}
+function handleTouchStartEvent(event: TouchEvent): void {
+    event.preventDefault();
+    touchTimer = setTimeout(() =>{
+        touchTimer = undefined;
+        handleTouch(event.touches[0], true, handleClick);
+    }, 500);
+}
+function handleTouchMoveEvent(event: TouchEvent): void {
+    event.preventDefault();
+    cancelTouchTimer();
+}
+function handleTouchEndEvent(event: TouchEvent): void {
+    event.preventDefault();
+    cancelTouchTimer();
+    handleTouch(event.touches[0], false, handleClick);
+}
+canvas.addEventListener('touchstart', handleTouchStartEvent);
+canvas.addEventListener('touchmove', handleTouchMoveEvent);
+canvas.addEventListener('touchend', handleTouchEndEvent);
+
 
 
 // Rules
@@ -478,27 +519,48 @@ function drawPromotionSelector(unflippedRow: number, unflippedCol: number) {
 function waitForPromo(): Promise<PieceType> {
     return new Promise(resolve => {
         // Handle click on the promotion selector
-        function handleClickPromotion(event: MouseEvent): void {
-            canvas.removeEventListener('click', handleClickPromotion);
-            canvas.addEventListener('click', handleClick);
+        function handleClickPromotionEvent(event: MouseEvent): void {
+            handleClickPromotion(event.offsetX, event.offsetY);
+        }
+        function handleTouchPromotionEvent(event: TouchEvent): void {
+            handleTouch(event.touches[0], false, handleClickPromotion);
+        }
+        function handleClickPromotion(offsetX: number, offsetY: number): void {
+            canvas.removeEventListener('click', handleClickPromotionEvent);
+            canvas.removeEventListener('touchend', handleTouchPromotionEvent);
+            canvas.addEventListener('click', handleClickEvent);
+            canvas.addEventListener('touchend', handleTouchEndEvent);
+
+            canvas.addEventListener('mousemove', handleMouseMoveEvent);
+            canvas.addEventListener('contextmenu', handleRightClickEvent);
+            canvas.addEventListener('touchstart', handleTouchStartEvent);
+            canvas.addEventListener('touchmove', handleTouchMoveEvent);
 
             const top = promoY !== lineSpace;
             
             // Check if click is within the selector box
-            if (event.offsetX < promoX || event.offsetX > promoX + pitch
-                || ( top && (event.offsetY > (promoY + pitch) || event.offsetY < promoY - 3 * pitch))
-                || (!top && (event.offsetY < promoY || event.offsetY > promoY + 4 * pitch))) {
+            if (offsetX < promoX || offsetX > promoX + pitch
+                || ( top && (offsetY > (promoY + pitch) || offsetY < promoY - 3 * pitch))
+                || (!top && (offsetY < promoY || offsetY > promoY + 4 * pitch))) {
                 // clicked outside of box: return empty
                 resolve(PieceType.EMPTY);
             } else {
-                if (top) resolve(promoPiecesOrder[Math.floor((promoY + pitch - event.offsetY) / pitch)]);
-                else resolve(promoPiecesOrder[Math.floor((event.offsetY - promoY) / promoDy)]);
+                if (top) resolve(promoPiecesOrder[Math.floor((promoY + pitch - offsetY) / pitch)]);
+                else resolve(promoPiecesOrder[Math.floor((offsetY - promoY) / promoDy)]);
             }
             
         }
 
-        canvas.removeEventListener('click', handleClick);
-        canvas.addEventListener('click', handleClickPromotion);
+        canvas.removeEventListener('click', handleClickEvent);
+        canvas.removeEventListener('touchend', handleTouchEndEvent);
+        canvas.addEventListener('click', handleClickPromotionEvent);
+        canvas.addEventListener('touchend', handleTouchPromotionEvent);
+
+        canvas.removeEventListener('mousemove', handleMouseMoveEvent);
+        canvas.removeEventListener('contextmenu', handleRightClickEvent);
+        canvas.removeEventListener('touchstart', handleTouchStartEvent);
+        canvas.removeEventListener('touchmove', handleTouchMoveEvent);
+        
     });
 }
 
@@ -554,7 +616,7 @@ export function clearLocalGameState(): void {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-async function handleClick(event: MouseEvent): Promise<void> {
+async function handleClick(offsetX: number, offsetY: number, isRightClick: boolean): Promise<void> {
     if (!localGameState) {
         console.error("No board to get piece from");
         return;
@@ -568,17 +630,17 @@ async function handleClick(event: MouseEvent): Promise<void> {
     //console.log(`Clicked on row ${Math.floor(event.offsetY / pitch)}, col ${Math.floor((event.offsetX - textSpace) / pitch)}`);
     // transmute to unflipped row/col index, which matches the board[row][col]
     if (flip) {
-        unflippedCol = 7 - Math.floor((event.offsetX - textSpace) / pitch);
-        unflippedRow = Math.floor((event.offsetY - lineSpace) / pitch);
+        unflippedCol = 7 - Math.floor((offsetX - textSpace) / pitch);
+        unflippedRow = Math.floor((offsetY - lineSpace) / pitch);
     } else {
-        unflippedCol = Math.floor((event.offsetX - textSpace) / pitch);
-        unflippedRow = 7 - Math.floor((event.offsetY - lineSpace) / pitch);
+        unflippedCol = Math.floor((offsetX - textSpace) / pitch);
+        unflippedRow = 7 - Math.floor((offsetY - lineSpace) / pitch);
     }
 
-    const xSquareOffset = (event.offsetX - textSpace) % pitch;
-    const ySquareOffset = (event.offsetY - 1) % pitch;
+    const xSquareOffset = (offsetX - textSpace) % pitch;
+    const ySquareOffset = (offsetY - 1) % pitch;
     // force isTile if our current selection is a tile, or if we try to highlight an empty square, or if it was a right click
-    const isTile = event.button === 2 || selectedSquare?.isTile || (!selectedSquare && localGameState.board[unflippedRow][unflippedCol].type === PieceType.EMPTY) 
+    const isTile = isRightClick || selectedSquare?.isTile || (!selectedSquare && localGameState.board[unflippedRow][unflippedCol].type === PieceType.EMPTY) 
                         || (xSquareOffset < pitch*tilePct || xSquareOffset > pitch*(1-tilePct)) && (ySquareOffset < pitch*tilePct || ySquareOffset > pitch*(1-tilePct));
     // for tiles, make the selected square the bottom left corner (unless it's a rotation), i.e. make the row and column even, rounding down
     if (isTile) {
@@ -601,7 +663,7 @@ async function handleClick(event: MouseEvent): Promise<void> {
             // if it's a tile move, start the hover logic
             if (isTile) {
                 hover = {uRow: unflippedRow, uCol: unflippedCol, prevWasValid: true};
-                handleHover(event);
+                handleHover(offsetX, offsetY);
             }
 
             // also highlight the bottom left corner of the tile
@@ -620,6 +682,7 @@ async function handleClick(event: MouseEvent): Promise<void> {
     } else {
         // try to move piece if we think it's valid. If it's an invalid move, the server will reject it. 
         if (localGameState.rules.ruleIgnoreAll || (myColor === localGameState.currentTurn && validSquares?.some(square => square.toRow === unflippedRow && square.toCol === unflippedCol))) {
+            hover = null;
             // if promotion(s) detected, show the dialog(s) and wait for the user to click
             const promoLocations = checkPromotion(localGameState.board, selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile);
             let promos: {row: number; col: number, piece: Piece}[] = [];
@@ -627,7 +690,6 @@ async function handleClick(event: MouseEvent): Promise<void> {
                 for (const promo of promoLocations) {
                     drawPromotionSelector(promo.row, promo.col);
                     const pieceType: PieceType = await waitForPromo();
-                    console.log(PieceType[pieceType]);
                     if (pieceType !== PieceType.EMPTY) promos.push({row: promo.row, col: promo.col, piece: {type: pieceType, color: myColor}});
                 }
                 renderFullBoard();
@@ -644,7 +706,6 @@ async function handleClick(event: MouseEvent): Promise<void> {
                 drawSquare(square.toRow, square.toCol, square.isTile, null);
             })
         }
-        hover = null;
         selectedSquare = null;
         validSquares = null;
 
@@ -655,19 +716,19 @@ async function handleClick(event: MouseEvent): Promise<void> {
     ctx.stroke();
 }
 
-function handleHover(event: MouseEvent): void {
-    if (!hover || !localGameState) return;
+function handleHover(offsetX: number, offsetY: number): void {
+    if (!hover || !localGameState || !selectedSquare) return;
     // hover holds the {uRow, uCol} of the corner of the tile
 
     // get the current square position
     let uCol: number;
     let uRow: number;
     if (flip) {
-        uCol = 7 - Math.floor((event.offsetX - textSpace) / pitch);
-        uRow = Math.floor((event.offsetY - lineSpace) / pitch);
+        uCol = 7 - Math.floor((offsetX - textSpace) / pitch);
+        uRow = Math.floor((offsetY - lineSpace) / pitch);
     } else {
-        uCol = Math.floor((event.offsetX - textSpace) / pitch);
-        uRow = 7 - Math.floor((event.offsetY - lineSpace) / pitch);
+        uCol = Math.floor((offsetX - textSpace) / pitch);
+        uRow = 7 - Math.floor((offsetY - lineSpace) / pitch);
     }
     
     // only update the hover if we've moved squares
