@@ -125,7 +125,7 @@ export class Game {
             this.chatLog = row.chat_log.split('|');
             const boardRes = getBoardFromMessage(row.moves_log, this.board);
             if (typeof boardRes === 'string') {
-                console.log('failed to parse board from DB notation');
+                console.log('Failed to parse board from DB notation:', boardRes);
                 return
             }
             this.movesLog = boardRes.movesLog;

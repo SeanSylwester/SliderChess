@@ -2,6 +2,10 @@ database
     sanitize inputs
 credits page for SVG attribution
 
+undo move highlight on undo
+hover tile move to show position
+right click select tile
+show captured pieces
 make draw condition trackers work on load from notation
 pause button
 way to make a game without time control

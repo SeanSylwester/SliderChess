@@ -294,11 +294,11 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
             let fromRow: number;
             let fromCol: number;
             for (const possiblePiece of possiblePieces) {
-                if (foundOne) {
-                    return `Found 2 or more pieces that could move to this spot ${move}`;
-                }
                 if ((parsedFromRow && parsedFromRow !== possiblePiece.fromRow) || (parsedFromCol && parsedFromCol !== possiblePiece.fromCol)) {
                     continue
+                }
+                if (foundOne) {
+                    return `Found 2 or more pieces that could move to this spot ${move}`;
                 }
                 foundOne = true;
                 fromRow = possiblePiece.fromRow;
@@ -344,9 +344,9 @@ export function findKing(playerColor: PieceColor, board: Piece[][]): [row: numbe
     return [-1, -1];  // this should really never happen...
 }
 
-export function getPieceChar(piece: Piece, isCapture: boolean, fromCol: number): string {
+export function getPieceChar(piece: Piece, fromCol: number): string {
     // arguments are only used for pawn moves. Can set to anything if you're sure it's not a pawn
-    return piece.type === PieceType.PAWN ? (isCapture ? col0ToFile(fromCol) : '') : (piece.type === PieceType.KNIGHT ? 'N' : PieceType[piece.type][0]);
+    return piece.type === PieceType.PAWN ? '' : (piece.type === PieceType.KNIGHT ? 'N' : PieceType[piece.type][0]);
 }
 
 export function getPiecesOnTile(row: number, col: number, board: Piece[][]): Piece[] {
@@ -620,7 +620,7 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
     // promotion notation
     let promotionNotation = '';
     for (const promo of promotions) {
-        promotionNotation += `${isTile ? col0ToFile(promo.col) : ''}=${getPieceChar(promo.piece, false, promo.col)}`
+        promotionNotation += `${isTile ? col0ToFile(promo.col) : ''}=${getPieceChar(promo.piece, promo.col)}`
     }
 
     // put it together
@@ -629,7 +629,7 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
         notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}`;
     } else {
         const capture = (!enPassant && oldPiece.type === PieceType.EMPTY) ? '' : 'x';
-        const pieceChar = getPieceChar(newPiece, capture === 'x', fromCol);
+        const pieceChar = getPieceChar(newPiece, fromCol);
         notation = castle === '' ? `${pieceChar}${disambiguation}${capture}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}` : castle;
     }
 
