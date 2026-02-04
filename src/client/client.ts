@@ -53,7 +53,6 @@ function connectWebSocket(): void {
                 showGame(message.gameId, message.password);
                 myGameId = gameId;
                 fromHistory = false;
-                sendRules();
                 break;
             case MESSAGE_TYPES.REJECT_JOIN_GAME:
                 handleRejection(message.gameId);
