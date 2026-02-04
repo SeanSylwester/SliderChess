@@ -240,6 +240,7 @@ server.listen(PORT, () => {
 // get games from DB and update the games map
 export let loadedFromDB = false;
 async function getGamesFromDB() {
+    if (process.env.LOCAL) await db.createDummyTable();
     const db_rows = await db.gamesFromDB();
     if(db_rows) {
         for (let i = 0; i < db_rows.rows.length; i++) {

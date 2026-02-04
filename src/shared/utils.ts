@@ -141,7 +141,7 @@ export function getMovesFromNotation(notationString: string): string[] | string 
     return moves
 }
 
-export function getBoardFromMessage(notationString: string, newBoard: Piece[][]): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean} | string {
+export function getBoardFromMessage(notationString: string, newBoard: Piece[][]): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, mapFEN: Map<string, number>} | string {
     const moves = getMovesFromNotation(notationString);
     if (typeof(moves) === 'string') {
         return moves;
@@ -151,6 +151,10 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
     let KW = true;
     let QB = true;
     let KB = true;
+    let halfmoveClock = 0;
+    const mapFEN = new Map<string, number>();
+    const fen = getFENish(newBoard, PieceColor.WHITE, QW, KW, QB, KB);
+    mapFEN.set(fen, 1);
     let movesLog: Move[] = [];
 
     // now do all the moves on a new board with no movement rules
@@ -323,9 +327,26 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
         }
         color = color === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
         [QW, KW, QB, KB] = checkCastle(newBoard, QW, KW, QB, KB, rules);
+
+        // keep track of half-moves for the 50 move rule if no capture or pawn move
+        const oldPiece = movesLog.at(-1)!.oldPiece;
+        const newPiece = movesLog.at(-1)!.newPiece;
+        if ((oldPiece.type !== PieceType.EMPTY && oldPiece.type !== PieceType.TILE) || newPiece.type === PieceType.PAWN) {
+            halfmoveClock = 0;
+        } else {
+            halfmoveClock += 1;
+        }
+        
+        // keep track of the number of times we've been in each position for 3 fold repetition
+        const fen = getFENish(newBoard, PieceColor.WHITE, QW, KW, QB, KB);
+        if (mapFEN.has(fen)) {
+            mapFEN.set(fen, mapFEN.get(fen)! + 1)
+        } else {
+            mapFEN.set(fen, 1);
+        }
     }
 
-    return {movesLog, color, QW, KW, QB, KB};
+    return {movesLog, color, QW, KW, QB, KB, halfmoveClock, mapFEN};
 }
 
 export function findKing(playerColor: PieceColor, board: Piece[][]): [row: number, col: number] {

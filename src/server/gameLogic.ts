@@ -126,19 +126,16 @@ export class Game {
             const boardRes = getBoardFromMessage(row.moves_log, this.board);
             if (typeof boardRes === 'string') {
                 console.log('Failed to parse board from DB notation:', boardRes);
-                return
+            } else {
+                this.movesLog = boardRes.movesLog;
+                this.currentTurn = boardRes.color;
+                this.KW = boardRes.KW;
+                this.QW = boardRes.QW;
+                this.KB = boardRes.KB;
+                this.QB = boardRes.QB;
+                this.halfmoveClock = boardRes.halfmoveClock;
+                this.mapFEN = boardRes.mapFEN;
             }
-            this.movesLog = boardRes.movesLog;
-            this.currentTurn = boardRes.color;
-            this.KW = boardRes.KW;
-            this.QW = boardRes.QW;
-            this.KB = boardRes.KB;
-            this.QB = boardRes.QB;
-            // TODO
-            /*
-            this.halfmoveClock = boardRes.halfmoveClock;
-            this.mapFEN = boardRes.mapFEN;
-            */
 
             this.rules = JSON.parse(row.rules);
 
@@ -625,8 +622,8 @@ export class Game {
         // log the move
         this.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
 
-        // keep track of half-moves for 50-fold repetition if no capture or pawn move
-        if (oldPiece.type !== PieceType.EMPTY || newPiece.type === PieceType.PAWN) {
+        // keep track of half-moves for the 50 move rule if no capture or pawn move
+        if ((oldPiece.type !== PieceType.EMPTY && oldPiece.type !== PieceType.TILE) || newPiece.type === PieceType.PAWN) {
             this.halfmoveClock = 0;
         } else {
             this.halfmoveClock += 1;
