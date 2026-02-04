@@ -6,6 +6,10 @@ import { col0ToFile, inCheck, formatMinSec, checkCastle, moveOnBoard, checkPromo
 // init canvas
 const canvas = document.getElementById("board") as HTMLCanvasElement;
 canvas.addEventListener('click', handleClick);
+canvas.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    handleClick(event);
+});
 
 const ctx = canvas.getContext("2d")!;
 ctx.font = "24px Arial";
@@ -524,6 +528,8 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     redrawMovesLog();
     renderFullBoard();
     highlightLastMove();
+    selectedSquare = null;
+    validSquares = null;
 }
 
 export function clearLocalGameState(): void {
@@ -559,8 +565,8 @@ async function handleClick(event: MouseEvent): Promise<void> {
 
     const xSquareOffset = (event.offsetX - textSpace) % pitch;
     const ySquareOffset = (event.offsetY - 1) % pitch;
-    // force isTile if our current selection is a tile, or if we try to highlight an empty square
-    const isTile = selectedSquare?.isTile || (!selectedSquare && localGameState.board[unflippedRow][unflippedCol].type === PieceType.EMPTY) 
+    // force isTile if our current selection is a tile, or if we try to highlight an empty square, or if it was a right click
+    const isTile = event.button === 2 || selectedSquare?.isTile || (!selectedSquare && localGameState.board[unflippedRow][unflippedCol].type === PieceType.EMPTY) 
                         || (xSquareOffset < pitch*tilePct || xSquareOffset > pitch*(1-tilePct)) && (ySquareOffset < pitch*tilePct || ySquareOffset > pitch*(1-tilePct));
     // for tiles, make the selected square the bottom left corner (unless it's a rotation), i.e. make the row and column even, rounding down
     if (isTile) {
