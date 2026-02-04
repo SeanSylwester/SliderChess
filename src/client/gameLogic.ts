@@ -10,51 +10,33 @@ ctx.font = "24px Arial";
 ctx.lineWidth = 2;
 
 // click events
-function handleClickEvent(event: MouseEvent): void {
+function hanelMouseUpEvent(event: MouseEvent): void {
     event.preventDefault();
-    handleClick(event.offsetX, event.offsetY, false);
+    console.log('mouseup');
+    if (event.button !== 2) {
+        handleClick(event.offsetX, event.offsetY, false);
+    }
 }
-function handleRightClickEvent(event: MouseEvent): void {
+function handleContextMenuEvent(event: MouseEvent): void {
     event.preventDefault();
+    console.log('context');
     handleClick(event.offsetX, event.offsetY, true);
 }
 function handleMouseMoveEvent(event: MouseEvent): void {
     handleHover(event.offsetX, event.offsetY)
 }
-canvas.addEventListener('click', handleClickEvent);
-canvas.addEventListener('mousemove', handleMouseMoveEvent);
-canvas.addEventListener('contextmenu', handleRightClickEvent);
-
-let touchTimer: undefined | NodeJS.Timeout = undefined;
-function cancelTouchTimer(): void {
-    clearTimeout(touchTimer);
-    touchTimer = undefined;
-}
-function handleTouch(touch: Touch, isRightClick: boolean, callback: Function): void {
-    const bcr = canvas.getBoundingClientRect();
-    const x = touch.clientX - bcr.x;
-    const y = touch.clientY - bcr.y;
-    callback(x, y, isRightClick);
-}
-function handleTouchStartEvent(event: TouchEvent): void {
-    event.preventDefault();
-    touchTimer = setTimeout(() =>{
-        touchTimer = undefined;
-        handleTouch(event.touches[0], true, handleClick);
-    }, 500);
-}
 function handleTouchMoveEvent(event: TouchEvent): void {
+    // prevents scrolling
     event.preventDefault();
-    cancelTouchTimer();
+    const bcr = canvas.getBoundingClientRect();
+    handleHover(event.touches[0].clientX - bcr.x, 
+                event.touches[0].clientY - bcr.y);
 }
-function handleTouchEndEvent(event: TouchEvent): void {
-    event.preventDefault();
-    cancelTouchTimer();
-    handleTouch(event.touches[0], false, handleClick);
-}
-canvas.addEventListener('touchstart', handleTouchStartEvent);
+
+canvas.addEventListener('mouseup', hanelMouseUpEvent);
+canvas.addEventListener('contextmenu', handleContextMenuEvent);
+canvas.addEventListener('mousemove', handleMouseMoveEvent);
 canvas.addEventListener('touchmove', handleTouchMoveEvent);
-canvas.addEventListener('touchend', handleTouchEndEvent);
 
 
 
@@ -519,46 +501,34 @@ function drawPromotionSelector(unflippedRow: number, unflippedCol: number) {
 function waitForPromo(): Promise<PieceType> {
     return new Promise(resolve => {
         // Handle click on the promotion selector
-        function handleClickPromotionEvent(event: MouseEvent): void {
-            handleClickPromotion(event.offsetX, event.offsetY);
-        }
-        function handleTouchPromotionEvent(event: TouchEvent): void {
-            handleTouch(event.touches[0], false, handleClickPromotion);
-        }
-        function handleClickPromotion(offsetX: number, offsetY: number): void {
-            canvas.removeEventListener('click', handleClickPromotionEvent);
-            canvas.removeEventListener('touchend', handleTouchPromotionEvent);
-            canvas.addEventListener('click', handleClickEvent);
-            canvas.addEventListener('touchend', handleTouchEndEvent);
+        function handleClickPromotion(event: MouseEvent): void {
+            canvas.removeEventListener('mouseup', handleClickPromotion);
+            canvas.addEventListener('mouseup', hanelMouseUpEvent);
 
             canvas.addEventListener('mousemove', handleMouseMoveEvent);
-            canvas.addEventListener('contextmenu', handleRightClickEvent);
-            canvas.addEventListener('touchstart', handleTouchStartEvent);
+            canvas.addEventListener('contextmenu', handleContextMenuEvent);
             canvas.addEventListener('touchmove', handleTouchMoveEvent);
 
             const top = promoY !== lineSpace;
             
             // Check if click is within the selector box
-            if (offsetX < promoX || offsetX > promoX + pitch
-                || ( top && (offsetY > (promoY + pitch) || offsetY < promoY - 3 * pitch))
-                || (!top && (offsetY < promoY || offsetY > promoY + 4 * pitch))) {
+            if (event.offsetX < promoX || event.offsetX > promoX + pitch
+                || ( top && (event.offsetY > (promoY + pitch) || event.offsetY < promoY - 3 * pitch))
+                || (!top && (event.offsetY < promoY || event.offsetY > promoY + 4 * pitch))) {
                 // clicked outside of box: return empty
                 resolve(PieceType.EMPTY);
             } else {
-                if (top) resolve(promoPiecesOrder[Math.floor((promoY + pitch - offsetY) / pitch)]);
-                else resolve(promoPiecesOrder[Math.floor((offsetY - promoY) / promoDy)]);
+                if (top) resolve(promoPiecesOrder[Math.floor((promoY + pitch - event.offsetY) / pitch)]);
+                else resolve(promoPiecesOrder[Math.floor((event.offsetY - promoY) / promoDy)]);
             }
             
         }
 
-        canvas.removeEventListener('click', handleClickEvent);
-        canvas.removeEventListener('touchend', handleTouchEndEvent);
-        canvas.addEventListener('click', handleClickPromotionEvent);
-        canvas.addEventListener('touchend', handleTouchPromotionEvent);
+        canvas.removeEventListener('mouseup', hanelMouseUpEvent);
+        canvas.addEventListener('mouseup', handleClickPromotion);
 
         canvas.removeEventListener('mousemove', handleMouseMoveEvent);
-        canvas.removeEventListener('contextmenu', handleRightClickEvent);
-        canvas.removeEventListener('touchstart', handleTouchStartEvent);
+        canvas.removeEventListener('contextmenu', handleContextMenuEvent);
         canvas.removeEventListener('touchmove', handleTouchMoveEvent);
         
     });
@@ -639,9 +609,14 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
 
     const xSquareOffset = (offsetX - textSpace) % pitch;
     const ySquareOffset = (offsetY - 1) % pitch;
-    // force isTile if our current selection is a tile, or if we try to highlight an empty square, or if it was a right click
-    const isTile = isRightClick || selectedSquare?.isTile || (!selectedSquare && localGameState.board[unflippedRow][unflippedCol].type === PieceType.EMPTY) 
+    // force isTile if it's a right click, our current selection is a tile, or if we try to highlight an empty square, or if it's along the edge of a square. 
+    let isTile = isRightClick || selectedSquare?.isTile 
+                        || (!selectedSquare && localGameState.board[unflippedRow][unflippedCol].type === PieceType.EMPTY) 
                         || (xSquareOffset < pitch*tilePct || xSquareOffset > pitch*(1-tilePct)) && (ySquareOffset < pitch*tilePct || ySquareOffset > pitch*(1-tilePct));
+    
+                        // If the first click wasn't a tile, force this false also
+    if (selectedSquare && !selectedSquare.isTile) isTile = false;
+
     // for tiles, make the selected square the bottom left corner (unless it's a rotation), i.e. make the row and column even, rounding down
     if (isTile) {
         // don't do this correction if it's the second click within the same tile so that we can capture rotation
@@ -682,7 +657,6 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
     } else {
         // try to move piece if we think it's valid. If it's an invalid move, the server will reject it. 
         if (localGameState.rules.ruleIgnoreAll || (myColor === localGameState.currentTurn && validSquares?.some(square => square.toRow === unflippedRow && square.toCol === unflippedCol))) {
-            hover = null;
             // if promotion(s) detected, show the dialog(s) and wait for the user to click
             const promoLocations = checkPromotion(localGameState.board, selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile);
             let promos: {row: number; col: number, piece: Piece}[] = [];
@@ -698,6 +672,7 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
                 requestMovePiece(selectedSquare.row, selectedSquare.col, unflippedRow, unflippedCol, isTile, promos);
             }
         }
+        hover = null;
 
         // regardless, clear the highlight
         drawSquare(selectedSquare.row, selectedSquare.col, selectedSquare.isTile, null);
