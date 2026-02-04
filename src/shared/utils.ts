@@ -189,7 +189,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
             } else if (move === 'O-O-O') {
                 rookFromCol = 0;
                 rookToCol = 3;
-                kingToCol = 4;
+                kingToCol = 2;
             } else {
                 return `Failed to parse castle: ${move}`;
             }
