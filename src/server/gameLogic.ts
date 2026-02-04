@@ -169,7 +169,7 @@ export class Game {
 
         let chatLogStr = '';
         for (let i = 0; i < this.chatLog.length; i++) {
-            if (i) chatLogStr += ', ';
+            if (i) chatLogStr += '| ';
             chatLogStr += this.chatLog[i].replace('\n', '|');
         }
 
