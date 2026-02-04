@@ -178,7 +178,6 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
     const pieceToRe = /(?<col>[a-h])(?<row>[1-8])$/; // always the last 2
     const pieceFromRe = /[NBRQK]?(?<col>[a-h]?)(?<row>[1-8]?)$/; // x and last 2 characters removed first!
     let color = PieceColor.WHITE;
-    // TODO: en passant
     for (const move of moves) {
         if (move[0] === 'O') {
             const row = color === PieceColor.WHITE ? 0 : 7;
@@ -312,6 +311,9 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
                 return `None of the possible pieces match the notation ${move}`;
             }
             const oldPiece = newBoard[fromRow!][fromCol!];
+            if (pieceType === PieceType.PAWN && oldPiece.type === PieceType.EMPTY) {
+                // TODO: en passant
+            }
             newBoard[fromRow!][fromCol!] = { type: PieceType.EMPTY, color: PieceColor.NONE };
             newBoard[toRow][toCol] =  {type: pieceType, color: color};
 
@@ -336,7 +338,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
         } else {
             halfmoveClock += 1;
         }
-        
+
         // keep track of the number of times we've been in each position for 3 fold repetition
         const fen = getFENish(newBoard, PieceColor.WHITE, QW, KW, QB, KB);
         if (mapFEN.has(fen)) {
@@ -746,7 +748,6 @@ export function checkPromotion(board: Piece[][], fromRow: number, fromCol: numbe
             else swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board);
         }
     } else if (piece.type === PieceType.PAWN && ((piece.color === PieceColor.WHITE && toRow === 7) || (piece.color === PieceColor.BLACK && toRow === 0))) {
-        // TODO: choose piece type to promote to
         promotions.push({ row: toRow, col: toCol });
     }
 
@@ -755,7 +756,6 @@ export function checkPromotion(board: Piece[][], fromRow: number, fromCol: numbe
 
 
 export function wouldBeInCheck(playerColor: PieceColor, board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): boolean {
-    // TODO: I don't know if mutating the board is okay here.
     let check: boolean;
     if (isTile) {
         if (toRow % 2 || toCol % 2) {

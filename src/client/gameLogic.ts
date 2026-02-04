@@ -1,11 +1,12 @@
 import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, ChatMessage, Rules, RulesMessage, Message } from "../shared/types.js";
 import { sendMessage } from "./client.js";
-import { col0ToFile, inCheck, formatMinSec, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves } from '../shared/utils.js'
+import { col0ToFile, inCheck, formatMinSec, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile } from '../shared/utils.js'
 
 
 // init canvas
 const canvas = document.getElementById("board") as HTMLCanvasElement;
 canvas.addEventListener('click', handleClick);
+canvas.addEventListener('mousemove', handleHover);
 canvas.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     handleClick(event);
@@ -347,17 +348,24 @@ function drawTileBorder(unflippedRow: number, unflippedCol: number): void {
     ctx.strokeRect(x, y, 2*pitch, 2*pitch);
 }
 
-export function drawSquare(unflippedRow: number, unflippedCol: number, isTile: boolean, piece: Piece | null): void {  
+export function drawSquare(unflippedRow: number, unflippedCol: number, isTile: boolean, piece: Piece | null | Piece[], alpha=1): void {  
     //console.log(`(${row}, ${col}), ${isTile}, ${piece}`);
     if (isTile) {
         // force index to the bottom left corner
         unflippedRow -= unflippedRow % 2;
         unflippedCol -= unflippedCol % 2;
 
-        drawSquare(unflippedRow, unflippedCol, false, null);
-        drawSquare(unflippedRow+1, unflippedCol, false, null);
-        drawSquare(unflippedRow, unflippedCol+1, false, null);
-        drawSquare(unflippedRow+1, unflippedCol+1, false, null);
+        if (Array.isArray(piece)) {
+            drawSquare(unflippedRow, unflippedCol, false, piece[0], alpha);
+            drawSquare(unflippedRow+1, unflippedCol, false, piece[1], alpha);
+            drawSquare(unflippedRow+1, unflippedCol+1, false, piece[2], alpha);
+            drawSquare(unflippedRow, unflippedCol+1, false, piece[3], alpha);
+        } else {
+            drawSquare(unflippedRow, unflippedCol, false, null, alpha);
+            drawSquare(unflippedRow+1, unflippedCol, false, null, alpha);
+            drawSquare(unflippedRow+1, unflippedCol+1, false, null, alpha);
+            drawSquare(unflippedRow, unflippedCol+1, false, null, alpha);
+        }
     } else {
         // x and y point to the top left corner of the square (flipped or not)
         const {x, y} = getXY(unflippedRow, unflippedCol, flip);
@@ -372,8 +380,11 @@ export function drawSquare(unflippedRow: number, unflippedCol: number, isTile: b
         }
 
         // draw piece (if we found one)
-        if (piece) {
+        if (piece && !Array.isArray(piece)) {
+            const prevAlpha = ctx.globalAlpha;
+            ctx.globalAlpha = alpha;
             drawPieceXY(x, y, piece);
+            ctx.globalAlpha = prevAlpha;
         }
 
         // redraw tile border
@@ -503,6 +514,7 @@ export let localGameState: GameState | undefined = undefined;
 let myColor = PieceColor.NONE;
 let selectedSquare: {row: number, col: number, isTile: boolean} | null = null;
 let validSquares: ReturnType<typeof getValidMoves> | null;
+let hover: {uRow: number, uCol: number, prevWasValid: boolean} | null = null;  // grabs initial hover tile from handleClick, then updated on mousemove from handleHover
 
 export function initLocalGameState(gameState: GameState, yourColor: PieceColor): void {
     localGameState = gameState;
@@ -578,7 +590,7 @@ async function handleClick(event: MouseEvent): Promise<void> {
     }
     //console.log(`(${row}, ${col}) ${isTile}`);
 
-    const piece = localGameState.board[unflippedRow][unflippedCol];
+    //const piece = localGameState.board[unflippedRow][unflippedCol];
     //console.log(`Clicked on ${col0ToFile(col)}${row+1}: ${PieceColor[piece.color]} ${PieceType[piece.type]}`);
 
     if (selectedSquare === null) {
@@ -586,6 +598,11 @@ async function handleClick(event: MouseEvent): Promise<void> {
         if (isTile || localGameState.board[unflippedRow][unflippedCol].color === myColor) {
             selectedSquare = {row: unflippedRow, col: unflippedCol, isTile};
             validSquares = getValidMoves(localGameState.board, unflippedRow, unflippedCol, isTile, myColor, false, localGameState.movesLog.at(-1), localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
+            // if it's a tile move, start the hover logic
+            if (isTile) {
+                hover = {uRow: unflippedRow, uCol: unflippedCol, prevWasValid: true};
+                handleHover(event);
+            }
 
             // also highlight the bottom left corner of the tile
             if (isTile) {
@@ -627,6 +644,7 @@ async function handleClick(event: MouseEvent): Promise<void> {
                 drawSquare(square.toRow, square.toCol, square.isTile, null);
             })
         }
+        hover = null;
         selectedSquare = null;
         validSquares = null;
 
@@ -635,6 +653,88 @@ async function handleClick(event: MouseEvent): Promise<void> {
 
     }
     ctx.stroke();
+}
+
+function handleHover(event: MouseEvent): void {
+    if (!hover || !localGameState) return;
+    // hover holds the {uRow, uCol} of the corner of the tile
+
+    // get the current square position
+    let uCol: number;
+    let uRow: number;
+    if (flip) {
+        uCol = 7 - Math.floor((event.offsetX - textSpace) / pitch);
+        uRow = Math.floor((event.offsetY - lineSpace) / pitch);
+    } else {
+        uCol = Math.floor((event.offsetX - textSpace) / pitch);
+        uRow = 7 - Math.floor((event.offsetY - lineSpace) / pitch);
+    }
+    
+    // only update the hover if we've moved squares
+    if ((uRow === hover.uRow && uCol === hover.uCol) || uRow < 0 || uRow > 7 || uCol < 0 || uCol > 7) return;
+
+    // clear previous hover
+    if (hover.prevWasValid) {
+        drawSquare(selectedSquare!.row, selectedSquare!.col, true, null);  // highlight done later
+        drawSquare(hover.uRow, hover.uCol, true, null);
+        highlightSquare(hover.uRow, hover.uCol, "rgb(255 0 0 / 25%)", true);
+    }
+
+    hover.uRow = uRow;
+    hover.uCol = uCol;
+    
+    const uRowCorner = uRow - uRow % 2;
+    const uColCorner = uCol - uCol % 2;
+
+    function highlightSelectedSquare(): void {
+        highlightSquare(selectedSquare!.row, selectedSquare!.col, "rgb(255 0 0 / 75%)", false);
+        highlightSquare(selectedSquare!.row, selectedSquare!.col, "rgb(255 0 0 / 75%)", true);
+        for (const square of validSquares!) {
+            if (square.toRow - square.toRow % 2 === selectedSquare!.row && square.toCol - square.toCol % 2 === selectedSquare!.col){
+                highlightSquare(square.toRow, square.toCol, "rgb(255 0 0 / 25%)", false);
+            }
+        }
+    }
+
+    // if this isn't a valid square, don't do the rest
+    if (!validSquares?.some(square => [uRow, uRowCorner].includes(square.toRow) && [uCol, uColCorner].includes(square.toCol))) {
+        hover.prevWasValid = false;
+        highlightSelectedSquare();
+        return;
+    }
+    hover.prevWasValid = true;
+
+
+    const inStartTile = uRowCorner === selectedSquare!.row && uColCorner === selectedSquare!.col;
+
+    // make move on dummy board if it's a valid square
+    // draw tiles and from dummy board
+    // NOTE: handleClick will redraw everything when we click off
+    const dummyBoard = structuredClone(localGameState.board);
+    if (inStartTile && (uRow % 2 || uCol % 2)) {
+        // tile rotation
+        for (const square of validSquares!) {
+            if (uRow === square.toRow && uCol === square.toCol) {
+                rotateTileOnBoard(selectedSquare!.row, selectedSquare!.col, uRow, uCol, dummyBoard, false);
+                drawSquare(selectedSquare!.row, selectedSquare!.col, true, getPiecesOnTile(selectedSquare!.row, selectedSquare!.col, dummyBoard), 0.75);
+            }
+        }
+    }
+    else {
+        // tile swap
+        for (const square of validSquares!) {
+            if (uRowCorner === square.toRow && uColCorner === square.toCol) {
+                swapTilesOnBoard(selectedSquare!.row, selectedSquare!.col, uRowCorner, uColCorner, dummyBoard);
+                drawSquare(selectedSquare!.row, selectedSquare!.col, true, getPiecesOnTile(selectedSquare!.row, selectedSquare!.col, dummyBoard), 0.75);
+                drawSquare(uRowCorner, uColCorner, true, getPiecesOnTile(uRowCorner, uColCorner, dummyBoard), 0.75);
+            }
+        }
+    }
+
+    // redo the highlights
+    highlightSelectedSquare();
+    highlightSquare(hover.uRow, hover.uCol, "rgb(255 0 0 / 25%)", true);
+
 }
 
 export function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
@@ -654,9 +754,6 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
 
     // check if castling is still allowed
     [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
-
-    // determine if the other player is now in check
-    const check = inCheck(localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE, localGameState.board);
 
     // draw promotions
     for (const promotion of promotions) {

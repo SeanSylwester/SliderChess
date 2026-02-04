@@ -66,6 +66,21 @@ export async function storeNewGame(): Promise<number | undefined> {
 }
 
 export async function createDummyTable(): Promise<void> {
-    await pool.query('DROP TABLE IF EXISTS games_dummy;', []);
-    await pool.query('CREATE TABLE games_dummy AS SELECT * FROM games;', []);
+    const client = await getClient();
+    // make table with same columns and data
+    await client.query('DROP TABLE IF EXISTS games_dummy;', []);
+    await client.query('CREATE TABLE games_dummy AS SELECT * FROM games;', []);
+
+    // add auto-incrementing primary key onto id with next val of max(id)
+    await client.query('DROP SEQUENCE IF EXISTS games_dummy_id_seq;', []);
+    await client.query('CREATE SEQUENCE games_dummy_id_seq;', []);
+    await client.query('ALTER TABLE games_dummy ALTER COLUMN id SET DEFAULT nextval(\'games_dummy_id_seq\');', []);
+    await client.query('ALTER TABLE games_dummy ADD PRIMARY KEY (id);', []);
+    await client.query('ALTER SEQUENCE games_dummy_id_seq OWNED BY games_dummy.id;', []);
+    await client.query(`SELECT setval(\'games_dummy_id_seq\', (SELECT MAX(id) FROM games_dummy));`, []);
+
+    // add timestamp default
+    await client.query('ALTER TABLE games_dummy ALTER COLUMN creation_timestamp SET DEFAULT CURRENT_TIMESTAMP;', []);
+    await client.query('ALTER TABLE games_dummy ALTER COLUMN creation_timestamp SET NOT NULL;', []);
+    client.release();
 }
