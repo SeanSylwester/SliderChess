@@ -82,6 +82,7 @@ export function getFENish(board: Piece[][], currentTurn: PieceColor, QW: boolean
     if (QW) s += 'Q';
     if (KB) s += 'k';
     if (QB) s += 'q';
+    if (!KW && !QW && !KB && !QB) s += '-'
 
     return s
 }
@@ -127,7 +128,7 @@ export function getMovesFromNotation(notationString: string): string[] | string 
     return moves
 }
 
-export function getBoardFromMessage(notationString: string, newBoard: Piece[][]): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, mapFEN: Map<string, number>} | string {
+export function getBoardFromMessage(notationString: string, newBoard: Piece[][]): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, mapFEN: Map<string, number>, arrayFEN: string[]} | string {
     const moves = getMovesFromNotation(notationString);
     if (typeof(moves) === 'string') {
         return moves;
@@ -139,6 +140,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
     let KB = true;
     let halfmoveClock = 0;
     const mapFEN = new Map<string, number>();
+    const arrayFEN: string[] = [];
     const fen = getFENish(newBoard, PieceColor.WHITE, QW, KW, QB, KB);
     mapFEN.set(fen, 1);
     let movesLog: Move[] = [];
@@ -148,6 +150,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
         ruleMoveOwnKing: true,
         ruleMoveOwnKingInCheck: true,
         ruleMoveOpp: true,
+        ruleUndoTileMove: true,
         ruleMoveOppKing: true,
         ruleMoveOppCheck: true,
         ruleDoubleMovePawn: true,
@@ -206,11 +209,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
             }
 
             // do the move
-            if (toRow % 2 || toCol % 2) {
-                rotateTileOnBoard(fromRow, fromCol, toRow, toCol, newBoard, false);
-            } else {
-                swapTilesOnBoard(fromRow, fromCol, toRow, toCol, newBoard);
-            }
+            doTileMove(fromRow, fromCol, toRow, toCol, newBoard, false);
 
             // handle promotions (could be 2)
             const promotions: {row: number, col: number, piece: Piece}[] = [];
@@ -327,6 +326,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
 
         // keep track of the number of times we've been in each position for 3 fold repetition
         const fen = getFENish(newBoard, PieceColor.WHITE, QW, KW, QB, KB);
+        arrayFEN.push(fen);
         if (mapFEN.has(fen)) {
             mapFEN.set(fen, mapFEN.get(fen)! + 1)
         } else {
@@ -334,7 +334,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
         }
     }
 
-    return {movesLog, color, QW, KW, QB, KB, halfmoveClock, mapFEN};
+    return {movesLog, color, QW, KW, QB, KB, halfmoveClock, mapFEN, arrayFEN};
 }
 
 export function findKing(playerColor: PieceColor, board: Piece[][]): [row: number, col: number] {
@@ -387,6 +387,10 @@ export function swapTilesOnBoard(fromRow: number, fromCol: number, toRow: number
     let temp = getPiecesOnTile(toRow, toCol, board);
     setPiecesOnTile(toRow, toCol, board, getPiecesOnTile(fromRow, fromCol, board));
     setPiecesOnTile(fromRow, fromCol, board, temp);
+}
+export function doTileMove(fromRow: number, fromCol: number, toRow: number, toCol: number, board: Piece[][], reverse: boolean): void {
+    if (toRow % 2 || toCol % 2) rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, reverse);
+    else swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board);
 }
 
 export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
@@ -459,6 +463,32 @@ export function inCheck(playerColor: PieceColor, board: Piece[][]): boolean {
 export function pawnOnHomeRow(color: PieceColor, row: number): boolean {
     if (color === PieceColor.NONE) return false;
     return row === (color === PieceColor.WHITE ? 1 : 6);
+}
+
+export function tileMoveWouldUndo(fromRow: number, fromCol: number, toRow: number, toCol: number, board: Piece[][], arrayFEN: string[]): boolean {
+    if (arrayFEN.length === 1) return false;
+
+    // if the last move changed the castling permission, then it can't be undone
+    // TODO: when I add enpassant, I'll need to update the index here
+    const castleStr = arrayFEN.at(-1)!.split(' ')[-1];
+    const castleStr2 = arrayFEN.at(-2)!.split(' ')[-1];
+    if (castleStr !== castleStr2) return false;
+    
+    const KW = castleStr.includes('K');
+    const QW = castleStr.includes('Q');
+    const KB = castleStr.includes('k');
+    const QB = castleStr.includes('q');
+    const color = arrayFEN.at(-2)!.split(' ')[-2] === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
+    doTileMove(fromRow, fromCol, toRow, toCol, board, false); 
+    const fen = getFENish(board, color, QW, KW, QB, KB);
+    doTileMove(fromRow, fromCol, toRow, toCol, board, true); 
+
+    return fen === arrayFEN.at(-2);
+}
+
+export function tileCanMoveTo(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
+    // simple check to see if the tiles are adjacent
+    return Math.max(Math.abs(fromRow - toRow), Math.abs(fromCol - toCol)) <= 2;
 }
 
 export function pieceCanMoveTo(fromRow: number, fromCol: number, toRow: number, toCol: number, board: Piece[][], lastMove: Move | undefined): boolean {
@@ -665,11 +695,7 @@ export function moveOnBoard(board: Piece[][], fromRow: number, fromCol: number, 
     if (isTile) {
         oldPiece = {type: PieceType.TILE, color: PieceColor.NONE};
         newPiece = {type: PieceType.TILE, color: PieceColor.NONE};
-        if (toRow % 2 || toCol % 2) {
-            rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, false);
-        } else {
-            swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board);
-        }
+        doTileMove(fromRow, fromCol, toRow, toCol, board, false);
     } else {
         oldPiece = board[toRow][toCol];
         newPiece = board[fromRow][fromCol];
@@ -715,8 +741,7 @@ export function checkPromotion(board: Piece[][], fromRow: number, fromCol: numbe
     if (isTile) {
         const isRotation = toRow % 2 || toCol % 2;
         if ([0, 6].includes(fromRow) || (!isRotation && [0, 6].includes(toRow))) {
-            if (isRotation) rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, false);
-            else swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board);
+            doTileMove(fromRow, fromCol, toRow, toCol, board, false);
 
             for (const testCol of [fromCol, fromCol+1]) {
                 const testRow = (fromRow === 0 || toRow === 0) ? 0 : 7;
@@ -726,8 +751,7 @@ export function checkPromotion(board: Piece[][], fromRow: number, fromCol: numbe
                 }
             }
             
-            if (isRotation) rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, true);
-            else swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board);
+            doTileMove(fromRow, fromCol, toRow, toCol, board, true);
         }
     } else if (piece.type === PieceType.PAWN && ((piece.color === PieceColor.WHITE && toRow === 7) || (piece.color === PieceColor.BLACK && toRow === 0))) {
         promotions.push({ row: toRow, col: toCol });
@@ -740,15 +764,9 @@ export function checkPromotion(board: Piece[][], fromRow: number, fromCol: numbe
 export function wouldBeInCheck(playerColor: PieceColor, board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): boolean {
     let check: boolean;
     if (isTile) {
-        if (toRow % 2 || toCol % 2) {
-            rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, false);
-            check = inCheck(playerColor, board);
-            rotateTileOnBoard(fromRow, fromCol, toRow, toCol, board, true);
-        } else {
-            swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board);
-            check = inCheck(playerColor, board);
-            swapTilesOnBoard(fromRow, fromCol, toRow, toCol, board); 
-        }      
+        doTileMove(fromRow, fromCol, toRow, toCol, board, false);
+        check = inCheck(playerColor, board);
+        doTileMove(fromRow, fromCol, toRow, toCol, board, true);   
     } else {
         const temp = board[toRow][toCol];
         board[toRow][toCol] = board[fromRow][fromCol];

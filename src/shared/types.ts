@@ -35,7 +35,7 @@ export interface GameState {
     drawBlack: boolean;
     rules: Rules;
     halfmoveClock: number;
-    mapFEN: string[];  // converted from Map<string, number> to string[], with each copy of string being copied number times
+    arrayFEN: string[];  // converted from Map<string, number> to string[], with each copy of string being copied number times
     creationTime: number;
 }
 export interface GameInfo {
@@ -87,6 +87,7 @@ export interface Rules {
     ruleMoveOwnKing: boolean;
     ruleMoveOwnKingInCheck: boolean;
     ruleMoveOpp: boolean;
+    ruleUndoTileMove: boolean;
     ruleMoveOppKing: boolean;
     ruleMoveOppCheck: boolean;
     ruleDoubleMovePawn: boolean;

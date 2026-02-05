@@ -1,6 +1,6 @@
 import { QueryResult } from 'pg';
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish, getMoveDisambiguationStr } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
 export class Game {
@@ -41,11 +41,13 @@ export class Game {
     halfmoveClock = 0;
 
     mapFEN: Map<string, number>;
+    arrayFEN: string[];
 
     rules: Rules = {
         ruleMoveOwnKing: true,
         ruleMoveOwnKingInCheck: true,
         ruleMoveOpp: true,
+        ruleUndoTileMove: true,
         ruleMoveOppKing: true,
         ruleMoveOppCheck: true,
         ruleDoubleMovePawn: true,
@@ -76,6 +78,7 @@ export class Game {
 
         this.board = getDefaultBoard();
         this.mapFEN = new Map<string, number>();
+        this.arrayFEN = [];
         this.updateFEN();
         this.creationTime = Date.now();
     }
@@ -105,7 +108,7 @@ export class Game {
         this.creationTime = gameState.creationTime;
 
         this.mapFEN = new Map<string, number>();
-        for (const fen of gameState.mapFEN) this.updateFEN(fen);
+        for (const fen of gameState.arrayFEN) this.updateFEN(fen);
     }
 
     public loadFromDB(row: any) {
@@ -135,6 +138,7 @@ export class Game {
                 this.QB = boardRes.QB;
                 this.halfmoveClock = boardRes.halfmoveClock;
                 this.mapFEN = boardRes.mapFEN;
+                this.arrayFEN = boardRes.arrayFEN;
             }
 
             this.rules = JSON.parse(row.rules);
@@ -204,6 +208,7 @@ export class Game {
 
     public updateFEN(fen?: string): void {
         if (fen === undefined) fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB);
+        this.arrayFEN.push(fen);
 
         if (this.mapFEN.has(fen)) {
             this.mapFEN.set(fen, this.mapFEN.get(fen)! + 1)
@@ -450,13 +455,6 @@ export class Game {
     }
 
     public sendGameState(client: ClientInfo): void {
-        const arrayFEN = [];
-        for (const [fen, num] of this.mapFEN) {
-            for (let i = 0; i < num; i++) {
-                arrayFEN.push(fen);
-            }
-        }
-
         const gameState: GameState = {
             playerWhiteName: this.playerWhite?.name ?? null,
             playerBlackName: this.playerBlack?.name ?? null,
@@ -482,7 +480,7 @@ export class Game {
             drawBlack: this.drawBlack,
             rules: this.rules,
             halfmoveClock: this.halfmoveClock,
-            mapFEN: arrayFEN,
+            arrayFEN: this.arrayFEN,
             creationTime: this.creationTime
         };
         const clientColor = this.getColor(client);
@@ -588,7 +586,7 @@ export class Game {
         if (c !== this.getPlayer(this.currentTurn)) return false;
 
         if (!this.rules.ruleIgnoreAll) {
-        // reject if the piece doesn't belong to the player
+            // reject if the piece doesn't belong to the player
             if (!isTile && !sameColor(this.board[fromRow][fromCol].color, this.currentTurn)) return false;
 
             // reject if they'd be in check after
@@ -599,8 +597,12 @@ export class Game {
             if (isTile && (!tileCanMove(fromRow, fromCol, this.board, this.currentTurn, currentlyInCheck, this.rules)
                             || !tileCanMove(toRow, toCol, this.board, this.currentTurn, currentlyInCheck, this.rules))) return false;
             
-            // reject piece move if it's impossible
+            // reject piece move if it's impossible for the piece to reach (ignoring checks and rules)
             if (!isTile && !pieceCanMoveTo(fromRow, fromCol, toRow, toCol, this.board, this.movesLog.at(-1))) return false;
+            if (isTile && !tileCanMoveTo(fromRow, fromCol, toRow, toCol)) return false;
+
+            // reject if it would completely undo the previous move
+            if (this.rules.ruleUndoTileMove && isTile && tileMoveWouldUndo(fromRow, fromCol, toRow, toCol, this.board, this.arrayFEN)) return false;
         }
 
         // before moving, grab the disambiguation info
@@ -661,6 +663,7 @@ export class Game {
         this.halfmoveClock -= 1;
         const fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB);
         this.mapFEN.set(fen, this.mapFEN.get(fen)! - 1);
+        this.arrayFEN.pop();
 
 
         // loop through all the moves and keep track of castling

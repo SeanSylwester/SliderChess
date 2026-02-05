@@ -45,6 +45,8 @@ const ruleMoveOwnKingInCheck = document.getElementById("ruleMoveOwnKingInCheck")
 ruleMoveOwnKingInCheck.addEventListener('change', sendRules);
 const ruleMoveOpp = document.getElementById("ruleMoveOpp") as HTMLInputElement;
 ruleMoveOpp.addEventListener('change', sendRules);
+const ruleUndoTileMove = document.getElementById("ruleUndoTileMove") as HTMLInputElement;
+ruleUndoTileMove.addEventListener('change', sendRules);
 const ruleMoveOppKing = document.getElementById("ruleMoveOppKing") as HTMLInputElement;
 ruleMoveOppKing.addEventListener('change', sendRules);
 const ruleMoveOppCheck = document.getElementById("ruleMoveOppCheck") as HTMLInputElement;
@@ -65,6 +67,7 @@ function getRules(): Rules {
     return {ruleMoveOwnKing: ruleMoveOwnKing.checked,
             ruleMoveOwnKingInCheck: ruleMoveOwnKingInCheck.checked,
             ruleMoveOpp: ruleMoveOpp.checked,
+            ruleUndoTileMove: ruleUndoTileMove.checked,
             ruleMoveOppKing: ruleMoveOppKing.checked,
             ruleMoveOppCheck: ruleMoveOppCheck.checked,
             ruleDoubleMovePawn: ruleDoubleMovePawn.checked,
@@ -81,6 +84,7 @@ export function updateRules(rules: Rules): void {
     ruleMoveOwnKing.checked = rules.ruleMoveOwnKing;
     ruleMoveOwnKingInCheck.checked = rules.ruleMoveOwnKingInCheck;
     ruleMoveOpp.checked = rules.ruleMoveOpp;
+    ruleUndoTileMove.checked = rules.ruleUndoTileMove;
     ruleMoveOppKing.checked = rules.ruleMoveOppKing;
     ruleMoveOppCheck.checked = rules.ruleMoveOppCheck;
     ruleDoubleMovePawn.checked = rules.ruleDoubleMovePawn;
@@ -92,6 +96,7 @@ export function updateRules(rules: Rules): void {
 
     ruleMoveOwnKingInCheck.disabled = ruleMoveOwnKing.checked;
 
+    ruleUndoTileMove.disabled = ruleMoveOpp.checked;
     ruleMoveOppKing.disabled = ruleMoveOpp.checked;
     ruleMoveOppCheck.disabled = ruleMoveOpp.checked;
 
