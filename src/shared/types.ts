@@ -166,6 +166,7 @@ export const MESSAGE_TYPES = {
     GAME_PASSWORD: 'gamePassword',
     REJECT_JOIN_GAME: 'rejectJoin',
     RECONNECT: 'reconnect',
+    POPUP: 'popup',
 } as const;
 
 // Message type definitions
@@ -254,4 +255,9 @@ export interface ReconnectMessage extends Message {
     clientId: number;
     clientName: string;
     gameState?: GameState;  // sent from the client to use when the server can't reload the game
+}
+export interface PopupMessage extends Message {
+    type: typeof MESSAGE_TYPES.POPUP;
+    text: string;
+    button: string[] | string;  // server sends list of button names, client sends back the selected name. String must match exactly. Be sure to include a "Cancel" or "Ok" or whatever
 }

@@ -11,7 +11,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
     let game: Game | undefined;
     if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.MOVE_PIECE, MESSAGE_TYPES.REWIND, MESSAGE_TYPES.PAUSE, MESSAGE_TYPES.DRAW, 
          MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER,
-         MESSAGE_TYPES.GAME_PASSWORD].includes(message.type)) {
+         MESSAGE_TYPES.GAME_PASSWORD, MESSAGE_TYPES.POPUP].includes(message.type)) {
         if (!client.gameId) {
             console.error(`Client ${client.id} is not in a game.`);
             return;
@@ -46,7 +46,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             break;
 
         case MESSAGE_TYPES.REWIND:
-            game!.rewind();
+            game!.requestUndo(client);
             break;
 
         case MESSAGE_TYPES.PAUSE:
@@ -93,6 +93,10 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
         case MESSAGE_TYPES.RECONNECT:
             handleReconnect(client, message.clientId, message.clientName, message.gameState);
+            break;
+
+        case MESSAGE_TYPES.POPUP:
+            game!.handlePopupRepsonse(client, message);
             break;
 
         default:

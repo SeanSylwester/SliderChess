@@ -26,43 +26,46 @@
     </div>
 
     <dialog id="createGameDialog">
-        <form>
-            <input type="checkbox" id="useTimeControl" checked="true"/><label for="useTimeControl">Use time control?</label> </br>
-            <p>
-                Bullet</br>
-                <button id="time1p0" class="timeControlButton">1+0</button>
-                <button id="time1p1" class="timeControlButton">1+1</button>
-                <button id="time2p1" class="timeControlButton">2+1</button>
-            </p>
-            <p>
-                Blitz</br>
-                <button id="time3p0" class="timeControlButton">3+0</button>
-                <button id="time3p2" class="timeControlButton">3+2</button>
-                <button id="time5p0" class="timeControlButton">5+0</button>
-            </p>
-            <p>
-                Rapid</br>
-                <button id="time10p0"  class="timeControlButton">10+0</button>
-                <button id="time15p10" class="timeControlButton">15+10</button>
-                <button id="time30p0"  class="timeControlButton">30+0</button>
-            </p>
-            <p>
-                <label for="createTimeInput">Time:</label>
-                <input type="number" id="createTimeInput" name="createTimeInput" value="60" size="2" min="0">
-                <label for="createTimeInput"> (min)</label>
-                <label for="createIncrementInput">+</label>
-                <input type="number" id="createIncrementInput" name="createIncrementInput" value="0" size="2" min="0">
-                <label for="createIncrementInput"> (sec)</label>
-            </p>
-            <p>
-                <label for="createPasswordInput">Password:</label>
-                <input type="text" id="createPasswordInput" name="createPasswordInput">
-            </p>
-            <div>
-                <button id="createCancelButton" type="button">Cancel</button>
-                <button id="createConfirmButton" type="submit">Confirm</button>
-            </div>
-        </form>
+        <input type="checkbox" id="useTimeControl" checked="true"/><label for="useTimeControl">Use time control?</label> </br>
+        <p>
+            Bullet</br>
+            <button id="time1p0" class="timeControlButton">1+0</button>
+            <button id="time1p1" class="timeControlButton">1+1</button>
+            <button id="time2p1" class="timeControlButton">2+1</button>
+        </p>
+        <p>
+            Blitz</br>
+            <button id="time3p0" class="timeControlButton">3+0</button>
+            <button id="time3p2" class="timeControlButton">3+2</button>
+            <button id="time5p0" class="timeControlButton">5+0</button>
+        </p>
+        <p>
+            Rapid</br>
+            <button id="time10p0"  class="timeControlButton">10+0</button>
+            <button id="time15p10" class="timeControlButton">15+10</button>
+            <button id="time30p0"  class="timeControlButton">30+0</button>
+        </p>
+        <p>
+            <label for="createTimeInput">Time:</label>
+            <input type="number" id="createTimeInput" name="createTimeInput" value="60" size="2" min="0">
+            <label for="createTimeInput"> (min)</label>
+            <label for="createIncrementInput">+</label>
+            <input type="number" id="createIncrementInput" name="createIncrementInput" value="0" size="2" min="0">
+            <label for="createIncrementInput"> (sec)</label>
+        </p>
+        <p>
+            <label for="createPasswordInput">Password:</label>
+            <input type="text" id="createPasswordInput" name="createPasswordInput">
+        </p>
+        <div>
+            <button id="createCancelButton" type="button">Cancel</button>
+            <button id="createConfirmButton" type="submit">Confirm</button>
+        </div>
+    </dialog>
+
+    <dialog id="popup">
+        <p id="popupP">Placeholder text.</p>
+        <div id="popupButtonsDiv"></div>
     </dialog>
 
     <div id="game-screen" style="display: none;">

@@ -1,23 +1,39 @@
-database
-    sanitize inputs
-credits page for SVG attribution
+before sharing:
+    database
+        sanitize inputs
+        only load games from DB as they're requested
+        delete game from games<> when the last player disconnects
+        don't recreate gameList on every change
+    save oldID and oldName to local storage
+    more admin commands
+    way to view archived games, locally allowing undo/redo without changing the moves, nor contacting the server
 
-show captured pieces
-way to view game, allowing undo/redo without changing the moves
-bug report button
-delete game from games<> when the last player disconnects, then reload from DB when it's requested
-sound effects
+    lock rules on first move
+    some way of negotiating rules
+
+    board resizing
+    show  # connected users
+    gray out player names if they're not actively connected
+
+    bug report button
+    credits page for SVG attribution
+    updates page for version history
+    accept cookies banner
+
+    change admin password
+    sliderchess.com domain?
+    discord channel
+    subreddit
+    post on chess reddit
 
 implement special rules for castling
 implement special rules for en passant
+gameover screen
+show captured pieces
+sound effects
+offline play: flag on create game to instead run a game locally, controlling black and white
 
-refactor to not recreate gameList on every change
+unit tests on LOCAL
 refactor to just send the whole game state every move, minus the notation and chat logs
 refactor to just redraw the whole board each move
-
-
-gameover screen
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)
-
-offline play
-    flag on lobby to disconnect from server, then run a game locally controlling black and white

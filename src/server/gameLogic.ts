@@ -1,7 +1,9 @@
 import { QueryResult } from 'pg';
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation } from '../shared/utils.js'
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage } from '../shared/types.js';
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
+
+const undoText = 'Your opponent has requested an undo.';
 
 export class Game {
     id: number;
@@ -26,6 +28,7 @@ export class Game {
     clockRunning = false;
 
     lastMoveTime = 0;  // not sent to client
+    waitingForUndoResponse = false;
     creationTime: number;
 
     KW = true;
@@ -671,6 +674,43 @@ export class Game {
         if (!this.getPlayer(this.currentTurn)) this.checkGameOver();
 
         return true;
+    }
+
+    public handlePopupRepsonse(client: ClientInfo, message: PopupMessage): void {
+        switch (message.text) {
+            case undoText:
+                if (this.waitingForUndoResponse) {
+                    this.waitingForUndoResponse = false;
+                    if (message.button === 'Approve') {
+                        this.logChatMessage('has approved the undo.', client);
+                        this.rewind();
+                    } else {
+                        this.logChatMessage('has rejected the undo.', client);
+                    }
+                    break;
+                }
+            default:
+                console.error(`Unknown popup response on game ${this.id}:`, message);
+        }
+    }
+
+    public requestUndo(client: ClientInfo): void {
+        // you can only request an undo on your opponent's turn
+        let opp: ClientInfo | null;
+        if (client === this.playerWhite) {
+            if (this.currentTurn !== PieceColor.BLACK) return;
+            opp = this.playerBlack;
+        } else if (client === this.playerBlack) {
+            if (this.currentTurn !== PieceColor.WHITE) return;
+            opp = this.playerWhite;
+        } else {
+            return;
+        }
+        if (!opp) return;
+        this.logChatMessage('has requested an undo.', client);
+        this.waitingForUndoResponse = true;
+        
+        sendMessage(opp, { type: MESSAGE_TYPES.POPUP, text: 'Your opponent has requested an undo.', button: ['Approve', 'Reject']} satisfies PopupMessage);
     }
 
     public rewind(): void {

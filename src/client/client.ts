@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage } from "../shared/types.js";
+import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage } from "../shared/types.js";
 import { move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules, localGameState } from "./gameLogic.js";
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry } from './lobbyScreen.js'
 import { showGame, updatePassword } from './gameScreen.js'
@@ -81,6 +81,9 @@ function connectWebSocket(): void {
             case MESSAGE_TYPES.GAME_PASSWORD:
                 updatePassword(message.password);
                 break
+            case MESSAGE_TYPES.POPUP:
+                handlePopup(message);
+                break;
             default:
                 console.error(`Unknown message type ${message.type}`);
                 console.error(message);
@@ -134,6 +137,27 @@ export function admin(command: ADMIN_COMMANDS, data={}): void {
 }
 (window as any).admin = admin;
 (window as any).AC = ADMIN_COMMANDS;
+
+const popup = document.getElementById('popup') as HTMLDialogElement;
+popup.addEventListener('cancel', (event) => sendMessage({ type: MESSAGE_TYPES.POPUP, text: '', button: 'Cancel' }));
+const popupP = document.getElementById('popupP') as HTMLParagraphElement;
+const popupButtonsDiv = document.getElementById('popupButtonsDiv') as HTMLDivElement;
+function handlePopup(message: PopupMessage): void {
+    popupP!.textContent = message.text;
+    popupButtonsDiv.innerHTML = '';
+    for (const button of message.button) {
+        const b = document.createElement('button');
+        b.style.margin = '2px';
+        b.textContent = button;
+        b.addEventListener('click', (event) => {
+            event.preventDefault();
+            sendMessage({ type: MESSAGE_TYPES.POPUP, text: message.text, button: button })
+            popup.close();
+        });
+        popupButtonsDiv.appendChild(b);
+    }
+    popup.showModal();
+}
 
 // Connect when page loads
 window.addEventListener('DOMContentLoaded', () => {connectWebSocket();});
