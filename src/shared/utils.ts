@@ -470,15 +470,15 @@ export function tileMoveWouldUndo(fromRow: number, fromCol: number, toRow: numbe
 
     // if the last move changed the castling permission, then it can't be undone
     // TODO: when I add enpassant, I'll need to update the index here
-    const castleStr = arrayFEN.at(-1)!.split(' ')[-1];
-    const castleStr2 = arrayFEN.at(-2)!.split(' ')[-1];
+    const castleStr = arrayFEN.at(-1)!.split(' ').at(-1)!;
+    const castleStr2 = arrayFEN.at(-2)!.split(' ').at(-1)!;
     if (castleStr !== castleStr2) return false;
     
     const KW = castleStr.includes('K');
     const QW = castleStr.includes('Q');
     const KB = castleStr.includes('k');
     const QB = castleStr.includes('q');
-    const color = arrayFEN.at(-2)!.split(' ')[-2] === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
+    const color = arrayFEN.at(-2)!.split(' ').at(-2)! === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
     doTileMove(fromRow, fromCol, toRow, toCol, board, false); 
     const fen = getFENish(board, color, QW, KW, QB, KB);
     doTileMove(fromRow, fromCol, toRow, toCol, board, true); 
