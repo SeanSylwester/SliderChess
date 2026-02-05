@@ -12,14 +12,12 @@ ctx.lineWidth = 2;
 // click events
 function hanelMouseUpEvent(event: MouseEvent): void {
     event.preventDefault();
-    console.log('mouseup');
     if (event.button !== 2) {
         handleClick(event.offsetX, event.offsetY, false);
     }
 }
 function handleContextMenuEvent(event: MouseEvent): void {
     event.preventDefault();
-    console.log('context');
     handleClick(event.offsetX, event.offsetY, true);
 }
 function handleMouseMoveEvent(event: MouseEvent): void {
@@ -255,6 +253,7 @@ const pitch = Math.floor(boardWidth / 8); // size of each square
 const tilePct = 0.2; // percentage of the square on each side for selecting a tile instead
 const piecesImg = document.getElementById("piecesSpriteSheet") as HTMLImageElement;
 const fillStyles = ["#f0d9b5", "#b58863"]; // light and dark squares
+const hoverAlpha = 0.5;  // transparency of pieces when hovering a tile move
 
 export function flipBoard(): void {
     flip = !flip;
@@ -752,7 +751,7 @@ function handleHover(offsetX: number, offsetY: number): void {
         for (const square of validSquares!) {
             if (uRow === square.toRow && uCol === square.toCol) {
                 rotateTileOnBoard(selectedSquare!.row, selectedSquare!.col, uRow, uCol, dummyBoard, false);
-                drawSquare(selectedSquare!.row, selectedSquare!.col, true, getPiecesOnTile(selectedSquare!.row, selectedSquare!.col, dummyBoard), 0.75);
+                drawSquare(selectedSquare!.row, selectedSquare!.col, true, getPiecesOnTile(selectedSquare!.row, selectedSquare!.col, dummyBoard), hoverAlpha);
             }
         }
     }
@@ -761,8 +760,8 @@ function handleHover(offsetX: number, offsetY: number): void {
         for (const square of validSquares!) {
             if (uRowCorner === square.toRow && uColCorner === square.toCol) {
                 swapTilesOnBoard(selectedSquare!.row, selectedSquare!.col, uRowCorner, uColCorner, dummyBoard);
-                drawSquare(selectedSquare!.row, selectedSquare!.col, true, getPiecesOnTile(selectedSquare!.row, selectedSquare!.col, dummyBoard), 0.75);
-                drawSquare(uRowCorner, uColCorner, true, getPiecesOnTile(uRowCorner, uColCorner, dummyBoard), 0.75);
+                drawSquare(selectedSquare!.row, selectedSquare!.col, true, getPiecesOnTile(selectedSquare!.row, selectedSquare!.col, dummyBoard), hoverAlpha);
+                drawSquare(uRowCorner, uColCorner, true, getPiecesOnTile(uRowCorner, uColCorner, dummyBoard), hoverAlpha);
             }
         }
     }

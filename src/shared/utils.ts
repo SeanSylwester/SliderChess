@@ -41,24 +41,10 @@ export function pieceTypeFromChar(char: string): PieceType {
 
     return PieceType.EMPTY;
 }
-export function charFromPieceType(pieceType: PieceType): string {
-    switch (pieceType) {
-        case PieceType.PAWN:
-            return 'P'
-        case PieceType.KNIGHT:
-            return 'N';
-        case PieceType.BISHOP:
-            return 'B';
-        case PieceType.ROOK:
-            return 'R';
-        case PieceType.QUEEN:
-            return 'Q';
-        case PieceType.KING:
-            return 'K';
-        case PieceType.TILE:
-            return 'T';
-    }
-    return '';
+export function charFromPieceType(pieceType: PieceType, isFEN=false): string {
+    return pieceType === PieceType.PAWN   ? (isFEN ? 'P' : '') 
+        : (pieceType === PieceType.KNIGHT ? 'N' 
+                                          : PieceType[pieceType][0]);
 }
 
 export function getFENish(board: Piece[][], currentTurn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean ): string {
@@ -367,11 +353,6 @@ export function findKing(playerColor: PieceColor, board: Piece[][]): [row: numbe
     return [-1, -1];  // this should really never happen...
 }
 
-export function getPieceChar(piece: Piece, fromCol: number): string {
-    // arguments are only used for pawn moves. Can set to anything if you're sure it's not a pawn
-    return piece.type === PieceType.PAWN ? '' : (piece.type === PieceType.KNIGHT ? 'N' : PieceType[piece.type][0]);
-}
-
 export function getPiecesOnTile(row: number, col: number, board: Piece[][]): Piece[] {
     // order is clockwise starting from the bottom left
     return [board[row][col], 
@@ -604,6 +585,7 @@ export function pieceGivingCheck(kingColor: PieceColor, row: number, col: number
 }
 
 export function getMoveDisambiguationStr(fromRow: number, fromCol: number, toRow: number, toCol: number, pieceType: PieceType, pieceColor: PieceColor, board: Piece[][]): string {
+    if (pieceType === PieceType.PAWN) return '';  // pawn moves never need to be disambiguated
     let sameRow = false;
     let sameCol = false;
     const otherFroms = getPiecesThatCanReach(toRow, toCol, pieceType, pieceColor, board, undefined);
@@ -643,7 +625,7 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
     // promotion notation
     let promotionNotation = '';
     for (const promo of promotions) {
-        promotionNotation += `${isTile ? col0ToFile(promo.col) : ''}=${getPieceChar(promo.piece, promo.col)}`
+        promotionNotation += `${isTile ? col0ToFile(promo.col) : ''}=${charFromPieceType(promo.piece.type)}`
     }
 
     // put it together
@@ -652,7 +634,7 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
         notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}`;
     } else {
         const capture = (!enPassant && oldPiece.type === PieceType.EMPTY) ? '' : 'x';
-        const pieceChar = getPieceChar(newPiece, fromCol);
+        const pieceChar = (capture && newPiece.type === PieceType.PAWN) ? col0ToFile(fromCol) : charFromPieceType(newPiece.type);
         notation = castle === '' ? `${pieceChar}${disambiguation}${capture}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}` : castle;
     }
 
