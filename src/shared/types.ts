@@ -20,6 +20,7 @@ export interface GameState {
     chatLog: string[];
     movesLog: Move[];
     currentTurn: PieceColor;
+    useTimeControl: boolean;
     initialTimeWhite: number; // in seconds
     initialTimeBlack: number; // in seconds
     incrementWhite: number;   // in seconds
@@ -50,6 +51,8 @@ export interface GameInfo {
     creationTime: number;
     result: GameResultCause;
     isActive: boolean;
+    useTimeControl: boolean;
+    currentTurn: PieceColor;
 }
 
 export enum GameResultCause {
@@ -172,6 +175,7 @@ export interface Message {
 
 export interface CreateGameMessage extends Message {
     type: typeof MESSAGE_TYPES.CREATE_GAME;
+    useTimeControl: boolean;
     initialTime: number;
     increment: number;
     password: string;
@@ -202,6 +206,7 @@ export interface MovePieceMessage extends Message {
 }
 export interface TimeMessage extends Message {
     type: typeof MESSAGE_TYPES.TIME;
+    useTimeControl: boolean;
     initialTimeWhite: number;
     initialTimeBlack: number;
     timeLeftWhite: number;

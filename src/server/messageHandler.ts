@@ -9,7 +9,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
     // lookup the game that the client is in for most message types
     let game: Game | undefined;
-    if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.MOVE_PIECE, MESSAGE_TYPES.REWIND, MESSAGE_TYPES.DRAW, 
+    if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.MOVE_PIECE, MESSAGE_TYPES.REWIND, MESSAGE_TYPES.PAUSE, MESSAGE_TYPES.DRAW, 
          MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER,
          MESSAGE_TYPES.GAME_PASSWORD].includes(message.type)) {
         if (!client.gameId) {
@@ -25,7 +25,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
     switch (message.type) {
         case MESSAGE_TYPES.CREATE_GAME:
-            handleCreateGame(client, games, message.initialTime, message.increment, message.password);
+            handleCreateGame(client, games, message.useTimeControl, message.initialTime, message.increment, message.password);
             break;
 
         case MESSAGE_TYPES.JOIN_GAME:
@@ -47,6 +47,10 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
         case MESSAGE_TYPES.REWIND:
             game!.rewind();
+            break;
+
+        case MESSAGE_TYPES.PAUSE:
+            game!.applyTimeAndPause();
             break;
 
         case MESSAGE_TYPES.DRAW:
@@ -97,14 +101,14 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
     }
 }
 
-async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, initialTime: number, increment: number, password: string): Promise<Game | undefined> {
+async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, useTimeControl: boolean, initialTime: number, increment: number, password: string): Promise<Game | undefined> {
     console.log(`Creating game for client ${client.id}`);
 
     // store new game in the DB and get the ID
     const gameId = await storeNewGame();
     if (gameId) {
         // only make the Game object if we were successful with the DB
-        const newGame = new Game(gameId, initialTime, increment, password);
+        const newGame = new Game(gameId, useTimeControl, initialTime, increment, password);
         games.set(newGame.id, newGame);
 
         handleJoinGame(client, games, newGame.id, password); // note: this will updateGameList() when the client is assigned to a position
@@ -116,7 +120,7 @@ async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, in
 }
 
 export async function handleCreateGameFromState(client: ClientInfo, games: Map<number, Game>, gameState: GameState): Promise<void> {
-    const game = await handleCreateGame(client, games, gameState.initialTimeWhite, gameState.incrementWhite, gameState.password);
+    const game = await handleCreateGame(client, games, gameState.useTimeControl, gameState.initialTimeWhite, gameState.incrementWhite, gameState.password);
     if (game) {
         game.loadFromState(gameState);
         pushGameList();
@@ -158,8 +162,6 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
         game.removePlayer(client);
         client.gameId = 0;
         client.gamePosition = PieceColor.NONE;
-        updateGameList();
-        serveLobby(client);
 
         if (game.isEmpty() && game.isActive) {
             // last player leaves and there's some result on the game -> game is no longer active;
@@ -167,6 +169,8 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
 
             saveToDB(game);
         }
+        updateGameList();
+        serveLobby(client);
     } else {
         console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
     }

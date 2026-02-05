@@ -29,7 +29,9 @@ export function showGame(gameId: number, password: string): void {
             timeLeftBlack: 0,
             creationTime: 0,
             result: GameResultCause.ONGOING,
-            isActive: true
+            isActive: true,
+            useTimeControl: false,
+            currentTurn: PieceColor.WHITE
         });
         sendMessage({ type: MESSAGE_TYPES.GAME_LIST } satisfies Message);
     }
@@ -86,6 +88,9 @@ flipBoardButton!.addEventListener('click', flipBoard);
 
 const rewindButton = document.getElementById('rewind');
 rewindButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.REWIND } satisfies Message));
+
+const pauseButton = document.getElementById('pause');
+pauseButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.PAUSE } satisfies Message));
 
 const drawButton = document.getElementById('draw');
 drawButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.DRAW } satisfies Message));

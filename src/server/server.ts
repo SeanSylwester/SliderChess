@@ -77,7 +77,9 @@ export function updateGameList() {
             timeLeftBlack: game.timeLeftBlack,
             creationTime: game.creationTime,
             result: game.result,
-            isActive: game.isActive
+            isActive: game.isActive,
+            useTimeControl: game.useTimeControl,
+            currentTurn: game.currentTurn
         });
     }
 }
@@ -258,7 +260,7 @@ async function getGamesFromDB() {
     if(db_rows) {
         for (let i = 0; i < db_rows.rows.length; i++) {
             const db_row: any = db_rows.rows[i];
-            const game = new Game(db_row.id, 0, 0, '');
+            const game = new Game(db_row.id, false, 0, 0, '');
             game.loadFromDB(db_row);
             newGames.set(db_row.id, game);
             updateGameList();

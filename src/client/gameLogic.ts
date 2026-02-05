@@ -212,21 +212,21 @@ export function updateTimeDisplay(): void{
     if (!localGameState) {
         return;
     }
-
+    
     if (flip) {
-        initialTimeTopText.textContent = formatMinSec(localGameState.initialTimeBlack, 0);
-        initialTimeBottomText.textContent = formatMinSec(localGameState.initialTimeWhite, 0);
-        incrementTopText.textContent = localGameState.incrementBlack.toString();
-        incrementBottomText.textContent = localGameState.incrementWhite.toString();
-        timeLeftTopText.textContent = formatMinSec(localGameState.timeLeftBlack, 1);
-        timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
+        initialTimeTopText.textContent = formatMinSec(localGameState.initialTimeWhite, 0);
+        initialTimeBottomText.textContent = formatMinSec(localGameState.initialTimeBlack, 0);
+        incrementTopText.textContent = localGameState.incrementWhite.toString();
+        incrementBottomText.textContent = localGameState.incrementBlack.toString();
+        timeLeftTopText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
+        timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftBlack, 1);
     } else {
-        initialTimeBottomText.textContent = formatMinSec(localGameState.initialTimeWhite, 0);
         initialTimeTopText.textContent = formatMinSec(localGameState.initialTimeBlack, 0);
-        incrementBottomText.textContent = localGameState.incrementWhite.toString();
+        initialTimeBottomText.textContent = formatMinSec(localGameState.initialTimeWhite, 0);
         incrementTopText.textContent = localGameState.incrementBlack.toString();
-        timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
+        incrementBottomText.textContent = localGameState.incrementWhite.toString();
         timeLeftTopText.textContent = formatMinSec(localGameState.timeLeftBlack, 1);
+        timeLeftBottomText.textContent = formatMinSec(localGameState.timeLeftWhite, 1);
     }
 }
 
@@ -830,7 +830,7 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
             stalemate = true;
         }
     }
-    if (checkmate || stalemate || localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0) {
+    if (checkmate || stalemate || (localGameState.useTimeControl && (localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0))) {
         sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
     }
 

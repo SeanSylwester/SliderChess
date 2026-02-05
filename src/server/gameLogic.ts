@@ -16,6 +16,7 @@ export class Game {
     movesLog: Move[] = [];
     currentTurn: PieceColor = PieceColor.WHITE;
 
+    useTimeControl: boolean;
     initialTimeWhite: number; // in seconds
     initialTimeBlack: number; // in seconds
     incrementWhite: number;   // in seconds
@@ -64,16 +65,26 @@ export class Game {
     lastBlackName = '';
     isActive = true;
 
-    public constructor(id: number, initialTime: number, increment: number, password: string) {
+    public constructor(id: number, useTimeControl: boolean, initialTime: number, increment: number, password: string) {
         this.id = id;
         this.logChatMessage(`Game ${this.id} created.`);
 
-        this.initialTimeWhite = initialTime;
-        this.initialTimeBlack = initialTime;
-        this.timeLeftWhite = initialTime;
-        this.timeLeftBlack = initialTime;
-        this.incrementWhite = increment;
-        this.incrementBlack = increment;
+        this.useTimeControl = useTimeControl;
+        if (this.useTimeControl) {
+            this.initialTimeWhite = initialTime;
+            this.initialTimeBlack = initialTime;
+            this.timeLeftWhite = initialTime;
+            this.timeLeftBlack = initialTime;
+            this.incrementWhite = increment;
+            this.incrementBlack = increment;
+        } else {
+            this.initialTimeWhite = 0;
+            this.initialTimeBlack = 0;
+            this.timeLeftWhite = 0;
+            this.timeLeftBlack = 0;
+            this.incrementWhite = 0;
+            this.incrementBlack = 0;
+        }
         this.setPassword(password);
 
         this.board = getDefaultBoard();
@@ -90,6 +101,7 @@ export class Game {
         this.chatLog = gameState.chatLog;
         this.movesLog = gameState.movesLog;
         this.currentTurn = gameState.currentTurn;
+        this.useTimeControl = gameState.useTimeControl;
         this.initialTimeWhite = gameState.initialTimeWhite;
         this.initialTimeBlack = gameState.initialTimeBlack;
         this.incrementWhite = gameState.incrementWhite;
@@ -139,6 +151,7 @@ export class Game {
             this.movesLog = JSON.parse(row.moves_log);
             this.rules = {...this.rules, ...JSON.parse(row.rules)};
 
+            this.useTimeControl = row.use_time_control;  // note: games before this waws added default to true in the DB
             this.initialTimeWhite = row.initial_time_white;
             this.initialTimeBlack = row.initial_time_black;
             this.incrementWhite = row.increment_white;
@@ -156,14 +169,14 @@ export class Game {
     public getDBStr(): string {
         const cols = ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn',
                       'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 
-                      'rules', 'result', 'cause', 'is_active', 'array_fen'];
+                      'rules', 'result', 'cause', 'is_active', 'array_fen', 'use_time_control'];
 
         let chatLogStr = this.chatLog.join('|');
         chatLogStr.replace(/\n/g, '|');  // some individual messages will have newlines in them. Replace those too. This will make them be treated as separate messages on reload but oh well
 
         const vals = [this.password, this.lastWhiteName, this.lastBlackName, chatLogStr, JSON.stringify(this.movesLog), this.currentTurn === PieceColor.WHITE,
                       this.initialTimeWhite, this.initialTimeBlack, this.incrementWhite, this.incrementBlack, this.timeLeftWhite, this.timeLeftBlack,
-                      JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive, JSON.stringify(this.arrayFEN)];
+                      JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive, JSON.stringify(this.arrayFEN), this.useTimeControl];
 
         let colEqVal = '';
         for (let i = 0; i < cols.length; i++) {
@@ -405,7 +418,7 @@ export class Game {
     }
 
     public syncTime(): void {
-        this.sendMessageToAll({type: MESSAGE_TYPES.TIME, 
+        this.sendMessageToAll({type: MESSAGE_TYPES.TIME, useTimeControl: this.useTimeControl,
                                initialTimeWhite: this.initialTimeWhite, initialTimeBlack: this.initialTimeBlack, 
                                timeLeftWhite: this.timeLeftWhite, timeLeftBlack: this.timeLeftBlack, 
                                incrementWhite: this.incrementWhite, incrementBlack: this.incrementBlack,
@@ -413,18 +426,22 @@ export class Game {
     }
 
     public applyElapsedTime(): void {
-        const newTime = Date.now();
-        if (this.clockRunning) {
-            if (this.currentTurn === PieceColor.WHITE) this.timeLeftWhite -= (newTime - this.lastMoveTime) / 1000;
-            else if (this.currentTurn === PieceColor.BLACK) this.timeLeftBlack -= (newTime - this.lastMoveTime) / 1000;
+        if (this.useTimeControl) {
+            const newTime = Date.now();
+            if (this.clockRunning) {
+                if (this.currentTurn === PieceColor.WHITE) this.timeLeftWhite -= (newTime - this.lastMoveTime) / 1000;
+                else if (this.currentTurn === PieceColor.BLACK) this.timeLeftBlack -= (newTime - this.lastMoveTime) / 1000;
+            }
+            this.lastMoveTime = newTime;
         }
-        this.lastMoveTime = newTime;
     }
 
     public applyTimeAndPause(): void {
-        this.applyElapsedTime();
-        this.clockRunning = false;
-        this.syncTime();
+        if (this.useTimeControl) {
+            this.applyElapsedTime();
+            this.clockRunning = false;
+            this.syncTime();
+        }
     }
 
     public logChatMessage(message: string, client?: ClientInfo): void {
@@ -469,6 +486,7 @@ export class Game {
             chatLog: this.chatLog,
             movesLog: this.movesLog,
             currentTurn: this.currentTurn,
+            useTimeControl: this.useTimeControl,
             initialTimeWhite: this.initialTimeWhite,
             initialTimeBlack: this.initialTimeBlack,
             incrementWhite: this.incrementWhite,
@@ -572,8 +590,10 @@ export class Game {
         }
 
         // start clock (in case it was paused) and sync time
-        this.clockRunning = true;
-        this.syncTime();
+        if (this.useTimeControl) {
+            this.clockRunning = true;
+            this.syncTime();
+        }
     }
 
     public move(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): boolean {
@@ -719,11 +739,13 @@ export class Game {
             }
             this.sendGameStateToAll();
         }
-        if (this.timeLeftBlack < 0) {
-            this.endGame(GameResultCause.BLACK_TIMEOUT, `${this.playerBlack?.name} (BLACK) has run out of time!`);
-        }
-        if (this.timeLeftWhite < 0) {
-            this.endGame(GameResultCause.WHITE_TIMEOUT, `${this.playerWhite?.name} (WHITE) has run out of time!`);
+        if (this.useTimeControl) {
+            if (this.timeLeftBlack < 0) {
+                this.endGame(GameResultCause.BLACK_TIMEOUT, `${this.playerBlack?.name} (BLACK) has run out of time!`);
+            }
+            if (this.timeLeftWhite < 0) {
+                this.endGame(GameResultCause.WHITE_TIMEOUT, `${this.playerWhite?.name} (WHITE) has run out of time!`);
+            }
         }
     }
 }

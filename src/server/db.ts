@@ -27,7 +27,7 @@ export async function testConnection(): Promise<void> {
 }
     
 
-// ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 'rules', 'result', 'cause', 'is_active', 'arrayfen'];
+// ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 'rules', 'result', 'cause', 'is_active', 'arrayfen', 'use_time_control'];
 export async function saveToDB(game: Game): Promise<QueryArrayResult | undefined> {
     const colEqVal = game.getDBStr();
     try {

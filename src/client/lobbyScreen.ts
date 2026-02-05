@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage, GameScore, GameResultCause } from "../shared/types.js";
+import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage, GameScore, GameResultCause, PieceColor } from "../shared/types.js";
 import { formatMinSec } from '../shared/utils.js'
 import { sendMessage, fromHistory } from './client.js'
 
@@ -107,10 +107,24 @@ export function updateGameList(newGameList: GameInfo[]): void {
         }
 
         const gameText = document.createElement('span');
+        function wrapStrong(s: string, wrap: boolean) {
+            return wrap ? `<strong>${s}</strong>` : s;
+        }
+        let nameWhite = `${game.playerWhite || 'None'}`;
+        let nameBlack = `${game.playerBlack || 'None'}`;
+
+        const timeWhite = game.useTimeControl ?  ` (${formatMinSec(game.timeLeftWhite)})` : ''
+        const timeBlack = game.useTimeControl ?  ` (${formatMinSec(game.timeLeftBlack)})` : ''
         if (game.isActive) {
-            gameText.textContent = ` [${formatDateTime(game.creationTime)}] ${game.playerWhite || 'None'} (${formatMinSec(game.timeLeftWhite)}) vs ${game.playerBlack || 'None'}  (${formatMinSec(game.timeLeftBlack)}). ${game.numberOfSpectators} spectators`;
+            nameWhite = wrapStrong(nameWhite, game.currentTurn === PieceColor.WHITE);
+            nameBlack = wrapStrong(nameBlack, game.currentTurn === PieceColor.BLACK);
+            gameText.innerHTML = ` [${formatDateTime(game.creationTime)}] ${nameWhite}${timeWhite} vs ${nameBlack}${timeBlack}. ${game.numberOfSpectators} Spectators`;
         } else {
-            gameText.textContent = ` [${formatDateTime(game.creationTime)}] ${game.playerWhite || 'None'} vs ${game.playerBlack || 'None'}: ${GameScore.get(game.result)}(${game.result})`;
+            const score = GameScore.get(game.result)!;
+            const result = game.result.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, s => s.toUpperCase());
+            nameWhite = wrapStrong(nameWhite, ['1-0', '1/2-1/2'].includes(score));
+            nameBlack = wrapStrong(nameBlack, ['0-1', '1/2-1/2'].includes(score));
+            gameText.innerHTML = ` [${formatDateTime(game.creationTime)}] ${nameWhite} vs ${nameBlack}: ${score} (${result})`;
         }
         gameItem.appendChild(gameText);
 
@@ -133,12 +147,21 @@ const createTimeInput = document.getElementById('createTimeInput') as HTMLInputE
 const createIncrementInput = document.getElementById('createIncrementInput') as HTMLInputElement;
 const createPasswordInput = document.getElementById('createPasswordInput') as HTMLInputElement;
 
+const useTimeControl = document.getElementById('useTimeControl') as HTMLInputElement;
+useTimeControl!.addEventListener('change', (event) => {
+    createTimeInput.disabled = !useTimeControl.checked;
+    createIncrementInput.disabled = !useTimeControl.checked;
+});
+
 const createConfirmButton = document.getElementById('createConfirmButton');
 createConfirmButton!.addEventListener('click', (event) => {
     event.preventDefault();
     sendMessage({ type: MESSAGE_TYPES.CREATE_GAME, 
+                  useTimeControl: useTimeControl.checked,
                   initialTime: 60*parseFloat(createTimeInput.value),
                   increment: parseFloat(createIncrementInput.value),
                   password: createPasswordInput.value } satisfies CreateGameMessage);
     createGameDialog.close();
 });
+const createCancelButton = document.getElementById('createCancelButton');
+createCancelButton!.addEventListener('click', (event) => createGameDialog.close());
