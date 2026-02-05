@@ -3,7 +3,7 @@ import { Game } from './gameLogic.js'
 
 
 const pool = new Pool({ ssl: { rejectUnauthorized: false } });
-const table = process.env.LOCAL ? 'games_dummy' : 'games';
+const table = process.env.DUMMY ? 'games_dummy' : 'games';
 
 export async function query(text: string, params: any): Promise<QueryArrayResult> {
   const start = Date.now()
@@ -27,7 +27,7 @@ export async function testConnection(): Promise<void> {
 }
     
 
-const cols = ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 'rules', 'result', 'cause', 'is_active'];
+// ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 'rules', 'result', 'cause', 'is_active', 'arrayfen'];
 export async function saveToDB(game: Game): Promise<QueryArrayResult | undefined> {
     const colEqVal = game.getDBStr();
     try {

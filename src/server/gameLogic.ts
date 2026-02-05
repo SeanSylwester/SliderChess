@@ -1,6 +1,6 @@
 import { QueryResult } from 'pg';
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFENish, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
 export class Game {
@@ -103,12 +103,13 @@ export class Game {
         this.QB = gameState.QB;
         this.drawWhite = false;
         this.drawBlack = false;
-        this.rules = gameState.rules;
+        this.rules = {...this.rules, ...gameState.rules};
         this.halfmoveClock = gameState.halfmoveClock;
         this.creationTime = gameState.creationTime;
 
+        this.arrayFEN = [];
         this.mapFEN = new Map<string, number>();
-        for (const fen of gameState.arrayFEN) this.updateFEN(fen);
+        for (const fen of gameState.arrayFEN) this.updateFEN(fen, fenStripMoves(fen));
     }
 
     public loadFromDB(row: any) {
@@ -126,22 +127,17 @@ export class Game {
             this.lastWhiteName = row.white;
             this.lastBlackName = row.black;
             this.chatLog = row.chat_log.split('|');
-            const boardRes = getBoardFromMessage(row.moves_log, this.board);
-            if (typeof boardRes === 'string') {
-                console.log('Failed to parse board from DB notation:', boardRes);
-            } else {
-                this.movesLog = boardRes.movesLog;
-                this.currentTurn = boardRes.color;
-                this.KW = boardRes.KW;
-                this.QW = boardRes.QW;
-                this.KB = boardRes.KB;
-                this.QB = boardRes.QB;
-                this.halfmoveClock = boardRes.halfmoveClock;
-                this.mapFEN = boardRes.mapFEN;
-                this.arrayFEN = boardRes.arrayFEN;
-            }
 
-            this.rules = JSON.parse(row.rules);
+            // get board, castling permission, and draw conditions from the last recorded FEN
+            const arrayFEN = JSON.parse(row.array_fen);
+            this.arrayFEN = [];
+            this.mapFEN = new Map<string, number>();
+            for (const fen of arrayFEN) this.updateFEN(fen, fenStripMoves(fen));
+            if (this.arrayFEN.length) this.setBoardFromFEN(this.arrayFEN.at(-1)!);
+            else console.error('Failed to parse arrayFEN loaded from DB:', arrayFEN);
+
+            this.movesLog = JSON.parse(row.moves_log);
+            this.rules = {...this.rules, ...JSON.parse(row.rules)};
 
             this.initialTimeWhite = row.initial_time_white;
             this.initialTimeBlack = row.initial_time_black;
@@ -158,25 +154,16 @@ export class Game {
     }
 
     public getDBStr(): string {
-        const cols = ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 
+        const cols = ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn',
                       'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 
-                      'rules', 'result', 'cause', 'is_active'];
+                      'rules', 'result', 'cause', 'is_active', 'array_fen'];
 
-        let movesLogStr = '';
-        for (let i = 0; i < this.movesLog.length; i++) {
-            if (i % 2 === 0) movesLogStr += `${i / 2 + 1}. `;
-            movesLogStr += `${this.movesLog[i].notation} `;
-        }
+        let chatLogStr = this.chatLog.join('|');
+        chatLogStr.replace(/\n/g, '|');  // some individual messages will have newlines in them. Replace those too. This will make them be treated as separate messages on reload but oh well
 
-        let chatLogStr = '';
-        for (let i = 0; i < this.chatLog.length; i++) {
-            if (i) chatLogStr += '| ';
-            chatLogStr += this.chatLog[i].replace('\n', '|');
-        }
-
-        const vals = [this.password, this.lastWhiteName, this.lastBlackName, chatLogStr, movesLogStr, this.currentTurn === PieceColor.WHITE,
+        const vals = [this.password, this.lastWhiteName, this.lastBlackName, chatLogStr, JSON.stringify(this.movesLog), this.currentTurn === PieceColor.WHITE,
                       this.initialTimeWhite, this.initialTimeBlack, this.incrementWhite, this.incrementBlack, this.timeLeftWhite, this.timeLeftBlack,
-                      JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive];
+                      JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive, JSON.stringify(this.arrayFEN)];
 
         let colEqVal = '';
         for (let i = 0; i < cols.length; i++) {
@@ -186,7 +173,7 @@ export class Game {
             } else if (typeof vals[i] === 'boolean') {
                 colEqVal += `${cols[i]} = ${vals[i] ? 'TRUE' : 'FALSE'}`;
             } else if (vals[i] === undefined) {
-                console.log(cols[i], vals[i]);
+                console.error('Undefined value when saving to db:', cols[i], vals[i]);
             } else {
                 colEqVal += `${cols[i]} = ${vals[i]}`;
             }
@@ -206,17 +193,21 @@ export class Game {
         if (client) this.logChatMessage(`has ${password !== '' ? 'updated' : 'removed'} the password`, client);
     }
 
-    public updateFEN(fen?: string): void {
-        if (fen === undefined) fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB);
+    public updateFEN(fen?: string, fenNoMoves?: string): void {
+        if (fen === undefined || fenNoMoves === undefined) {
+            const {fen, fenNoMoves} = getFEN(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB, this.halfmoveClock, Math.floor(this.movesLog.length / 2) + 1);
+            this.updateFEN(fen, fenNoMoves);  // recursion?? in my program??
+            return;
+        }
+        
         this.arrayFEN.push(fen);
-
-        if (this.mapFEN.has(fen)) {
-            this.mapFEN.set(fen, this.mapFEN.get(fen)! + 1)
-            if (this.mapFEN.get(fen)! >= 3) {
+        if (this.mapFEN.has(fenNoMoves)) {
+            this.mapFEN.set(fenNoMoves, this.mapFEN.get(fenNoMoves)! + 1)
+            if (this.mapFEN.get(fenNoMoves)! >= 3) {
                 this.endGame(GameResultCause.THREEFOLD_REPETITION, 'Draw by 3-fold repetition')
             }
         } else {
-            this.mapFEN.set(fen, 1);
+            this.mapFEN.set(fenNoMoves, 1);
         }
     }
 
@@ -233,6 +224,16 @@ export class Game {
         return clients;
     }
 
+    public setBoardFromFEN(fen: string): void {
+        const ret = parseFEN(fen);
+        this.board = ret.board;
+        this.QW = ret.QW;
+        this.KW = ret.KW;
+        this.QB = ret.QB;
+        this.KB = ret.KB;
+        this.halfmoveClock = ret.halfmoveClock;
+    }
+
     public setBoardFromMessage(notationString: string): string | void {
         const newBoard = getDefaultBoard();
         const ret = getBoardFromMessage(notationString, newBoard);
@@ -246,7 +247,9 @@ export class Game {
             this.QB = ret.QB;
             this.KB = ret.KB;
             this.board = newBoard;
-            this.sendGameStateToAll();
+            this.halfmoveClock = ret.halfmoveClock;
+            this.mapFEN = ret.mapFEN;
+            this.arrayFEN = ret.arrayFEN;
         }
     }
 
@@ -441,6 +444,7 @@ export class Game {
                 }
                 return;
             }
+            this.sendGameStateToAll();
             message = 'loaded board from notation';
         }
 
@@ -497,7 +501,7 @@ export class Game {
         if (JSON.stringify(rules) !== JSON.stringify(this.rules)) {
             this.logChatMessage(`Rules changed by ${client.name}`);
         }
-        this.rules = rules;
+        this.rules = {...this.rules, ...rules};
         this.sendMessageToAll({ type: MESSAGE_TYPES.RULES, rules: this.rules } satisfies RulesMessage);
     }
 
@@ -661,9 +665,8 @@ export class Game {
 
         // undo draw conditions
         this.halfmoveClock -= 1;
-        const fen = getFENish(this.board, this.currentTurn, this.QW, this.KW, this.QB, this.KB);
-        this.mapFEN.set(fen, this.mapFEN.get(fen)! - 1);
-        this.arrayFEN.pop();
+        const fenNoMoves = fenStripMoves(this.arrayFEN.pop()!);
+        this.mapFEN.set(fenNoMoves, this.mapFEN.get(fenNoMoves)! - 1);
 
 
         // loop through all the moves and keep track of castling

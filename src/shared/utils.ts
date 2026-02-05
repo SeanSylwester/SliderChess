@@ -24,6 +24,8 @@ export function fileToCol0(file: string): number {
 }
 export function pieceTypeFromChar(char: string): PieceType {
     switch (char) {
+        case 'P':
+            return PieceType.PAWN;  // FEN
         case 'N':
             return PieceType.KNIGHT;
         case 'B':
@@ -37,17 +39,17 @@ export function pieceTypeFromChar(char: string): PieceType {
         case 'T':
             return PieceType.TILE;
     }
-    if (char.match(/[a-h]/)) return PieceType.PAWN;
+    if (char.match(/[a-h]/)) return PieceType.PAWN;  // not FEN
 
     return PieceType.EMPTY;
 }
-export function charFromPieceType(pieceType: PieceType, isFEN=false): string {
+export function charFromPieceType(pieceType: PieceType, isFEN: boolean): string {
     return pieceType === PieceType.PAWN   ? (isFEN ? 'P' : '') 
         : (pieceType === PieceType.KNIGHT ? 'N' 
                                           : PieceType[pieceType][0]);
 }
 
-export function getFENish(board: Piece[][], currentTurn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean ): string {
+export function getFEN(board: Piece[][], currentTurn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, fullmoveNumber: number ): {fen: string, fenNoMoves: string} {
     let s = '';
     let spaces = 0;
     let piece: Piece;
@@ -63,7 +65,7 @@ export function getFENish(board: Piece[][], currentTurn: PieceColor, QW: boolean
                 }
                 spaces = 0;
                 
-                pieceChar = charFromPieceType(piece.type);
+                pieceChar = charFromPieceType(piece.type, true);
                 s += piece.color === PieceColor.WHITE ? pieceChar : pieceChar.toLowerCase();
             }
         }
@@ -84,7 +86,46 @@ export function getFENish(board: Piece[][], currentTurn: PieceColor, QW: boolean
     if (QB) s += 'q';
     if (!KW && !QW && !KB && !QB) s += '-'
 
-    return s
+    // TODO: add en passant
+    s += ' -';
+    const fenNoMoves = s;
+
+    s += ` ${halfmoveClock} ${fullmoveNumber}`;
+
+    return {fen: s, fenNoMoves: fenNoMoves}
+}
+export function fenStripMoves(fen: string): string {
+    return fen.split(' ').slice(0, -2).join(' ');
+}
+export function parseFEN(fen: string): {board: Piece[][], turn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number} {
+    const board = getDefaultBoard();
+    const [boardStr, turnStr, castleStr, enPassant, halfmoveClockStr, fullmoveNumberStr] = fen.split(' ');
+    const turn = turnStr === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
+    const KW = castleStr.includes('K');
+    const QW = castleStr.includes('Q');
+    const KB = castleStr.includes('k');
+    const QB = castleStr.includes('q');
+    const halfmoveClock = parseInt(halfmoveClockStr)
+
+    let row = 7;
+    let col = 0;
+    for (const c of boardStr) {
+        if (c.match(/[0-8]/)) {
+            for (let i = 0; i < parseInt(c); i++) {
+                board[row][col++] = { type: PieceType.EMPTY, color: PieceColor.NONE };
+            }
+        } else if (c === '/') {
+            row--;
+            col = 0;
+        } else {
+            board[row][col++] = { type: pieceTypeFromChar(c.toUpperCase()), color: c.match(/[A-Z]/) ? PieceColor.WHITE : PieceColor.BLACK };
+        }
+    }
+    if (row !== 0 || col != 8) {
+        console.error('Potential problem parsing FEN:', fen, row, col, board);
+    }
+
+    return {board, turn, QW, KW, QB, KB, halfmoveClock};
 }
 
 export function getDefaultBoard(): Piece[][] {
@@ -101,7 +142,7 @@ export function getDefaultBoard(): Piece[][] {
     ];
 }
 
-export function getMovesFromNotation(notationString: string): string[] | string {
+export function splitMovesFromNotation(notationString: string): string[] | string {
     // this will try to skip numbers (like 1.) and will fail on any other notation it doesn't recognize
     // first, replace newlines with spaces
     const noN = notationString.trim().replace(/\n/g, ' ');
@@ -129,7 +170,7 @@ export function getMovesFromNotation(notationString: string): string[] | string 
 }
 
 export function getBoardFromMessage(notationString: string, newBoard: Piece[][]): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, mapFEN: Map<string, number>, arrayFEN: string[]} | string {
-    const moves = getMovesFromNotation(notationString);
+    const moves = splitMovesFromNotation(notationString);
     if (typeof(moves) === 'string') {
         return moves;
     }
@@ -141,8 +182,9 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
     let halfmoveClock = 0;
     const mapFEN = new Map<string, number>();
     const arrayFEN: string[] = [];
-    const fen = getFENish(newBoard, PieceColor.WHITE, QW, KW, QB, KB);
-    mapFEN.set(fen, 1);
+    const {fen, fenNoMoves} = getFEN(newBoard, PieceColor.WHITE, QW, KW, QB, KB, 0, 0);
+    arrayFEN.push(fen);
+    mapFEN.set(fenNoMoves, 1);
     let movesLog: Move[] = [];
 
     // now do all the moves on a new board with no movement rules
@@ -325,12 +367,12 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
         }
 
         // keep track of the number of times we've been in each position for 3 fold repetition
-        const fen = getFENish(newBoard, PieceColor.WHITE, QW, KW, QB, KB);
+        const {fen, fenNoMoves} = getFEN(newBoard, PieceColor.WHITE, QW, KW, QB, KB, halfmoveClock, Math.floor(movesLog.length / 2) + 1 );
         arrayFEN.push(fen);
-        if (mapFEN.has(fen)) {
-            mapFEN.set(fen, mapFEN.get(fen)! + 1)
+        if (mapFEN.has(fenNoMoves)) {
+            mapFEN.set(fenNoMoves, mapFEN.get(fenNoMoves)! + 1)
         } else {
-            mapFEN.set(fen, 1);
+            mapFEN.set(fenNoMoves, 1);
         }
     }
 
@@ -469,21 +511,20 @@ export function tileMoveWouldUndo(fromRow: number, fromCol: number, toRow: numbe
     if (arrayFEN.length === 1) return false;
 
     // if the last move changed the castling permission, then it can't be undone
-    // TODO: when I add enpassant, I'll need to update the index here
-    const castleStr = arrayFEN.at(-1)!.split(' ').at(-1)!;
-    const castleStr2 = arrayFEN.at(-2)!.split(' ').at(-1)!;
+    const castleStr = arrayFEN.at(-1)!.split(' ').at(-4)!;
+    const castleStr2 = arrayFEN.at(-2)!.split(' ').at(-4)!;
     if (castleStr !== castleStr2) return false;
     
     const KW = castleStr.includes('K');
     const QW = castleStr.includes('Q');
     const KB = castleStr.includes('k');
     const QB = castleStr.includes('q');
-    const color = arrayFEN.at(-2)!.split(' ').at(-2)! === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
+    const color = arrayFEN.at(-2)!.split(' ').at(-5)! === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
     doTileMove(fromRow, fromCol, toRow, toCol, board, false); 
-    const fen = getFENish(board, color, QW, KW, QB, KB);
+    const {fen, fenNoMoves} = getFEN(board, color, QW, KW, QB, KB, 0, 0);
     doTileMove(fromRow, fromCol, toRow, toCol, board, true); 
 
-    return fen === arrayFEN.at(-2);
+    return fenNoMoves === fenStripMoves(arrayFEN.at(-2)!);
 }
 
 export function tileCanMoveTo(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
@@ -655,7 +696,7 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
     // promotion notation
     let promotionNotation = '';
     for (const promo of promotions) {
-        promotionNotation += `${isTile ? col0ToFile(promo.col) : ''}=${charFromPieceType(promo.piece.type)}`
+        promotionNotation += `${isTile ? col0ToFile(promo.col) : ''}=${charFromPieceType(promo.piece.type, false)}`
     }
 
     // put it together
@@ -664,7 +705,7 @@ export function moveNotation(oldPiece: Piece, newPiece: Piece, fromRow: number, 
         notation = `T${col0ToFile(fromCol)}${fromRow+1}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}`;
     } else {
         const capture = (!enPassant && oldPiece.type === PieceType.EMPTY) ? '' : 'x';
-        const pieceChar = (capture && newPiece.type === PieceType.PAWN) ? col0ToFile(fromCol) : charFromPieceType(newPiece.type);
+        const pieceChar = (capture && newPiece.type === PieceType.PAWN) ? col0ToFile(fromCol) : charFromPieceType(newPiece.type, false);
         notation = castle === '' ? `${pieceChar}${disambiguation}${capture}${col0ToFile(toCol)}${toRow+1}${promotionNotation}${check}` : castle;
     }
 

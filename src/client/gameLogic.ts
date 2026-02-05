@@ -578,6 +578,7 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     highlightLastMove();
     selectedSquare = null;
     validSquares = null;
+    updateRules(gameState.rules);
 }
 
 export function clearLocalGameState(): void {

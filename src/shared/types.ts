@@ -136,6 +136,7 @@ export enum ADMIN_COMMANDS {
     GAME_KICK_PLAYER,
     GAME_DEMOTE_PLAYER,
     REFRESH_DB,
+    FORCE_SAVE_ALL,
 }
 
 // Message types as constants

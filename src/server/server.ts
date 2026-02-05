@@ -166,6 +166,12 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
             getGamesFromDB();
             pushGameList();
             break;
+        
+        case ADMIN_COMMANDS.FORCE_SAVE_ALL:
+            for (const [gameId, game] of games) {
+                db.saveToDB(game);
+            }
+            break;
 
 
         default:
@@ -247,7 +253,7 @@ server.listen(PORT, () => {
 export let loadedFromDB = false;
 async function getGamesFromDB() {
     const newGames = new Map<number, Game>();
-    if (process.env.LOCAL) await db.createDummyTable();
+    if (process.env.DUMMY) await db.createDummyTable();
     const db_rows = await db.gamesFromDB();
     if(db_rows) {
         for (let i = 0; i < db_rows.rows.length; i++) {
