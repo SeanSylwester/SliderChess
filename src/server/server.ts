@@ -52,7 +52,7 @@ const clients = new Map<WebSocket, ClientInfo>();
 let clientIdCounter = 1;
 
 // Store list of games
-const games = new Map<number, Game>();
+let games = new Map<number, Game>();
 let gameList: GameInfo[] = [];
 
 export function sendMessage<T extends Message>(client: ClientInfo, message: T): void {
@@ -161,6 +161,12 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
             const demotedPlayer = data.color === PieceColor.WHITE ? game!.playerWhite : game!.playerBlack;
             if (demotedPlayer) game!.changePosition(demotedPlayer, PieceColor.NONE);
             break;
+        
+        case ADMIN_COMMANDS.REFRESH_DB:
+            getGamesFromDB();
+            pushGameList();
+            break;
+
 
         default:
             sendLog(admin, `Command ${ADMIN_COMMANDS[command]} (${command}) not found, or handler not implemented`);
@@ -240,6 +246,7 @@ server.listen(PORT, () => {
 // get games from DB and update the games map
 export let loadedFromDB = false;
 async function getGamesFromDB() {
+    const newGames = new Map<number, Game>();
     if (process.env.LOCAL) await db.createDummyTable();
     const db_rows = await db.gamesFromDB();
     if(db_rows) {
@@ -247,10 +254,11 @@ async function getGamesFromDB() {
             const db_row: any = db_rows.rows[i];
             const game = new Game(db_row.id, 0, 0, '');
             game.loadFromDB(db_row);
-            games.set(db_row.id, game);
+            newGames.set(db_row.id, game);
             updateGameList();
         }
     }
+    games = newGames;
     pushGameList();
     loadedFromDB = true;  // set this even if it failed
 }

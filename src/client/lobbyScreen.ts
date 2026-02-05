@@ -85,6 +85,7 @@ function formatDateTime(datems: number) {
 }
 export function updateGameList(newGameList: GameInfo[]): void {
     gameListElement.innerHTML = ''; // Clear existing list
+    newGameList.sort((a, b) => b.creationTime - a.creationTime);
     for (const game of newGameList){
         // transfer over our stored password to games with matching IDs
         const oldGameInfo = getGame(game.gameId);
@@ -113,7 +114,7 @@ export function updateGameList(newGameList: GameInfo[]): void {
         }
         gameItem.appendChild(gameText);
 
-        gameListElement.prepend(gameItem);
+        gameListElement.append(gameItem);
     }
     gameList = newGameList
 }
