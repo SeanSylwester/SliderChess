@@ -3,7 +3,6 @@ database
 credits page for SVG attribution
 
 show captured pieces
-time control suggestions on new game creation
 way to view game, allowing undo/redo without changing the moves
 bug report button
 delete game from games<> when the last player disconnects, then reload from DB when it's requested

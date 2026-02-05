@@ -153,6 +153,19 @@ useTimeControl!.addEventListener('change', (event) => {
     createIncrementInput.disabled = !useTimeControl.checked;
 });
 
+function setTime(id: string) {
+    const [timeStr, incStr] = id.slice(4).split('p');
+    createTimeInput.value = timeStr;
+    createIncrementInput.value = incStr;
+}
+const timeButtons = document.querySelectorAll('.timeControlButton');
+timeButtons!.forEach(button => {
+    button.addEventListener('click', (event) => {
+        event.preventDefault();
+        setTime(button.id);
+    });
+});
+
 const createConfirmButton = document.getElementById('createConfirmButton');
 createConfirmButton!.addEventListener('click', (event) => {
     event.preventDefault();
