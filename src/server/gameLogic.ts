@@ -654,9 +654,14 @@ export class Game {
 
     public move(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): boolean {
         // if rules are unlocked, then check if they match before continuing. 
-        if (!this.rulesLocked && !this.checkRulesAgreement()) {
-            this.logChatMessage('Agree on the rules before beginning!');
-            return false;
+        if (!this.rulesLocked) { 
+            if (!this.checkRulesAgreement()) {
+                this.logChatMessage('Agree on the rules before beginning!');
+                return false;
+            } else {
+                this.rulesLocked = true;
+                this.rules = {...this.rules, ...this.rulesMap.get(this.playerWhite!)};  // the most recent rules are the ones sent to new players
+            }
         }
 
         // bounds check
@@ -690,9 +695,6 @@ export class Game {
             // reject if it would completely undo the previous move
             if (this.rules.ruleUndoTileMove && isTile && tileMoveWouldUndo(fromRow, fromCol, toRow, toCol, this.board, this.arrayFEN)) return false;
         }
-
-        // at this point, the move is accepted
-        this.rulesLocked = true;
 
         // before moving, grab the disambiguation info
         const disambiguation = isTile ? '' : getMoveDisambiguationStr(fromRow, fromCol, toRow, toCol, this.board[fromRow][fromCol].type, this.currentTurn, this.board);

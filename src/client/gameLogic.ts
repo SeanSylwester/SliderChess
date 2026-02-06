@@ -6,8 +6,13 @@ import { col0ToFile, inCheck, formatMinSec, checkCastle, moveOnBoard, checkPromo
 // init canvas
 const canvas = document.getElementById("board") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
-ctx.font = "24px Arial";
+const font = '24px Arial';
+ctx.font = font;
 ctx.lineWidth = 2;
+(window as any).ctx = ctx;
+
+const sampleText = ctx.measureText('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz');
+const textHeight = sampleText.actualBoundingBoxAscent + sampleText.actualBoundingBoxDescent;
 
 // click events
 function hanelMouseUpEvent(event: MouseEvent): void {
@@ -286,18 +291,71 @@ export function syncTime( clockRunning: boolean, timeLeftWhite: number, timeLeft
 
 // drawing the board
 let flip = false;
-const higlightSpace = 2;
+const highlightSpace = 2;
 const lineSpace = 1;
 const textSpace = 20;
 const textMargin = 4;
-const boardWidth = canvas.width - textSpace;
-const boardHeight = canvas.height - textSpace;
-const pitch = Math.floor(boardWidth / 8); // size of each square
+const boardWidthMax = 1000;
+let boardSize = canvas.width - textSpace;
+let pitch = Math.floor(boardSize / 8); // size of each square
 const tilePct = 0.2; // percentage of the square on each side for selecting a tile instead
 const piecesImg = document.getElementById("piecesSpriteSheet") as HTMLImageElement;
 const fillStyles = ["#f0d9b5", "#b58863"]; // light and dark squares
 const hoverAlpha = 0.5;  // transparency of pieces when hovering a tile move
 
+
+function setVeritcal(isVertical: boolean): void {
+    if (isVertical) {
+        chatLogElement.cols = 35;
+        (document.getElementById('chatEntry') as HTMLInputElement).size = 32;
+    } else {
+        chatLogElement.cols = 70;
+        (document.getElementById('chatEntry') as HTMLInputElement).size = 67;
+    }
+}
+function updateBoardDimensions(): void {
+    const movesLogWidth = parseInt(movesLogElement.style.width.slice(0, -2)) + 20;  // slice off the "px"
+    const padding = 50;  // not sure how to calculate the padding and stuff around all the elements
+    const chatButtons = 400;  
+
+    // TODO: make notation box fit better in vertical
+    movesLogElement.style.width = "215px";
+
+    const vertical = window.innerHeight > window.innerWidth * 1.5;
+
+    if (vertical) {
+        setVeritcal(true);
+        const windowX = window.visualViewport!.width - padding; 
+        const windowY = window.visualViewport!.height - padding;
+
+        boardSize = Math.min(boardWidthMax, Math.min(windowX, windowY));
+        pitch = Math.floor(boardSize / 8); // size of each square
+        boardSize = pitch * 8;
+        canvas.width = boardSize + textSpace;
+        canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
+
+        movesLogElement.style.marginBottom = '0px';
+        movesLogElement.style.height = `${canvas.height / 4}px`;
+        ctx.font = font;
+    } else {
+        setVeritcal(false);
+        const windowX = window.innerWidth - movesLogWidth - padding; 
+        const windowY = window.innerHeight - chatButtons - padding;
+
+        boardSize = Math.min(boardWidthMax, Math.min(windowX, windowY));
+        pitch = Math.floor(boardSize / 8); // size of each square
+        boardSize = pitch * 8;
+        canvas.width = boardSize + textSpace;
+        canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
+
+        movesLogElement.style.marginBottom = `${1.5*textHeight + textMargin - 2}px`;
+        movesLogElement.style.height = `${boardSize - 2}px`;
+        ctx.font = font;
+    }
+    renderFullBoard();
+}
+window.addEventListener('resize', updateBoardDimensions);
+//window.visualViewport?.addEventListener('resize', updateBoardDimensions);
 export function flipBoard(): void {
     flip = !flip;
     renderFullBoard();
@@ -340,13 +398,15 @@ export function renderFullBoard(): void {
     // draw text around edges
     ctx.fillStyle = "black";
     ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
     for (let row = 0; row < 8; row++) {
-        ctx.fillText((flip ? row+1 : 8-row).toString(), textSpace - textMargin, row * pitch + pitch/2 + 6);
+        ctx.fillText((flip ? row+1 : 8-row).toString(), textSpace - textMargin, lineSpace + row * pitch + pitch/2);
     }
     ctx.textAlign = "center";
+    ctx.textBaseline = "top";
     for (let col = 0; col < 8; col++) {
         // 97 is 'a'
-        ctx.fillText(col0ToFile(flip ? 7-col: col), col * pitch + pitch/2 + textSpace, boardHeight + textMargin);
+        ctx.fillText(col0ToFile(flip ? 7-col: col), col * pitch + pitch/2 + textSpace, boardSize + lineSpace + textMargin);
     }
 
     // draw tile borders
@@ -466,10 +526,10 @@ function highlightSquare(unflippedRow: number, unflippedCol: number, style: stri
     } 
 
     ctx.strokeStyle = style;
-    ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + higlightSpace, 
-                   row * pitch + ctx.lineWidth/2 + higlightSpace + lineSpace, 
-                   (isTile ? 2 : 1)*pitch - ctx.lineWidth - 2*higlightSpace, 
-                   (isTile ? 2 : 1)*pitch - ctx.lineWidth - 2*higlightSpace);
+    ctx.strokeRect(col * pitch + textSpace + ctx.lineWidth/2 + highlightSpace, 
+                   row * pitch + ctx.lineWidth/2 + highlightSpace + lineSpace, 
+                   (isTile ? 2 : 1)*pitch - ctx.lineWidth - 2*highlightSpace, 
+                   (isTile ? 2 : 1)*pitch - ctx.lineWidth - 2*highlightSpace);
 }
 
 function highlightLastMove(): void {
@@ -617,6 +677,7 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     selectedSquare = null;
     validSquares = null;
     // updateRules(gameState.rules, myClientId);  // server will send a separate message to negotiate rules
+    updateBoardDimensions();
 }
 
 export function clearLocalGameState(): void {

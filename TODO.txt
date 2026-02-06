@@ -8,10 +8,6 @@ before sharing:
     more admin commands
     way to view archived games, locally allowing undo/redo without changing the moves, nor contacting the server
 
-    lock rules on first move
-    some way of negotiating rules
-
-    board resizing
     show  # connected users
     gray out player names if they're not actively connected
 

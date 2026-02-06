@@ -14,6 +14,7 @@ import { Game } from './gameLogic.js';
 import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGame } from './messageHandler.js';
 import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState } from '../shared/types.js';
 import * as db from './db.js';
+import { QueryArrayResult } from 'pg';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -205,7 +206,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     ws.on('close', () => {
         clients.delete(ws);
         console.log(`Client disconnected: ${clientId}`);
-        if (clientInfo.gameId) handleQuitGame(clientInfo, games);
+        if (clientInfo.gameId && !shuttingDown) handleQuitGame(clientInfo, games);
     });
 
     ws.on('error', (error) => {
@@ -215,7 +216,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
 export function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState | undefined): void {
     // wait until we've heard from the DB to do any reconnections
-    if (!loadedFromDB) setTimeout(() => handleReconnect(client, clientOldId, clientOldName, gameState), 1000);
+    if (!loadedFromDB) {
+        setTimeout(() => handleReconnect(client, clientOldId, clientOldName, gameState), 1000);
+        return;
+    }
 
     // try to reconnect client to old id and name
     console.log(`Reconnecting client ${client.id} (was ${clientOldId}) to their old name (${clientOldName})`);
@@ -269,6 +273,7 @@ async function getGamesFromDB() {
     games = newGames;
     pushGameList();
     loadedFromDB = true;  // set this even if it failed
+    console.log(`Loaded ${newGames.size} games from DB`);
 }
 getGamesFromDB();
 
@@ -279,28 +284,55 @@ getGamesFromDB();
 // to keep the process running so it can receive signals.
 process.stdin.resume();
 
-process.on('SIGINT', () => {
-  console.log('Caught interrupt signal (SIGINT). Performing cleanup...');
-  gracefulExit();
-});
+process.on('SIGINT', () => gracefulExit('SIGINT'));
+process.on('SIGTERM', () => gracefulExit('SIGTERM'));
 
-async function gracefulExit() {
-  // stop accepting new clients
-  wss.close();
-  
-  // save all games
-  const promises = [];
-  for (const [gameId, game] of games) {
-    if (game.isActive) {
-        game.logChatMessage('SERVER SHUTTING DOWN! Trying to save game to database...|  Keep this tab open just in case the DB write fails to avoid losing your game');
-        promises.push(db.saveToDB(game));
+let shuttingDown = false;
+async function gracefulExit(term: string) {
+    console.log(`Caught interrupt signal (${term}). Performing cleanup...`);
+    shuttingDown = true;
+    try {
+        // start closing server, await later
+        console.log('Trying to close server');
+        const closeServer = new Promise<void>((resolve, reject) => {
+            wss.close((err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        // tell all the games that they're getting shut down
+        for (const [gameId, game] of games) {
+            if (game.isActive && !game.isEmpty()) {
+                game.logChatMessage('SERVER SHUTTING DOWN! Trying to save game to database...|  Keep this tab open just in case the DB write fails to avoid losing your game');
+            }
+        }
+
+        // disconnect all existing connections
+        console.log('Trying to disconnect clients');
+        wss.clients.forEach((client) => {
+            client.close();
+        });
+        console.log('  All clients disconnected');
+
+        // actually close the server now
+        await closeServer;
+        console.log('  HTTP server closed');
+
+        // save all games
+        console.log('Trying to save games');
+        const promises: Promise<QueryArrayResult | undefined>[] = [];
+        for (const [gameId, game] of games) {
+            if (game.isActive) {
+                promises.push(db.saveToDB(game));
+            }
+        }
+        await Promise.all(promises);
+        console.log('  All games saved')
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
     }
-  }
-  await Promise.all(promises);
-  console.log('Games saved...');
-
-  // disconnect all existing connections
-  for (const [client_ws, client_info] of clients) {
-    client_ws.close();
-  }
+    console.log('Calling process exit');
+    process.exit(0);
 }
