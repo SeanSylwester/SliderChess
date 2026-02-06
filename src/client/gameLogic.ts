@@ -109,6 +109,35 @@ function getRules(): Rules {
 export function sendRules(): void {
     sendMessage({type: MESSAGE_TYPES.RULES, rules: getRules()} satisfies RulesMessage);
 }
+function disableRules(): void {
+    if (localGameState && localGameState.rulesLocked) {
+        ruleMoveOwnKing.disabled = true;
+        ruleMoveOwnKingInCheck.disabled = true;
+        ruleMoveOpp.disabled = true;
+        ruleUndoTileMove.disabled = true;
+        ruleMoveOppKing.disabled = true;
+        ruleMoveOppCheck.disabled = true;
+        ruleDoubleMovePawn.disabled = true;
+        ruleCastleNormal.disabled = true;
+        ruleCastleMoved.disabled = true;
+        ruleEnPassantTile.disabled = true;
+        ruleEnPassantTileHome.disabled = true;
+        ruleIgnoreAll.disabled = true;
+    } else {
+        ruleMoveOwnKing.disabled = false;
+        ruleMoveOwnKingInCheck.disabled = ruleMoveOwnKing.checked;
+        ruleMoveOpp.disabled = false;
+        ruleUndoTileMove.disabled = ruleMoveOpp.checked;
+        ruleMoveOppKing.disabled = ruleMoveOpp.checked;
+        ruleMoveOppCheck.disabled = ruleMoveOpp.checked;
+        ruleDoubleMovePawn.disabled = true; // TODO
+        ruleCastleNormal.disabled = true; // TODO
+        ruleCastleMoved.disabled = true; // TODO
+        ruleEnPassantTile.disabled = true; // TODO
+        ruleEnPassantTileHome.disabled = true; // TODO
+        ruleIgnoreAll.disabled = false;
+    }
+}
 export function updateRulesAgreement(rules: Rules, haveBoth: boolean, rulesLocked: boolean) {
     const hide = !haveBoth && !rulesLocked;
     ruleMoveOwnKingDisagree.hidden = hide || rules.ruleMoveOwnKing;
@@ -124,21 +153,8 @@ export function updateRulesAgreement(rules: Rules, haveBoth: boolean, rulesLocke
     ruleEnPassantTileHomeDisagree.hidden = hide || rules.ruleEnPassantTileHome;
     ruleIgnoreAllDisagree.hidden = hide || rules.ruleIgnoreAll;
 
-    if (rulesLocked) {
-        if(localGameState) localGameState.rulesLocked = true;
-        ruleMoveOwnKing.disabled = true;
-        ruleMoveOwnKingInCheck.disabled = true;
-        ruleMoveOpp.disabled = true;
-        ruleUndoTileMove.disabled = true;
-        ruleMoveOppKing.disabled = true;
-        ruleMoveOppCheck.disabled = true;
-        ruleDoubleMovePawn.disabled = true;
-        ruleCastleNormal.disabled = true;
-        ruleCastleMoved.disabled = true;
-        ruleEnPassantTile.disabled = true;
-        ruleEnPassantTileHome.disabled = true;
-        ruleIgnoreAll.disabled = true;
-    }
+    if(localGameState) localGameState.rulesLocked = rulesLocked;
+    disableRules();
 }
 export function updateRules(rules: Rules): void {
     ruleMoveOwnKing.checked = rules.ruleMoveOwnKing;
@@ -154,22 +170,7 @@ export function updateRules(rules: Rules): void {
     ruleEnPassantTileHome.checked = rules.ruleEnPassantTileHome;
     ruleIgnoreAll.checked = rules.ruleIgnoreAll;
 
-    if(!localGameState || localGameState.rulesLocked) {
-        ruleMoveOwnKingInCheck.disabled = ruleMoveOwnKing.checked;
-
-        ruleUndoTileMove.disabled = ruleMoveOpp.checked;
-        ruleMoveOppKing.disabled = ruleMoveOpp.checked;
-        ruleMoveOppCheck.disabled = ruleMoveOpp.checked;
-
-        ruleEnPassantTileHome.disabled = ruleEnPassantTile.checked;
-
-        ruleDoubleMovePawn.disabled = true; // TODO
-        ruleCastleNormal.disabled = true; // TODO
-        ruleCastleMoved.disabled = true; // TODO
-        ruleEnPassantTile.disabled = true; // TODO
-        ruleEnPassantTileHome.disabled = true; // TODO
-    }
-
+    disableRules();
     if(localGameState) localGameState.rules = getRules();
 }
 

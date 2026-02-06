@@ -4,6 +4,7 @@ import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeIn
 import { sendMessage, ClientInfo } from './server.js';
 
 const undoText = 'Your opponent has requested an undo.';
+const unlockRulesText = 'Your opponent has requested to unlock the rules.';
 
 export class Game {
     id: number;
@@ -29,6 +30,7 @@ export class Game {
 
     lastMoveTime = 0;  // not sent to client
     waitingForUndoResponse = false;
+    waitingForUnlockRulesResponse = false;
     rulesLocked = false;
     rulesMap = new Map<ClientInfo, Rules>();
     creationTime: number;
@@ -525,6 +527,22 @@ export class Game {
         }
     }
 
+    public unlockRules(client: ClientInfo): void {
+        let opp: ClientInfo | null;
+        if (client === this.playerWhite) {
+            opp = this.playerBlack;
+        } else if (client === this.playerBlack) {
+            opp = this.playerWhite;
+        } else {
+            return;
+        }
+        if (!opp) return;
+        this.logChatMessage('has requested to unlock the rules.', client);
+        this.waitingForUnlockRulesResponse = true;
+        
+        sendMessage(opp, { type: MESSAGE_TYPES.POPUP, text: unlockRulesText, button: ['Agree', 'Disagree']} satisfies PopupMessage);
+    }
+
     public checkRulesAgreement(): boolean {
         return this.playerWhite !== null && this.rulesMap.has(this.playerWhite) && 
                this.playerBlack !== null && this.rulesMap.has(this.playerBlack) &&
@@ -755,8 +773,23 @@ export class Game {
                     } else {
                         this.logChatMessage('has rejected the undo.', client);
                     }
-                    break;
                 }
+                break;
+
+            case unlockRulesText:
+                if (this.waitingForUnlockRulesResponse) {
+                    this.waitingForUnlockRulesResponse = false;
+                    if (message.button === 'Agree') {
+                        this.logChatMessage('has agreed to unlock the rules.', client);
+                        this.rulesLocked = false;
+                        this.sendRulesAgreement();
+                    } else {
+                        this.logChatMessage('has declined to unlock the rules.', client);
+                    }
+                }
+                break;
+
+
             default:
                 console.error(`Unknown popup response on game ${this.id}:`, message);
         }
@@ -778,7 +811,7 @@ export class Game {
         this.logChatMessage('has requested an undo.', client);
         this.waitingForUndoResponse = true;
         
-        sendMessage(opp, { type: MESSAGE_TYPES.POPUP, text: 'Your opponent has requested an undo.', button: ['Approve', 'Reject']} satisfies PopupMessage);
+        sendMessage(opp, { type: MESSAGE_TYPES.POPUP, text: undoText, button: ['Approve', 'Reject']} satisfies PopupMessage);
     }
 
     public rewind(): void {

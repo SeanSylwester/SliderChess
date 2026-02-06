@@ -92,6 +92,9 @@ flipBoardButton!.addEventListener('click', flipBoard);
 const rewindButton = document.getElementById('rewind');
 rewindButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.REWIND } satisfies Message));
 
+const unlockRulesButton = document.getElementById('unlockRules');
+unlockRulesButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.UNLOCK_RULES } satisfies Message));
+
 const pauseButton = document.getElementById('pause');
 pauseButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.PAUSE } satisfies Message));
 

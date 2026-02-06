@@ -143,6 +143,7 @@ export enum ADMIN_COMMANDS {
     GAME_DEMOTE_PLAYER,
     REFRESH_DB,
     FORCE_SAVE_ALL,
+    GAME_UNLOCK_RULES,
 }
 
 // Message types as constants
@@ -171,6 +172,7 @@ export const MESSAGE_TYPES = {
     REJECT_JOIN_GAME: 'rejectJoin',
     RECONNECT: 'reconnect',
     POPUP: 'popup',
+    UNLOCK_RULES: 'unlockRules',
 } as const;
 
 // Message type definitions

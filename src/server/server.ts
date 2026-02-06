@@ -130,7 +130,8 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
 
     // lookup the game that the client is in for most message types
     let game: Game | undefined;
-    if ([ADMIN_COMMANDS.GAME_DELETE, ADMIN_COMMANDS.GAME_GET_IDS, ADMIN_COMMANDS.GAME_KICK_PLAYER, ADMIN_COMMANDS.GAME_DEMOTE_PLAYER].includes(command)) {
+    if ([ADMIN_COMMANDS.GAME_DELETE, ADMIN_COMMANDS.GAME_GET_IDS, ADMIN_COMMANDS.GAME_KICK_PLAYER, 
+        ADMIN_COMMANDS.GAME_DEMOTE_PLAYER, ADMIN_COMMANDS.GAME_UNLOCK_RULES].includes(command)) {
         game = games.get(data.gameId);
         if (game === undefined) {
             console.error(`Game with ID ${data.gameId} not found`);
@@ -165,6 +166,12 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
         case ADMIN_COMMANDS.GAME_DEMOTE_PLAYER:
             const demotedPlayer = data.color === PieceColor.WHITE ? game!.playerWhite : game!.playerBlack;
             if (demotedPlayer) game!.changePosition(demotedPlayer, PieceColor.NONE);
+            break;
+        
+        case ADMIN_COMMANDS.GAME_UNLOCK_RULES:
+            game!.rulesLocked = false;
+            game!.logChatMessage('admin has unlocked the rules.');
+            game!.sendRulesAgreement();
             break;
         
         case ADMIN_COMMANDS.REFRESH_DB:
