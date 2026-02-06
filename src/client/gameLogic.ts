@@ -40,29 +40,53 @@ canvas.addEventListener('touchmove', handleTouchMoveEvent);
 
 // Rules
 const ruleMoveOwnKing = document.getElementById("ruleMoveOwnKing") as HTMLInputElement;
+const ruleMoveOwnKingDisagree = document.getElementById("ruleMoveOwnKingDisagree") as HTMLInputElement;
 ruleMoveOwnKing.addEventListener('change', sendRules);
+
 const ruleMoveOwnKingInCheck = document.getElementById("ruleMoveOwnKingInCheck") as HTMLInputElement;
+const ruleMoveOwnKingInCheckDisagree = document.getElementById("ruleMoveOwnKingInCheckDisagree") as HTMLInputElement;
 ruleMoveOwnKingInCheck.addEventListener('change', sendRules);
+
 const ruleMoveOpp = document.getElementById("ruleMoveOpp") as HTMLInputElement;
+const ruleMoveOppDisagree = document.getElementById("ruleMoveOppDisagree") as HTMLInputElement;
 ruleMoveOpp.addEventListener('change', sendRules);
+
 const ruleUndoTileMove = document.getElementById("ruleUndoTileMove") as HTMLInputElement;
+const ruleUndoTileMoveDisagree = document.getElementById("ruleUndoTileMoveDisagree") as HTMLInputElement;
 ruleUndoTileMove.addEventListener('change', sendRules);
+
 const ruleMoveOppKing = document.getElementById("ruleMoveOppKing") as HTMLInputElement;
+const ruleMoveOppKingDisagree = document.getElementById("ruleMoveOppKingDisagree") as HTMLInputElement;
 ruleMoveOppKing.addEventListener('change', sendRules);
+
 const ruleMoveOppCheck = document.getElementById("ruleMoveOppCheck") as HTMLInputElement;
+const ruleMoveOppCheckDisagree = document.getElementById("ruleMoveOppCheckDisagree") as HTMLInputElement;
 ruleMoveOppCheck.addEventListener('change', sendRules);
+
 const ruleDoubleMovePawn = document.getElementById("ruleDoubleMovePawn") as HTMLInputElement;
+const ruleDoubleMovePawnDisagree = document.getElementById("ruleDoubleMovePawnDisagree") as HTMLInputElement;
 ruleDoubleMovePawn.addEventListener('change', sendRules);
+
 const ruleCastleNormal = document.getElementById("ruleCastleNormal") as HTMLInputElement;
+const ruleCastleNormalDisagree = document.getElementById("ruleCastleNormalDisagree") as HTMLInputElement;
 ruleCastleNormal.addEventListener('change', sendRules);
+
 const ruleCastleMoved = document.getElementById("ruleCastleMoved") as HTMLInputElement;
+const ruleCastleMovedDisagree = document.getElementById("ruleCastleMovedDisagree") as HTMLInputElement;
 ruleCastleMoved.addEventListener('change', sendRules);
+
 const ruleEnPassantTile = document.getElementById("ruleEnPassantTile") as HTMLInputElement;
+const ruleEnPassantTileDisagree = document.getElementById("ruleEnPassantTileDisagree") as HTMLInputElement;
 ruleEnPassantTile.addEventListener('change', sendRules);
+
 const ruleEnPassantTileHome = document.getElementById("ruleEnPassantTileHome") as HTMLInputElement;
+const ruleEnPassantTileHomeDisagree = document.getElementById("ruleEnPassantTileHomeDisagree") as HTMLInputElement;
 ruleEnPassantTileHome.addEventListener('change', sendRules);
+
 const ruleIgnoreAll = document.getElementById("ruleIgnoreAll") as HTMLInputElement;
+const ruleIgnoreAllDisagree = document.getElementById("ruleIgnoreAllDisagree") as HTMLInputElement;
 ruleIgnoreAll.addEventListener('change', sendRules);
+
 function getRules(): Rules {
     return {ruleMoveOwnKing: ruleMoveOwnKing.checked,
             ruleMoveOwnKingInCheck: ruleMoveOwnKingInCheck.checked,
@@ -78,7 +102,21 @@ function getRules(): Rules {
             ruleIgnoreAll: ruleIgnoreAll.checked};
 }
 export function sendRules(): void {
-    sendMessage({type: MESSAGE_TYPES.RULES, rules: getRules() } satisfies RulesMessage);
+    sendMessage({type: MESSAGE_TYPES.RULES, rules: getRules()} satisfies RulesMessage);
+}
+export function updateRulesAgreement(rules: Rules, haveBoth: boolean) {
+    ruleMoveOwnKingDisagree.hidden = !haveBoth || rules.ruleMoveOwnKing;
+    ruleMoveOwnKingInCheckDisagree.hidden = !haveBoth || rules.ruleMoveOwnKingInCheck;
+    ruleMoveOppDisagree.hidden = !haveBoth || rules.ruleMoveOpp;
+    ruleUndoTileMoveDisagree.hidden = !haveBoth || rules.ruleUndoTileMove;
+    ruleMoveOppKingDisagree.hidden = !haveBoth || rules.ruleMoveOppKing;
+    ruleMoveOppCheckDisagree.hidden = !haveBoth || rules.ruleMoveOppCheck;
+    ruleDoubleMovePawnDisagree.hidden = !haveBoth || rules.ruleDoubleMovePawn;
+    ruleCastleNormalDisagree.hidden = !haveBoth || rules.ruleCastleNormal;
+    ruleCastleMovedDisagree.hidden = !haveBoth || rules.ruleCastleMoved;
+    ruleEnPassantTileDisagree.hidden = !haveBoth || rules.ruleEnPassantTile;
+    ruleEnPassantTileHomeDisagree.hidden = !haveBoth || rules.ruleEnPassantTileHome;
+    ruleIgnoreAllDisagree.hidden = !haveBoth || rules.ruleIgnoreAll;
 }
 export function updateRules(rules: Rules): void {
     ruleMoveOwnKing.checked = rules.ruleMoveOwnKing;
@@ -578,7 +616,7 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     highlightLastMove();
     selectedSquare = null;
     validSquares = null;
-    updateRules(gameState.rules);
+    // updateRules(gameState.rules, myClientId);  // server will send a separate message to negotiate rules
 }
 
 export function clearLocalGameState(): void {

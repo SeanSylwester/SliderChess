@@ -1,5 +1,5 @@
 import { QueryResult } from 'pg';
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage } from '../shared/types.js';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage } from '../shared/types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
@@ -29,6 +29,8 @@ export class Game {
 
     lastMoveTime = 0;  // not sent to client
     waitingForUndoResponse = false;
+    rulesLocked = false;
+    rulesMap = new Map<ClientInfo, Rules>();
     creationTime: number;
 
     KW = true;
@@ -299,6 +301,7 @@ export class Game {
             player.gamePosition = PieceColor.NONE
         }
         this.sendGameStateToAll();
+        sendMessage(player, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);  // send the latest rules when they first join
 
         if (bumped) {
             this.logChatMessage(`Player ${player.name} tried to join as ${PieceColor[color]}, but that position was already filled.`);
@@ -359,6 +362,7 @@ export class Game {
         this.logChatMessage(`${c.name} has moved from position ${originalPosition === PieceColor.NONE ? 'spectator' : PieceColor[originalPosition]} to ${position === PieceColor.NONE ? 'spectator' : PieceColor[position]}.`);
 
         this.sendGameStateToAll();
+        if (!this.rulesLocked) this.sendRulesAgreement();
         this.updateLastNames();
     }
 
@@ -503,7 +507,7 @@ export class Game {
             QB: this.QB,
             drawWhite: this.drawWhite,
             drawBlack: this.drawBlack,
-            rules: this.rules,
+            rules: this.rules,  // TODO: this is ignored. Remove?
             halfmoveClock: this.halfmoveClock,
             arrayFEN: this.arrayFEN,
             creationTime: this.creationTime
@@ -518,12 +522,61 @@ export class Game {
         }
     }
 
-    public updateRules(client: ClientInfo, rules: Rules): void {
-        if (JSON.stringify(rules) !== JSON.stringify(this.rules)) {
-            this.logChatMessage(`Rules changed by ${client.name}`);
+    public checkRulesAgreement(): boolean {
+        return this.playerWhite !== null && this.rulesMap.has(this.playerWhite) && 
+               this.playerBlack !== null && this.rulesMap.has(this.playerBlack) &&
+               JSON.stringify(this.rulesMap.get(this.playerWhite)) === JSON.stringify(this.rulesMap.get(this.playerBlack));
+    }
+
+    public sendRulesAgreement(): void {
+        let rules: Rules;
+        const haveBoth = this.playerWhite !== null && this.rulesMap.has(this.playerWhite) && 
+                         this.playerBlack !== null && this.rulesMap.has(this.playerBlack);
+        if (!haveBoth) {
+            rules = {
+                ruleMoveOwnKing: true,
+                ruleMoveOwnKingInCheck: true,
+                ruleMoveOpp: true,
+                ruleUndoTileMove: true,
+                ruleMoveOppKing: true,
+                ruleMoveOppCheck: true,
+                ruleDoubleMovePawn: true,
+                ruleCastleNormal: false,
+                ruleCastleMoved: false,
+                ruleEnPassantTile: false,
+                ruleEnPassantTileHome: false,
+                ruleIgnoreAll: false,
+            };
+        } else {
+            const white = this.rulesMap.get(this.playerWhite!)!;
+            const black = this.rulesMap.get(this.playerBlack!)!;
+            rules = {
+                ruleMoveOwnKing: white.ruleMoveOwnKing === black.ruleMoveOwnKing,
+                ruleMoveOwnKingInCheck: white.ruleMoveOwnKingInCheck === black.ruleMoveOwnKingInCheck,
+                ruleMoveOpp: white.ruleMoveOpp === black.ruleMoveOpp,
+                ruleUndoTileMove: white.ruleUndoTileMove === black.ruleUndoTileMove,
+                ruleMoveOppKing: white.ruleMoveOppKing === black.ruleMoveOppKing,
+                ruleMoveOppCheck: white.ruleMoveOppCheck === black.ruleMoveOppCheck,
+                ruleDoubleMovePawn: white.ruleDoubleMovePawn === black.ruleDoubleMovePawn,
+                ruleCastleNormal: white.ruleCastleNormal === black.ruleCastleNormal,
+                ruleCastleMoved: white.ruleCastleMoved === black.ruleCastleMoved,
+                ruleEnPassantTile: white.ruleEnPassantTile === black.ruleEnPassantTile,
+                ruleEnPassantTileHome: white.ruleEnPassantTileHome === black.ruleEnPassantTileHome,
+                ruleIgnoreAll: white.ruleIgnoreAll === black.ruleIgnoreAll,
+            };
         }
-        this.rules = {...this.rules, ...rules};
-        this.sendMessageToAll({ type: MESSAGE_TYPES.RULES, rules: this.rules } satisfies RulesMessage);
+        this.sendMessageToAll({ type: MESSAGE_TYPES.RULES_AGREEMENT, rulesAgreement: rules, haveBoth: haveBoth } satisfies RulesAgreementMessage);
+    }
+
+    public updateRules(client: ClientInfo, rules: Rules): void {
+        if (!this.rulesLocked) {
+            this.rulesMap.set(client, rules);
+            this.rules = {...this.rules, ...rules};  // the most recent rules are the ones sent to new players
+            this.sendRulesAgreement();
+        } else {
+            // reject rules change
+            sendMessage(client, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);
+        }
     }
 
     public endGame(result: GameResultCause, chatMessage: string): void {
@@ -600,6 +653,12 @@ export class Game {
     }
 
     public move(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): boolean {
+        // if rules are unlocked, then check if they match before continuing. 
+        if (!this.rulesLocked && !this.checkRulesAgreement()) {
+            this.logChatMessage('Agree on the rules before beginning!');
+            return false;
+        }
+
         // bounds check
         if (fromRow < 0 || fromRow > 7 || fromCol < 0 || fromCol > 7 || toRow < 0 || toRow > 7 || toCol < 0 || toCol > 7) return false;
 
@@ -631,6 +690,9 @@ export class Game {
             // reject if it would completely undo the previous move
             if (this.rules.ruleUndoTileMove && isTile && tileMoveWouldUndo(fromRow, fromCol, toRow, toCol, this.board, this.arrayFEN)) return false;
         }
+
+        // at this point, the move is accepted
+        this.rulesLocked = true;
 
         // before moving, grab the disambiguation info
         const disambiguation = isTile ? '' : getMoveDisambiguationStr(fromRow, fromCol, toRow, toCol, this.board[fromRow][fromCol].type, this.currentTurn, this.board);

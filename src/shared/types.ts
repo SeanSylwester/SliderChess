@@ -160,6 +160,7 @@ export const MESSAGE_TYPES = {
     GAME_STATE: 'gameState',
     GAME_LIST: 'gameList',
     RULES: 'rules',
+    RULES_AGREEMENT: 'rulesAgreement',
     GAME_OVER: 'gameOver',
     ADMIN_MESSAGE: 'adminMessage',
     LOG_MESSAGE: 'logMessage',
@@ -232,6 +233,11 @@ export interface gameListMessage extends Message {
 export interface RulesMessage extends Message {
     type: typeof MESSAGE_TYPES.RULES;
     rules: Rules;
+}
+export interface RulesAgreementMessage extends Message {
+    type: typeof MESSAGE_TYPES.RULES_AGREEMENT;
+    rulesAgreement: Rules;
+    haveBoth: boolean;
 }
 export interface AdminMessage extends Message {
     type: typeof MESSAGE_TYPES.ADMIN_MESSAGE;

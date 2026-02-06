@@ -1,5 +1,5 @@
-import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage } from "../shared/types.js";
-import { move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules, localGameState } from "./gameLogic.js";
+import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage, RulesMessage } from "../shared/types.js";
+import { move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules, localGameState, updateRulesAgreement } from "./gameLogic.js";
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry } from './lobbyScreen.js'
 import { showGame, updatePassword } from './gameScreen.js'
 let ws: WebSocket;
@@ -53,6 +53,7 @@ function connectWebSocket(): void {
                 showGame(message.gameId, message.password);
                 myGameId = gameId;
                 fromHistory = false;
+                sendRules();
                 break;
             case MESSAGE_TYPES.REJECT_JOIN_GAME:
                 handleRejection(message.gameId);
@@ -74,6 +75,9 @@ function connectWebSocket(): void {
                 break;
             case MESSAGE_TYPES.RULES:
                 updateRules(message.rules);
+                break;
+            case MESSAGE_TYPES.RULES_AGREEMENT:
+                updateRulesAgreement(message.rulesAgreement, message.haveBoth);
                 break;
             case MESSAGE_TYPES.LOG_MESSAGE:
                 console.log(message.log);
