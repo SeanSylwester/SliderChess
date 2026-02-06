@@ -86,7 +86,7 @@ export function updateGameList() {
 }
 
 export function sendGameList(client: ClientInfo): void {
-    sendMessage(client, { type: MESSAGE_TYPES.GAME_LIST,  gameList: gameList } satisfies gameListMessage)
+    sendMessage(client, { type: MESSAGE_TYPES.GAME_LIST,  gameList: gameList, nClients: clients.size } satisfies gameListMessage)
 }
 
 export function pushGameList(): void {

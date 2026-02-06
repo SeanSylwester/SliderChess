@@ -229,6 +229,7 @@ export interface GameStateMessage extends Message {
 export interface gameListMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_LIST;
     gameList?: GameInfo[];  // only sent back from the server
+    nClients?: number;  // only sent back from the server
 }
 export interface RulesMessage extends Message {
     type: typeof MESSAGE_TYPES.RULES;

@@ -68,6 +68,8 @@ playerNameEntry!.addEventListener('keypress', function (event) {
 
 // game list
 // gamesInfo is replaced each call to updateGameList after transferring over any locally stored data
+const nClientsSpan = document.getElementById('nClients') as HTMLSpanElement;
+const nGamesSpan = document.getElementById('nGames') as HTMLSpanElement;
 export let gameList: GameInfo[] = [];
 export function getGame(gameId: number): GameInfo | undefined {
     return gameList.find(el => el.gameId === gameId);
@@ -83,10 +85,12 @@ function formatDateTime(datems: number) {
 
     return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
-export function updateGameList(newGameList: GameInfo[]): void {
+export function updateGameList(newGameList: GameInfo[], nClients: number): void {
     gameListElement.innerHTML = ''; // Clear existing list
     newGameList.sort((a, b) => b.creationTime - a.creationTime);
+    let nActive = 0;
     for (const game of newGameList){
+        if (game.isActive) nActive++;
         // transfer over our stored password to games with matching IDs
         const oldGameInfo = getGame(game.gameId);
         if (oldGameInfo && oldGameInfo.password) game.password = oldGameInfo.password;
@@ -131,6 +135,8 @@ export function updateGameList(newGameList: GameInfo[]): void {
         gameListElement.append(gameItem);
     }
     gameList = newGameList
+    nClientsSpan.textContent = `${nClients}`;
+    nGamesSpan.textContent = `${nActive}`;
 }
 
 

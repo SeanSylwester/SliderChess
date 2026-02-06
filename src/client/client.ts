@@ -44,7 +44,7 @@ function connectWebSocket(): void {
                 if (message.clientId) myClientId = message.clientId;
                 break;
             case MESSAGE_TYPES.GAME_LIST:
-                updateGameList(message.gameList);
+                updateGameList(message.gameList, message.nClients);
                 break;
             case MESSAGE_TYPES.GAME_STATE:
                 initLocalGameState(message.gameState, message.yourColor);
