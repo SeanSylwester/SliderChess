@@ -71,8 +71,10 @@ export function updateGameList() {
         gameList.push({
             hasPassword: game.password !== '',
             gameId: game.id, 
-            playerWhite: game.playerWhite?.name || game.lastWhiteName,
-            playerBlack: game.playerBlack?.name || game.lastBlackName, 
+            playerWhite: game.playerWhite?.name || null,
+            playerBlack: game.playerBlack?.name || null, 
+            lastNameWhite: game.lastNameWhite,
+            lastNameBlack: game.lastNameBlack, 
             numberOfSpectators: game.spectators.length,
             timeLeftWhite: game.timeLeftWhite, 
             timeLeftBlack: game.timeLeftBlack,

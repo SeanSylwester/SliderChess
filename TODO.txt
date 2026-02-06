@@ -8,9 +8,6 @@ before sharing:
     more admin commands
     way to view archived games, locally allowing undo/redo without changing the moves, nor contacting the server
 
-    show  # connected users
-    gray out player names if they're not actively connected
-
     bug report button
     credits page for SVG attribution
     updates page for version history

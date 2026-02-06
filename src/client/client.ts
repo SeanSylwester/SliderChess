@@ -77,7 +77,7 @@ function connectWebSocket(): void {
                 updateRules(message.rules);
                 break;
             case MESSAGE_TYPES.RULES_AGREEMENT:
-                updateRulesAgreement(message.rulesAgreement, message.haveBoth);
+                updateRulesAgreement(message.rulesAgreement, message.haveBoth, message.rulesLocked);
                 break;
             case MESSAGE_TYPES.LOG_MESSAGE:
                 console.log(message.log);

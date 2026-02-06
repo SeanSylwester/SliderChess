@@ -1,5 +1,5 @@
 import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause } from "../shared/types.js";
-import { flipBoard } from "./gameLogic.js";
+import { flipBoard, updateBoardDimensions } from "./gameLogic.js";
 import { sendMessage, fromHistory, myGameId } from "./client.js";
 import { getGame, gameList } from "./lobbyScreen.js"
 
@@ -24,6 +24,8 @@ export function showGame(gameId: number, password: string): void {
             gameId: gameId,
             playerWhite: '?',
             playerBlack: '?',
+            lastNameWhite: '?',
+            lastNameBlack: '?',
             numberOfSpectators: 0,
             timeLeftWhite: 0,
             timeLeftBlack: 0,
@@ -35,6 +37,7 @@ export function showGame(gameId: number, password: string): void {
         });
         sendMessage({ type: MESSAGE_TYPES.GAME_LIST } satisfies Message);
     }
+    updateBoardDimensions();
 }
 
 

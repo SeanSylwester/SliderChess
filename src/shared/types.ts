@@ -35,6 +35,7 @@ export interface GameState {
     drawWhite: boolean;
     drawBlack: boolean;
     rules: Rules;
+    rulesLocked: boolean;
     halfmoveClock: number;
     arrayFEN: string[];  // converted from Map<string, number> to string[], with each copy of string being copied number times
     creationTime: number;
@@ -45,6 +46,8 @@ export interface GameInfo {
     gameId: number;
     playerWhite: string | null;
     playerBlack: string | null;
+    lastNameWhite: string | null;
+    lastNameBlack: string | null;
     numberOfSpectators: number;
     timeLeftWhite: number; // in seconds
     timeLeftBlack: number; // in seconds
@@ -239,6 +242,7 @@ export interface RulesAgreementMessage extends Message {
     type: typeof MESSAGE_TYPES.RULES_AGREEMENT;
     rulesAgreement: Rules;
     haveBoth: boolean;
+    rulesLocked: boolean;
 }
 export interface AdminMessage extends Message {
     type: typeof MESSAGE_TYPES.ADMIN_MESSAGE;

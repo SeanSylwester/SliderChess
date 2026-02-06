@@ -114,8 +114,8 @@ export function updateGameList(newGameList: GameInfo[], nClients: number): void 
         function wrapStrong(s: string, wrap: boolean) {
             return wrap ? `<strong>${s}</strong>` : s;
         }
-        let nameWhite = `${game.playerWhite || 'None'}`;
-        let nameBlack = `${game.playerBlack || 'None'}`;
+        let nameWhite =  game.playerWhite !== null ? `${game.playerWhite}` : `<em>${game.lastNameWhite ? game.lastNameWhite : 'None'}</em>`;
+        let nameBlack =  game.playerBlack !== null ? `${game.playerBlack}` : `<em>${game.lastNameBlack ? game.lastNameBlack : 'None'}</em>`;
 
         const timeWhite = game.useTimeControl ?  ` (${formatMinSec(game.timeLeftWhite)})` : ''
         const timeBlack = game.useTimeControl ?  ` (${formatMinSec(game.timeLeftBlack)})` : ''

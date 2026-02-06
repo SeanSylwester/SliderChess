@@ -66,8 +66,8 @@ export class Game {
 
     // database stuff
     result = GameResultCause.ONGOING;
-    lastWhiteName = '';
-    lastBlackName = '';
+    lastNameWhite = '';
+    lastNameBlack = '';
     isActive = true;
 
     public constructor(id: number, useTimeControl: boolean, initialTime: number, increment: number, password: string) {
@@ -121,6 +121,7 @@ export class Game {
         this.drawWhite = false;
         this.drawBlack = false;
         this.rules = {...this.rules, ...gameState.rules};
+        this.rulesLocked = gameState.rulesLocked;
         this.halfmoveClock = gameState.halfmoveClock;
         this.creationTime = gameState.creationTime;
 
@@ -141,8 +142,8 @@ export class Game {
 
         // these fields may be missing if it was saved incorrectly
         try {
-            this.lastWhiteName = row.white;
-            this.lastBlackName = row.black;
+            this.lastNameWhite = row.white;
+            this.lastNameBlack = row.black;
             this.chatLog = row.chat_log.split('|');
 
             // get board, castling permission, and draw conditions from the last recorded FEN
@@ -155,6 +156,7 @@ export class Game {
 
             this.movesLog = JSON.parse(row.moves_log);
             this.rules = {...this.rules, ...JSON.parse(row.rules)};
+            this.rulesLocked = this.movesLog.length > 0;
 
             this.useTimeControl = row.use_time_control;  // note: games before this waws added default to true in the DB
             this.initialTimeWhite = row.initial_time_white;
@@ -179,7 +181,7 @@ export class Game {
         let chatLogStr = this.chatLog.join('|');
         chatLogStr.replace(/\n/g, '|');  // some individual messages will have newlines in them. Replace those too. This will make them be treated as separate messages on reload but oh well
 
-        const vals = [this.password, this.lastWhiteName, this.lastBlackName, chatLogStr, JSON.stringify(this.movesLog), this.currentTurn === PieceColor.WHITE,
+        const vals = [this.password, this.lastNameWhite, this.lastNameBlack, chatLogStr, JSON.stringify(this.movesLog), this.currentTurn === PieceColor.WHITE,
                       this.initialTimeWhite, this.initialTimeBlack, this.incrementWhite, this.incrementBlack, this.timeLeftWhite, this.timeLeftBlack,
                       JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive, JSON.stringify(this.arrayFEN), this.useTimeControl];
 
@@ -201,8 +203,8 @@ export class Game {
     }
 
     public updateLastNames(): void {
-        if (this.playerWhite) this.lastWhiteName = this.playerWhite.name;
-        if (this.playerBlack) this.lastBlackName = this.playerBlack.name;
+        if (this.playerWhite) this.lastNameWhite = this.playerWhite.name;
+        if (this.playerBlack) this.lastNameBlack = this.playerBlack.name;
     }
 
     public setPassword(password: string, client?: ClientInfo): void {
@@ -284,8 +286,8 @@ export class Game {
     public addPlayer(player: ClientInfo, color = PieceColor.NONE): void {
         // figure out if we're reconnecting someone and try to put them in the right spot
         if (color === PieceColor.NONE) {
-            if (!this.playerWhite && this.lastWhiteName === player.name) color = PieceColor.WHITE;
-            else if (!this.playerBlack && this.lastBlackName === player.name) color = PieceColor.BLACK;
+            if (!this.playerWhite && this.lastNameWhite === player.name) color = PieceColor.WHITE;
+            else if (!this.playerBlack && this.lastNameBlack === player.name) color = PieceColor.BLACK;
         }
 
         // if the player spot is already filled, then make them a spectator and log a message
@@ -508,6 +510,7 @@ export class Game {
             drawWhite: this.drawWhite,
             drawBlack: this.drawBlack,
             rules: this.rules,  // TODO: this is ignored. Remove?
+            rulesLocked: this.rulesLocked,  // TODO: this is ignored. Remove?
             halfmoveClock: this.halfmoveClock,
             arrayFEN: this.arrayFEN,
             creationTime: this.creationTime
@@ -565,7 +568,7 @@ export class Game {
                 ruleIgnoreAll: white.ruleIgnoreAll === black.ruleIgnoreAll,
             };
         }
-        this.sendMessageToAll({ type: MESSAGE_TYPES.RULES_AGREEMENT, rulesAgreement: rules, haveBoth: haveBoth } satisfies RulesAgreementMessage);
+        this.sendMessageToAll({ type: MESSAGE_TYPES.RULES_AGREEMENT, rulesAgreement: rules, haveBoth: haveBoth, rulesLocked: this.rulesLocked } satisfies RulesAgreementMessage);
     }
 
     public updateRules(client: ClientInfo, rules: Rules): void {
@@ -661,6 +664,7 @@ export class Game {
             } else {
                 this.rulesLocked = true;
                 this.rules = {...this.rules, ...this.rulesMap.get(this.playerWhite!)};  // the most recent rules are the ones sent to new players
+                this.sendRulesAgreement();
             }
         }
 
