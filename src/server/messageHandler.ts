@@ -164,24 +164,24 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
         serveLobby(client);
         return;
     }
-
     const game = games.get(client.gameId);
+    client.gameId = 0;
+    client.gamePosition = PieceColor.NONE;
+
     if (game) {
         game.removePlayer(client);
-        client.gameId = 0;
-        client.gamePosition = PieceColor.NONE;
-
         if (game.isEmpty() && game.isActive) {
             // last player leaves and there's some result on the game -> game is no longer active;
             if (game.result !== GameResultCause.ONGOING) game.isActive = false;
 
             saveToDB(game);
         }
-        updateGameList();
-        serveLobby(client);
     } else {
         console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
     }
+
+    updateGameList();
+    serveLobby(client);
 }
 
 function handleChangeName(client: ClientInfo, name: string): void {

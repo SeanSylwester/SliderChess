@@ -1,4 +1,4 @@
-import { Piece, PieceColor, PieceType, Move, Rules } from '../shared/types.js'
+import { Piece, PieceColor, PieceType, Move, Rules, GameState, GameInfo, GameResultCause } from '../shared/types.js'
 const knightMoves = [[-2, 1], [-1, 2], [1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1]];
 const bishopDirections = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
 const rookDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -1040,4 +1040,23 @@ export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMov
     }
 
     return false;
+}
+
+export function gameInfoFromGameState(game: GameState): GameInfo {
+    return {
+        hasPassword: game.password !== '', 
+        gameId: game.id,
+        playerWhite: game.playerWhiteName,
+        playerBlack: game.playerBlackName,
+        lastNameWhite: game.playerWhiteName,
+        lastNameBlack: game.playerBlackName,
+        numberOfSpectators: game.spectatorNames.length,
+        timeLeftWhite: game.timeLeftWhite,
+        timeLeftBlack: game.timeLeftBlack,
+        creationTime: game.creationTime,
+        result: GameResultCause.ONGOING,
+        isActive: game.isActive,
+        useTimeControl: game.useTimeControl,
+        currentTurn: game.currentTurn
+    };
 }

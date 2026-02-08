@@ -1,15 +1,14 @@
 import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage, RulesMessage } from "../shared/types.js";
-import { move, initLocalGameState as initLocalGameState, clearLocalGameState, updateChat, syncTime, updateRules, sendRules, localGameState, updateRulesAgreement } from "./gameLogic.js";
+import { move, localGameState, initLocalGameState, clearLocalGameState, updateChat } from "./gameLogic.js";
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry } from './lobbyScreen.js'
-import { showGame, updatePassword } from './gameScreen.js'
+import { showGame, updatePassword, updateRules, sendRules, updateRulesAgreement } from './gameScreen.js'
+import { syncTime } from "./timer.js";
 let ws: WebSocket;
 let reconnectAttempts = 0;
 let reconnectMax = 10;
 export let myGameId = 0;
 export let myClientId = 0;
 export let fromHistory = false;
-let debugClient = false;
-(window as any).debugClient = debugClient
 
 function connectWebSocket(): void {
     // Extract game ID from URL, if available
@@ -37,7 +36,6 @@ function connectWebSocket(): void {
 
     ws.onmessage = (event: MessageEvent) => {
         const message = JSON.parse(event.data);
-        if (debugClient) console.log('Received: ', message);
         switch (message.type) {
             case MESSAGE_TYPES.CHANGE_NAME:
                 playerNameEntry.value = message.name;
@@ -53,7 +51,6 @@ function connectWebSocket(): void {
                 showGame(message.gameId, message.password);
                 myGameId = gameId;
                 fromHistory = false;
-                sendRules();
                 break;
             case MESSAGE_TYPES.REJECT_JOIN_GAME:
                 handleRejection(message.gameId);
@@ -77,7 +74,7 @@ function connectWebSocket(): void {
                 updateRules(message.rules);
                 break;
             case MESSAGE_TYPES.RULES_AGREEMENT:
-                updateRulesAgreement(message.rulesAgreement, message.haveBoth, message.rulesLocked);
+                updateRulesAgreement(message.rulesAgreement, message.rulesLocked);
                 break;
             case MESSAGE_TYPES.LOG_MESSAGE:
                 console.log(message.log);
@@ -125,7 +122,6 @@ function tryReconnect(): void {
 
 export function sendMessage<T extends Message>(message: T): void {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        if (debugClient) console.log('Sending: ', message);
         ws.send(JSON.stringify(message));
     } else {
         console.error('WebSocket is not connected');

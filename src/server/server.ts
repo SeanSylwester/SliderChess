@@ -15,6 +15,7 @@ import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGam
 import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState } from '../shared/types.js';
 import * as db from './db.js';
 import { QueryArrayResult } from 'pg';
+import { gameInfoFromGameState } from '../shared/utils.js';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -60,7 +61,7 @@ export function sendMessage<T extends Message>(client: ClientInfo, message: T): 
     if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify(message));
     } else {
-        console.error('WebSocket is not connected');
+        console.error(`WebSocket is not connected, cannot send ${message.type} message to ${client.id} (${client.name})`);
     }
 }
 
@@ -68,22 +69,7 @@ export function updateGameList() {
     // TODO: probably don't need to recreate the whole array each time...
     gameList = [];
     for (const game of games.values()) {
-        gameList.push({
-            hasPassword: game.password !== '',
-            gameId: game.id, 
-            playerWhite: game.playerWhite?.name || null,
-            playerBlack: game.playerBlack?.name || null, 
-            lastNameWhite: game.lastNameWhite,
-            lastNameBlack: game.lastNameBlack, 
-            numberOfSpectators: game.spectators.length,
-            timeLeftWhite: game.timeLeftWhite, 
-            timeLeftBlack: game.timeLeftBlack,
-            creationTime: game.creationTime,
-            result: game.result,
-            isActive: game.isActive,
-            useTimeControl: game.useTimeControl,
-            currentTurn: game.currentTurn
-        });
+        gameList.push(game.getGameInfo());
     }
 }
 
@@ -103,16 +89,21 @@ export function pushGameList(): void {
 
 // functions to force a client to change screens to a game room (by JOIN_GAME), or the lobby (by QUIT_GAME)
 export function serveGameRoom(client: ClientInfo, password: string): void {
-    if (!client.gameId) {
-        console.error(`Client ${client.id} is missing gameId, cannot assign to room`);
-        return;
+    if (clients.has(client.ws)) {
+        if (!client.gameId) {
+            console.error(`Client ${client.id} is missing gameId, cannot assign to room`);
+            return;
+        }
+        sendGameList(client);
+        sendMessage(client, { type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId, password: password } satisfies JoinGameMessage);
     }
-    sendMessage(client, { type: MESSAGE_TYPES.JOIN_GAME, gameId: client.gameId, password: password } satisfies JoinGameMessage);
 }
 
 export function serveLobby(client: ClientInfo): void {
-    sendGameList(client);
-    sendMessage(client, { type: MESSAGE_TYPES.QUIT_GAME } satisfies Message)
+    if (clients.has(client.ws)) {
+        sendGameList(client);
+        sendMessage(client, { type: MESSAGE_TYPES.QUIT_GAME } satisfies Message);
+    }
 }
 
 function sendLog(client: ClientInfo, data: any): void {

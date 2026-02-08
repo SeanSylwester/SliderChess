@@ -39,6 +39,7 @@ export interface GameState {
     halfmoveClock: number;
     arrayFEN: string[];  // converted from Map<string, number> to string[], with each copy of string being copied number times
     creationTime: number;
+    isActive: boolean;
 }
 export interface GameInfo {
     hasPassword: boolean;

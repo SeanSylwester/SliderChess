@@ -1,5 +1,5 @@
 import { QueryResult } from 'pg';
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage } from '../shared/types.js';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo } from '../shared/types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
@@ -293,19 +293,21 @@ export class Game {
         }
 
         // if the player spot is already filled, then make them a spectator and log a message
+        let checkRules: boolean;
         const bumped = ((color === PieceColor.WHITE && this.playerWhite) || (color === PieceColor.BLACK && this.playerBlack));
         if (color === PieceColor.WHITE && !this.playerWhite) {
             this.playerWhite = player;
             player.gamePosition = PieceColor.WHITE
+            checkRules = true;
         } else if (color === PieceColor.BLACK && !this.playerBlack) {
             this.playerBlack = player;
             player.gamePosition = PieceColor.BLACK
+            checkRules = true;
         } else {
             this.spectators.push(player);
             player.gamePosition = PieceColor.NONE
+            checkRules = false;
         }
-        this.sendGameStateToAll();
-        sendMessage(player, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);  // send the latest rules when they first join
 
         if (bumped) {
             this.logChatMessage(`Player ${player.name} tried to join as ${PieceColor[color]}, but that position was already filled.`);
@@ -313,6 +315,12 @@ export class Game {
             this.logChatMessage(`Player ${player.name} has joined as ${color === PieceColor.NONE ? 'a spectator' : PieceColor[color]}.`);
         }
         this.updateLastNames();
+        this.sendGameStateToAll();  // this really just needs to send the full state to "player", and the name/position update to the rest
+
+        // send the latest rules when they first join
+        sendMessage(player, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);  
+        this.rulesMap.set(player, { ...this.rules });
+        if (this.isActive && !this.rulesLocked && checkRules) this.sendRulesAgreement();
     }
 
     public changePosition(c: ClientInfo, position: PieceColor): void {
@@ -365,9 +373,9 @@ export class Game {
         //console.log(`Client  ${c} (${c.name}) moved from position ${originalPosition} to ${position} in game ${this.id}`);
         this.logChatMessage(`${c.name} has moved from position ${originalPosition === PieceColor.NONE ? 'spectator' : PieceColor[originalPosition]} to ${position === PieceColor.NONE ? 'spectator' : PieceColor[position]}.`);
 
-        this.sendGameStateToAll();
-        if (!this.rulesLocked) this.sendRulesAgreement();
         this.updateLastNames();
+        this.sendGameStateToAll();  // this really just needs to send the name/position update to the rest
+        if (this.isActive && !this.rulesLocked && (position != PieceColor.NONE || originalPosition != PieceColor.NONE)) this.sendRulesAgreement();
     }
 
     public removePlayer(player: ClientInfo): void {
@@ -486,6 +494,25 @@ export class Game {
         this.sendMessageToAll({type: MESSAGE_TYPES.CHAT, message: this.chatLog[this.chatLog.length - 1] } satisfies ChatMessage);
     }
 
+    public getGameInfo(): GameInfo {
+        return {
+            hasPassword: this.password !== '',
+            gameId: this.id, 
+            playerWhite: this.playerWhite?.name || null,
+            playerBlack: this.playerBlack?.name || null, 
+            lastNameWhite: this.lastNameWhite,
+            lastNameBlack: this.lastNameBlack, 
+            numberOfSpectators: this.spectators.length,
+            timeLeftWhite: this.timeLeftWhite, 
+            timeLeftBlack: this.timeLeftBlack,
+            creationTime: this.creationTime,
+            result: this.result,
+            isActive: this.isActive,
+            useTimeControl: this.useTimeControl,
+            currentTurn: this.currentTurn
+        }
+    }
+
     public sendGameState(client: ClientInfo): void {
         const gameState: GameState = {
             playerWhiteName: this.playerWhite?.name ?? null,
@@ -515,7 +542,8 @@ export class Game {
             rulesLocked: this.rulesLocked,  // TODO: this is ignored. Remove?
             halfmoveClock: this.halfmoveClock,
             arrayFEN: this.arrayFEN,
-            creationTime: this.creationTime
+            creationTime: this.creationTime,
+            isActive: this.isActive
         };
         const clientColor = this.getColor(client);
         sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage);
@@ -543,18 +571,20 @@ export class Game {
         sendMessage(opp, { type: MESSAGE_TYPES.POPUP, text: unlockRulesText, button: ['Agree', 'Disagree']} satisfies PopupMessage);
     }
 
-    public checkRulesAgreement(): boolean {
+    public haveBothRules(): boolean {
         return this.playerWhite !== null && this.rulesMap.has(this.playerWhite) && 
-               this.playerBlack !== null && this.rulesMap.has(this.playerBlack) &&
-               JSON.stringify(this.rulesMap.get(this.playerWhite)) === JSON.stringify(this.rulesMap.get(this.playerBlack));
+               this.playerBlack !== null && this.rulesMap.has(this.playerBlack);
+    }
+
+    public checkRulesAgreement(): boolean {
+        return this.haveBothRules() && JSON.stringify(this.rulesMap.get(this.playerWhite!)) === JSON.stringify(this.rulesMap.get(this.playerBlack!));
     }
 
     public sendRulesAgreement(): void {
-        let rules: Rules;
-        const haveBoth = this.playerWhite !== null && this.rulesMap.has(this.playerWhite) && 
-                         this.playerBlack !== null && this.rulesMap.has(this.playerBlack);
+        let rulesAgreement: Rules;
+        const haveBoth = this.haveBothRules();
         if (!haveBoth) {
-            rules = {
+            rulesAgreement = {
                 ruleMoveOwnKing: true,
                 ruleMoveOwnKingInCheck: true,
                 ruleMoveOpp: true,
@@ -562,16 +592,16 @@ export class Game {
                 ruleMoveOppKing: true,
                 ruleMoveOppCheck: true,
                 ruleDoubleMovePawn: true,
-                ruleCastleNormal: false,
-                ruleCastleMoved: false,
-                ruleEnPassantTile: false,
-                ruleEnPassantTileHome: false,
-                ruleIgnoreAll: false,
+                ruleCastleNormal: true,
+                ruleCastleMoved: true,
+                ruleEnPassantTile: true,
+                ruleEnPassantTileHome: true,
+                ruleIgnoreAll: true,
             };
         } else {
             const white = this.rulesMap.get(this.playerWhite!)!;
             const black = this.rulesMap.get(this.playerBlack!)!;
-            rules = {
+            rulesAgreement = {
                 ruleMoveOwnKing: white.ruleMoveOwnKing === black.ruleMoveOwnKing,
                 ruleMoveOwnKingInCheck: white.ruleMoveOwnKingInCheck === black.ruleMoveOwnKingInCheck,
                 ruleMoveOpp: white.ruleMoveOpp === black.ruleMoveOpp,
@@ -586,16 +616,22 @@ export class Game {
                 ruleIgnoreAll: white.ruleIgnoreAll === black.ruleIgnoreAll,
             };
         }
-        this.sendMessageToAll({ type: MESSAGE_TYPES.RULES_AGREEMENT, rulesAgreement: rules, haveBoth: haveBoth, rulesLocked: this.rulesLocked } satisfies RulesAgreementMessage);
+        this.sendMessageToAll({ type: MESSAGE_TYPES.RULES_AGREEMENT, rulesAgreement: rulesAgreement, haveBoth: haveBoth, rulesLocked: this.rulesLocked } satisfies RulesAgreementMessage);
     }
 
     public updateRules(client: ClientInfo, rules: Rules): void {
-        if (!this.rulesLocked) {
+        if (this.isActive && !this.rulesLocked  && (client === this.playerWhite || client === this.playerBlack)) {
             this.rulesMap.set(client, rules);
             this.rules = {...this.rules, ...rules};  // the most recent rules are the ones sent to new players
             this.sendRulesAgreement();
+
+            // update the rules of all the spectators (whose checkboxes should be disabled!) but not the other player
+            for (const spectator of this.spectators) {
+                sendMessage(spectator, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);
+                this.rulesMap.set(spectator, this.rules);
+            }
         } else {
-            // reject rules change
+            // if the rules aren't changeable, then this will uncheck whatever rules they're trying to send
             sendMessage(client, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);
         }
     }
@@ -674,15 +710,18 @@ export class Game {
     }
 
     public move(c: ClientInfo, fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): boolean {
-        // if rules are unlocked, then check if they match before continuing. 
-        if (!this.rulesLocked) { 
+        // if rules are unlocked, then check if they match before continuing. Allow a move before both players join, though (mostly for debugging purposes)
+        if (!this.rulesLocked && this.haveBothRules()) { 
             if (!this.checkRulesAgreement()) {
                 this.logChatMessage('Agree on the rules before beginning!');
                 return false;
             } else {
+                this.logChatMessage('Rules locked!');
                 this.rulesLocked = true;
-                this.rules = {...this.rules, ...this.rulesMap.get(this.playerWhite!)};  // the most recent rules are the ones sent to new players
-                this.sendRulesAgreement();
+                // the playerWhite and playerBlack rules should be identical at this point, so I just grab playerWhite here.
+                // I'm not positive that we _dont'_ need to update it here, so I'm just doing it to be safe
+                this.rules = {...this.rules, ...this.rulesMap.get(this.playerWhite!)};
+                this.sendRulesAgreement();  // basically just to tell them that the rules are locked now. They should match
             }
         }
 
@@ -782,7 +821,8 @@ export class Game {
                     if (message.button === 'Agree') {
                         this.logChatMessage('has agreed to unlock the rules.', client);
                         this.rulesLocked = false;
-                        this.sendRulesAgreement();
+                        this.applyTimeAndPause();  // negotiating time
+                        this.sendRulesAgreement();   // basically just to tell them that the rules are locked now. They should match
                     } else {
                         this.logChatMessage('has declined to unlock the rules.', client);
                     }
