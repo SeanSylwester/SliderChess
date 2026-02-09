@@ -6,7 +6,6 @@ before sharing:
         don't recreate gameList on every change
     save oldID and oldName to local storage
     more admin commands
-    way to view archived games, locally allowing undo/redo without changing the moves, nor contacting the server
 
     bug report button
     credits page for SVG attribution

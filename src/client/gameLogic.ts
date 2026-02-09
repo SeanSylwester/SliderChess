@@ -121,12 +121,11 @@ export let myColor = PieceColor.NONE;
 let selectedSquare: {row: number, col: number, isTile: boolean} | null = null;
 let validSquares: ReturnType<typeof getValidMoves> | null;
 let hover: {uRow: number, uCol: number, prevWasValid: boolean} | null = null;  // grabs initial hover tile from handleClick, then updated on mousemove from handleHover
-let movePointer = 99999;
+export let movePointer = Number.POSITIVE_INFINITY;  // will be set to max value once we have a gameState
 
 export function initLocalGameState(gameState: GameState, yourColor: PieceColor): void {
     localGameState = gameState;
     myColor = yourColor;
-    movePointer = 99999;
     if (myColor === PieceColor.WHITE) {
         setFlip(false);
     } else if (myColor === PieceColor.BLACK) {
@@ -141,6 +140,13 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     chatLogElement.value = gameState.chatLog.join("\n");
     chatLogElement.scrollTop = chatLogElement.scrollHeight;
     redrawMovesLog();
+
+    if (localGameState.isActive) {
+        boardToRender = localGameState.board
+        movePointer = Number.POSITIVE_INFINITY;
+    } else {
+        updateMovePointer(localGameState.movesLog.length - 1);
+    }
     renderFullBoard();
     highlightLastMove();
     selectedSquare = null;
@@ -159,6 +165,7 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
 export function clearLocalGameState(): void {
     localGameState = undefined;
     myColor = PieceColor.NONE;
+    movePointer = Number.POSITIVE_INFINITY;
     selectedSquare = null;
     setFlip(false);
     chatLogElement.value = "";
@@ -436,24 +443,25 @@ export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYP
 
 
 // archived game scrolling
+export let boardToRender = getDefaultBoard();
 function scrollToMove(moveNum: number): void {
     if (!localGameState || localGameState.isActive) return;
 
-    const board = getDefaultBoard();
-    for (let i = 0; i < Math.min(moveNum, localGameState.movesLog.length); i++) {
+    boardToRender = getDefaultBoard();
+    for (let i = 0; i < Math.min(moveNum + 1, localGameState.movesLog.length); i++) {
         const move = localGameState.movesLog.at(i)!;
-        moveOnBoard(board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
+        moveOnBoard(boardToRender, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
     }
-    renderFullBoard(board);
-    if (moveNum > 0) highlightMove(localGameState.movesLog.at(moveNum - 1)!)
+    renderFullBoard();
+    if (moveNum >= 0) highlightMove(localGameState.movesLog.at(moveNum)!)
 }
-function updateMovePointer(newNum: number): void {
+export function updateMovePointer(newNum: number): void {
     if (!localGameState || localGameState.isActive) return;
 
-    movePointer = Math.min(localGameState.movesLog.length, Math.max(newNum, 1));
+    movePointer = Math.min(localGameState.movesLog.length - 1, Math.max(newNum, 0));
     if (localGameState && !localGameState.isActive) {
         scrollToMove(movePointer);
-        boldMovePointer(movePointer - 1);
+        boldMovePointer(movePointer);
     }
 }
 const backwardButton = document.getElementById('backward')! as HTMLButtonElement;
@@ -461,7 +469,7 @@ backwardButton.addEventListener('click', () => updateMovePointer(movePointer - 1
 const forwardButton = document.getElementById('forward')! as HTMLButtonElement;
 forwardButton.addEventListener('click', () => updateMovePointer(movePointer + 1));
 const backwardAllButton = document.getElementById('backwardAll')! as HTMLButtonElement;
-backwardAllButton.addEventListener('click', () => updateMovePointer(1));
+backwardAllButton.addEventListener('click', () => updateMovePointer(0));
 const forwardAllButton = document.getElementById('forwardAll')! as HTMLButtonElement;
-forwardAllButton.addEventListener('click', () => updateMovePointer(99999));
+forwardAllButton.addEventListener('click', () => updateMovePointer(Number.POSITIVE_INFINITY));
 

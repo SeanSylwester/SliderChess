@@ -1,6 +1,6 @@
 import { Move, Piece, PieceType } from "../shared/types.js";
 import { col0ToFile } from "../shared/utils.js";
-import { chatLogElement, localGameState, movesLogDiv } from "./gameLogic.js";
+import { boardToRender, chatLogElement, localGameState, movePointer, movesLogDiv } from "./gameLogic.js";
 import { updateTimeDisplay } from "./timer.js";
 
 // init canvas
@@ -134,12 +134,7 @@ function getFlippedRowCol(unflippedRow: number, unflippedCol: number, isFlip: bo
             row: (isFlip ? unflippedRow : 7 - unflippedRow)}
 }
 
-export function renderFullBoard(board?: Piece[][]): void {
-    if (!localGameState && !board) {
-        console.error("No game state to render");
-        return;
-    }
-    if (!board) board = localGameState!.board;
+export function renderFullBoard(): void {
     // clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -149,7 +144,7 @@ export function renderFullBoard(board?: Piece[][]): void {
     // draw pieces, bottom to top (rank 1-8), left to right (file a-h)
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
-            drawPieceRowCol(row, col, board[row][col])
+            drawPieceRowCol(row, col, boardToRender[row][col])
         }
     }
 
@@ -296,8 +291,11 @@ export function highlightLastMove(): void {
     if (!localGameState || localGameState.movesLog.length === 0) {
         return;
     }
-    const localLastMove = localGameState.movesLog.at(-1)!;
-    highlightMove(localLastMove);
+    if (movePointer !== Number.POSITIVE_INFINITY) {
+        highlightMove(localGameState.movesLog.at(movePointer)!);
+    } else {
+        highlightMove(localGameState.movesLog.at(-1)!);
+    }
 }
 
 export function clearSquareHighlight(unflippedRow: number, unflippedCol: number, isTile: boolean): void {
@@ -324,6 +322,9 @@ export function clearLastMoveHighlight(): void {
     if (!localGameState || localGameState.movesLog.length === 0) {
         return;
     }
-    const localLastMove = localGameState.movesLog.at(-1)!;
-    clearMoveHighlight(localLastMove);
+    if (movePointer !== Number.POSITIVE_INFINITY) {
+        clearMoveHighlight(localGameState.movesLog.at(movePointer)!);
+    } else {
+        clearMoveHighlight(localGameState.movesLog.at(-1)!);
+    }
 }
