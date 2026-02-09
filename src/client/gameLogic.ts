@@ -1,10 +1,10 @@
 import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Rules, Message } from "../shared/types.js";
 import { sendMessage } from "./client.js";
-import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState } from '../shared/utils.js'
+import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard } from '../shared/utils.js'
 import { gameList, getGame, showLobby } from "./lobbyScreen.js";
 import { disableRules, hideRulesAgreement, updateGameButtons, updateNames, updatePositionButtons, updateRulesAgreement } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
-import { canvas, checkIfTile, clearLastMoveHighlight, ctx, drawSquare, flip, getBoardRowCol, highlightLastMove, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
+import { canvas, checkIfTile, clearLastMoveHighlight, clearMoveHighlight, clearSquareHighlight, ctx, drawSquare, flip, getBoardRowCol, highlightLastMove, highlightMove, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
 import { syncTime } from "./timer.js";
 
 export let localGameState: GameState | undefined = undefined;
@@ -44,7 +44,10 @@ canvas.addEventListener('touchmove', handleTouchMoveEvent);
 
 // UI stuff
 export const chatLogElement = document.getElementById("chatLog") as HTMLTextAreaElement;
-export const movesLogElement = document.getElementById('movesLog') as HTMLTextAreaElement;
+export const movesLogDiv = document.getElementById('movesLogDiv') as HTMLDivElement;
+export const movesLogColumnNum = document.getElementById('movesLogColumnNum') as HTMLDivElement;
+export const movesLogColumnWhite = document.getElementById('movesLogColumnWhite') as HTMLDivElement;
+export const movesLogColumnBlack = document.getElementById('movesLogColumnBlack') as HTMLDivElement;
 
 export function updateChat(message: string): void {
     if (!localGameState) {
@@ -55,26 +58,19 @@ export function updateChat(message: string): void {
     chatLogElement.scrollTop = chatLogElement.scrollHeight;
 }
 
-function appendToMovesLog(notation: string): void {
+function appendToMovesLog(notation: string, moveNum: number): void {
     if (!localGameState) {
         console.error("No local game state to log move to");
         return;
     }
     
-    // prep line with move number for a white move
-    if (localGameState.movesLog.length % 2 === 1) {
-        movesLogElement.value += `${Math.floor(localGameState.movesLog.length/2) + 1}. `;
-    } 
-
-    movesLogElement.value += notation;
-
-    // add space or newline to prep for next note
-    if (localGameState.movesLog.length % 2 === 0) {
-        movesLogElement.value += '\n';
-    }  else {
-        movesLogElement.value += ' ';
+    if (moveNum % 2 === 1) {
+        movesLogColumnNum.innerHTML += `${Math.floor(moveNum / 2) + 1}.<br>`;
+        movesLogColumnWhite.innerHTML += `${notation}<br>`;
+    } else {
+        movesLogColumnBlack.innerHTML += `${notation}<br>`;
     }
-    movesLogElement.scrollTop = movesLogElement.scrollHeight;
+    movesLogDiv.scrollTop = movesLogDiv.scrollHeight;
 }
 
 function redrawMovesLog(): void {
@@ -82,11 +78,39 @@ function redrawMovesLog(): void {
         console.error("No local game state to log move to");
         return;
     }
-    movesLogElement.value = '';
-    localGameState.movesLog.forEach((move, idx) => {
-        if (idx % 2 === 0) movesLogElement.value += `${Math.floor(idx/2) + 1}. ${move.notation} `;
-        else movesLogElement.value += `${move.notation}\n`;
-    })
+    movesLogColumnNum.innerHTML = '';
+    movesLogColumnWhite.innerHTML = '';
+    movesLogColumnBlack.innerHTML = '';
+
+    for (let i = 0; i < localGameState.movesLog.length; i++) {
+        appendToMovesLog(localGameState.movesLog.at(i)!.notation, i + 1);
+    }
+    boldMovePointer(localGameState.movesLog.length - 1);
+}
+
+function boldMovePointer(moveNum: number): void {
+    let lines;
+    movesLogColumnBlack.innerHTML = movesLogColumnBlack.innerHTML.replace(/\<\/?strong\>/g, '');
+    movesLogColumnWhite.innerHTML = movesLogColumnWhite.innerHTML.replace(/\<\/?strong\>/g, '');
+    if (moveNum % 2) {
+        lines = movesLogColumnBlack.innerHTML.trim().split('<br>');
+    } else {
+        lines = movesLogColumnWhite.innerHTML.trim().split('<br>');
+    }
+
+    const lineNum = Math.floor(moveNum / 2);
+    const line = lines.at(lineNum);
+    if (!line) return;
+
+
+    const newLine = `<strong>${line}</strong>`;
+    lines.splice(lineNum, 1, newLine);
+
+    if (moveNum % 2) {
+        movesLogColumnBlack.innerHTML = lines.join('<br>');
+    } else {
+        movesLogColumnWhite.innerHTML = lines.join('<br>');
+    }
 }
 
 
@@ -97,9 +121,12 @@ export let myColor = PieceColor.NONE;
 let selectedSquare: {row: number, col: number, isTile: boolean} | null = null;
 let validSquares: ReturnType<typeof getValidMoves> | null;
 let hover: {uRow: number, uCol: number, prevWasValid: boolean} | null = null;  // grabs initial hover tile from handleClick, then updated on mousemove from handleHover
+let movePointer = 99999;
+
 export function initLocalGameState(gameState: GameState, yourColor: PieceColor): void {
     localGameState = gameState;
     myColor = yourColor;
+    movePointer = 99999;
     if (myColor === PieceColor.WHITE) {
         setFlip(false);
     } else if (myColor === PieceColor.BLACK) {
@@ -221,10 +248,10 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
         hover = null;
 
         // regardless, clear the highlight
-        drawSquare(selectedSquare.row, selectedSquare.col, selectedSquare.isTile, null);
+        clearSquareHighlight(selectedSquare.row, selectedSquare.col, selectedSquare.isTile);
         if (validSquares) {
             validSquares.forEach(square => {
-                drawSquare(square.toRow, square.toCol, square.isTile, null);
+                clearSquareHighlight(square.toRow, square.toCol, square.isTile);
             })
         }
         selectedSquare = null;
@@ -250,8 +277,8 @@ function handleHover(offsetX: number, offsetY: number): void {
 
     // clear previous hover
     if (hover.prevWasValid) {
-        drawSquare(selectedSquare!.row, selectedSquare!.col, true, null);  // highlight done later
-        drawSquare(hover.uRow, hover.uCol, true, null);
+        clearSquareHighlight(selectedSquare!.row, selectedSquare!.col, true);  // highlight done later
+        clearSquareHighlight(hover.uRow, hover.uCol, true);
         highlightSquare(hover.uRow, hover.uCol, "rgb(255 0 0 / 25%)", true);
     }
 
@@ -328,15 +355,20 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
 
     // do the move!
     const {oldPiece, newPiece, enPassant} = moveOnBoard(localGameState.board, fromRow, fromCol, toRow, toCol, isTile, promotions);
-    drawSquare(fromRow, fromCol, isTile, null); // redraw origin
-    drawSquare(toRow, toCol, isTile, newPiece); // redraw destination
+    if (isTile) {
+        drawSquare(fromRow, fromCol, true, getPiecesOnTile(fromRow, fromCol, localGameState.board)); // redraw origin
+        drawSquare(toRow, toCol, true, getPiecesOnTile(toRow, toCol, localGameState.board)); // redraw destination
+    } else {
+        drawSquare(fromRow, fromCol, false, null); // redraw origin
+        drawSquare(toRow, toCol, false, newPiece); // redraw destination
+    }
 
     // check if castling is still allowed
     [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
 
     // draw promotions
     for (const promotion of promotions) {
-        drawSquare(promotion.row, promotion.col, false, null);
+        drawSquare(promotion.row, promotion.col, false, promotion.piece);
     }
 
     // detect castle (king moves twice) and draw the rook
@@ -346,10 +378,10 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         if (fromCol > toCol) {
             // queenside, move a
             drawSquare(castleRow, 0, false, null);
-            drawSquare(castleRow, 3, false, null);
+            drawSquare(castleRow, 3, false, localGameState.board[castleRow][3]);
         } else {
             drawSquare(castleRow, 7, false, null);
-            drawSquare(castleRow, 5, false, null);
+            drawSquare(castleRow, 5, false, localGameState.board[castleRow][5]);
         }
     }
 
@@ -359,23 +391,22 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
     highlightLastMove();
 
     // check for checkmate/stalemate/timer
-    if (localGameState.isActive) {    
-        let checkmate = false;
-        let stalemate = false;
-        if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules)) {
-            if (inCheck(myColor, localGameState.board)) {
-                checkmate = true;
-            } else {
-                stalemate = true;
-            }
+    let checkmate = false;
+    let stalemate = false;
+    if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules)) {
+        if (inCheck(myColor, localGameState.board)) {
+            checkmate = true;
+        } else {
+            stalemate = true;
         }
-        if (checkmate || stalemate || (localGameState.useTimeControl && (localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0))) {
-            sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
-        }
-
-        // update the move log text
-        appendToMovesLog(notation);
     }
+    if (checkmate || stalemate || (localGameState.useTimeControl && (localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0))) {
+        sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
+    }
+
+    // update the move log text
+    appendToMovesLog(notation, localGameState.movesLog.length);
+    boldMovePointer(localGameState.movesLog.length - 1);
     
     // Update the current turn
     localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
@@ -400,3 +431,37 @@ export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYP
             break;
     }
 }
+
+
+
+
+// archived game scrolling
+function scrollToMove(moveNum: number): void {
+    if (!localGameState || localGameState.isActive) return;
+
+    const board = getDefaultBoard();
+    for (let i = 0; i < Math.min(moveNum, localGameState.movesLog.length); i++) {
+        const move = localGameState.movesLog.at(i)!;
+        moveOnBoard(board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
+    }
+    renderFullBoard(board);
+    if (moveNum > 0) highlightMove(localGameState.movesLog.at(moveNum - 1)!)
+}
+function updateMovePointer(newNum: number): void {
+    if (!localGameState || localGameState.isActive) return;
+
+    movePointer = Math.min(localGameState.movesLog.length, Math.max(newNum, 1));
+    if (localGameState && !localGameState.isActive) {
+        scrollToMove(movePointer);
+        boldMovePointer(movePointer - 1);
+    }
+}
+const backwardButton = document.getElementById('backward')! as HTMLButtonElement;
+backwardButton.addEventListener('click', () => updateMovePointer(movePointer - 1));
+const forwardButton = document.getElementById('forward')! as HTMLButtonElement;
+forwardButton.addEventListener('click', () => updateMovePointer(movePointer + 1));
+const backwardAllButton = document.getElementById('backwardAll')! as HTMLButtonElement;
+backwardAllButton.addEventListener('click', () => updateMovePointer(1));
+const forwardAllButton = document.getElementById('forwardAll')! as HTMLButtonElement;
+forwardAllButton.addEventListener('click', () => updateMovePointer(99999));
+

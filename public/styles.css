@@ -1,0 +1,47 @@
+
+input[type=number][size="1"]{ width: 2em; }
+
+input[type=number][size="2"]{ width: 3em; }
+
+.boardContainer {
+    display: inline-flex; /* Aligns child elements horizontally by default */
+    justify-content: left; /* Distributes space evenly between elements */
+    align-items: center; /* Aligns elements vertically in the center */
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.movesLogContainer {
+    display: grid;
+    place-items: center;
+    width: fit-content;
+    height: fit-content;
+    overflow: auto;
+    border: 1px solid #ccc;
+}
+
+.movesLogButtonsDiv {
+    width: fit-content;
+    margin: 0 auto;
+}
+
+.movesLogDiv {
+    display: flex;
+    overflow: auto;
+    min-width: 120px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+}
+
+
+.movesLogColumn {
+    padding: 5px;
+}
+
+.chatDiv {
+    display: inline-flex;
+    justify-content: left; /* Distributes space evenly between elements */
+    align-items: top;
+    border: 1px solid #ccc;
+    padding: 10px;
+}

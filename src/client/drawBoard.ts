@@ -1,6 +1,6 @@
-import { Piece, PieceType } from "../shared/types.js";
+import { Move, Piece, PieceType } from "../shared/types.js";
 import { col0ToFile } from "../shared/utils.js";
-import { chatLogElement, movesLogElement, localGameState } from "./gameLogic.js";
+import { chatLogElement, localGameState, movesLogDiv } from "./gameLogic.js";
 import { updateTimeDisplay } from "./timer.js";
 
 // init canvas
@@ -50,58 +50,67 @@ export function checkIfTile(offsetX: number, offsetY: number): boolean {
 
 
 export function setFlip(doFlip: boolean): void {
-    flip = doFlip;
+    if (flip !== doFlip) flipBoard();
 }
-function setVeritcal(isVertical: boolean): void {
+
+const movesLogContainer = document.getElementById('movesLogContainer') as HTMLDivElement;
+const chatDiv = document.getElementById('chatDiv') as HTMLDivElement;
+const boardContainer = document.getElementById('boardContainer') as HTMLDivElement;
+const chatEntry = document.getElementById('chatEntry') as HTMLInputElement;
+let isVertical: undefined | boolean = undefined;
+function setVeritcal(newIsVertical: boolean): void {
+    if (newIsVertical === isVertical) return;
+
+    isVertical = newIsVertical;
     if (isVertical) {
         chatLogElement.cols = 35;
-        (document.getElementById('chatEntry') as HTMLInputElement).size = 32;
+        chatEntry.size = 28;
+        boardContainer.removeChild(movesLogContainer);
+        chatDiv.appendChild(movesLogContainer);
     } else {
+        chatDiv.removeChild(movesLogContainer);
+        boardContainer.appendChild(movesLogContainer);
         chatLogElement.cols = 70;
-        (document.getElementById('chatEntry') as HTMLInputElement).size = 67;
+        chatEntry.size = 67;
     }
 }
 export function updateBoardDimensions(): void {
-    const movesLogWidth = parseInt(movesLogElement.style.width.slice(0, -2)) + 20;  // slice off the "px"
+    const movesLogWidth = 215;//parseInt(movesLogElement.style.width.slice(0, -2)) + 20;  // slice off the "px"
     const padding = 50;  // not sure how to calculate the padding and stuff around all the elements
     const chatButtons = 400;  
 
     // TODO: make notation box fit better in vertical
-    movesLogElement.style.width = "215px";
+    //movesLogElement.style.width = "215px";
 
-    const vertical = window.innerHeight > window.innerWidth * 1.5;
+    setVeritcal(window.innerWidth < 600);
 
-    if (vertical) {
+    let boardSpaceX: number;
+    let boardSpaceY: number;
+    if (isVertical) {
         setVeritcal(true);
-        const windowX = window.visualViewport!.width - padding; 
-        const windowY = window.visualViewport!.height - padding;
-
-        boardSize = Math.min(boardWidthMax, Math.min(windowX, windowY));
-        pitch = Math.floor(boardSize / 8); // size of each square
-        boardSize = pitch * 8;
-        canvas.width = boardSize + textSpace;
-        canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
-
-        movesLogElement.style.marginBottom = '0px';
-        movesLogElement.style.height = `${canvas.height / 4}px`;
-        ctx.font = font;
+        boardSpaceX = window.innerWidth - padding; 
+        boardSpaceY = window.innerHeight - padding;
     } else {
         setVeritcal(false);
-        const windowX = window.innerWidth - movesLogWidth - padding; 
-        const windowY = window.innerHeight - chatButtons - padding;
-
-        boardSize = Math.min(boardWidthMax, Math.min(windowX, windowY));
-        pitch = Math.floor(boardSize / 8); // size of each square
-        boardSize = pitch * 8;
-        canvas.width = boardSize + textSpace;
-        canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
-
-        movesLogElement.style.marginBottom = `${1.5*textHeight + textMargin - 2}px`;
-        movesLogElement.style.height = `${boardSize - 2}px`;
-        ctx.font = font;
+        boardSpaceX = window.innerWidth - movesLogWidth - padding; 
+        boardSpaceY = window.innerHeight - chatButtons - padding;
     }
+
+    boardSize = Math.min(boardWidthMax, Math.min(boardSpaceX, boardSpaceY));
+    pitch = Math.floor(boardSize / 8); // size of each square
+    boardSize = pitch * 8;
+    canvas.width = boardSize + textSpace;
+    canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
+
+    if (isVertical) {
+        movesLogDiv.style.height = '10em';
+    } else {
+        movesLogDiv.style.height = `${canvas.height - 40}px`;  // TODO: figure out why this is 40
+    }
+
     if (!canvas.width) setTimeout(updateBoardDimensions, 100);
     renderFullBoard();
+    highlightLastMove();
 }
 window.addEventListener('resize', updateBoardDimensions);
 //window.visualViewport?.addEventListener('resize', updateBoardDimensions);
@@ -126,11 +135,12 @@ function getFlippedRowCol(unflippedRow: number, unflippedCol: number, isFlip: bo
             row: (isFlip ? unflippedRow : 7 - unflippedRow)}
 }
 
-export function renderFullBoard(): void {
-    if (!localGameState) {
+export function renderFullBoard(board?: Piece[][]): void {
+    if (!localGameState && !board) {
         console.error("No game state to render");
         return;
     }
+    if (!board) board = localGameState!.board;
     // clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -140,11 +150,12 @@ export function renderFullBoard(): void {
     // draw pieces, bottom to top (rank 1-8), left to right (file a-h)
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
-            drawPieceRowCol(row, col, localGameState.board[row][col])
+            drawPieceRowCol(row, col, board[row][col])
         }
     }
 
     // draw text around edges
+    ctx.font = font;
     ctx.fillStyle = "black";
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
@@ -160,6 +171,8 @@ export function renderFullBoard(): void {
 
     // draw tile borders
     drawAllTileBorders();
+
+    // highlight last move
 
     ctx.stroke();
 }
@@ -229,16 +242,11 @@ export function drawSquare(unflippedRow: number, unflippedCol: number, isTile: b
         unflippedRow -= unflippedRow % 2;
         unflippedCol -= unflippedCol % 2;
 
-        if (Array.isArray(piece)) {
+        if (piece && Array.isArray(piece)) {
             drawSquare(unflippedRow, unflippedCol, false, piece[0], alpha);
             drawSquare(unflippedRow+1, unflippedCol, false, piece[1], alpha);
             drawSquare(unflippedRow+1, unflippedCol+1, false, piece[2], alpha);
             drawSquare(unflippedRow, unflippedCol+1, false, piece[3], alpha);
-        } else {
-            drawSquare(unflippedRow, unflippedCol, false, null, alpha);
-            drawSquare(unflippedRow+1, unflippedCol, false, null, alpha);
-            drawSquare(unflippedRow+1, unflippedCol+1, false, null, alpha);
-            drawSquare(unflippedRow, unflippedCol+1, false, null, alpha);
         }
     } else {
         // x and y point to the top left corner of the square (flipped or not)
@@ -248,12 +256,7 @@ export function drawSquare(unflippedRow: number, unflippedCol: number, isTile: b
         ctx.fillStyle = fillStyles[1 - (unflippedRow + unflippedCol) % 2];
         ctx.fillRect(x, y, pitch, pitch);
 
-        // grab piece from the board, or use the argument
-        if (!piece && localGameState) {
-            piece = localGameState.board[unflippedRow][unflippedCol];
-        }
-
-        // draw piece (if we found one)
+        // draw piece
         if (piece && !Array.isArray(piece)) {
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = alpha;
@@ -281,18 +284,41 @@ export function highlightSquare(unflippedRow: number, unflippedCol: number, styl
                    (isTile ? 2 : 1)*pitch - ctx.lineWidth - 2*highlightSpace);
 }
 
+export function highlightMove(move: Move): void {
+    highlightSquare(move.fromRow, move.fromCol, "rgb(0 255 0 / 25%)", move.isTile);
+    highlightSquare(move.toRow, move.toCol, "rgb(0 255 0 / 75%)", move.isTile);
+    if (move.isTile) {
+        highlightSquare(move.fromRow, move.fromCol, "rgb(0 255 0 / 25%)", false);
+        highlightSquare(move.toRow, move.toCol, "rgb(0 255 0 / 75%)", false);
+    }
+}
+
 export function highlightLastMove(): void {
     if (!localGameState || localGameState.movesLog.length === 0) {
         return;
     }
-    
     const localLastMove = localGameState.movesLog.at(-1)!;
-    highlightSquare(localLastMove.fromRow, localLastMove.fromCol, "rgb(0 255 0 / 25%)", localLastMove.isTile);
-    highlightSquare(localLastMove.toRow, localLastMove.toCol, "rgb(0 255 0 / 75%)", localLastMove.isTile);
-    if (localLastMove.isTile) {
-        highlightSquare(localLastMove.fromRow, localLastMove.fromCol, "rgb(0 255 0 / 25%)", false);
-        highlightSquare(localLastMove.toRow, localLastMove.toCol, "rgb(0 255 0 / 75%)", false);
+    highlightMove(localLastMove);
+}
+
+export function clearSquareHighlight(unflippedRow: number, unflippedCol: number, isTile: boolean): void {
+    if (isTile) {
+        // force draw index to the top left corner
+        unflippedRow -= unflippedRow % 2;
+        unflippedCol -= unflippedCol % 2;   
+
+        clearSquareHighlight(unflippedRow, unflippedCol, false);
+        clearSquareHighlight(unflippedRow+1, unflippedCol, false);
+        clearSquareHighlight(unflippedRow+1, unflippedCol+1, false);
+        clearSquareHighlight(unflippedRow, unflippedCol+1, false);
+    } else {
+        highlightSquare(unflippedRow, unflippedCol, fillStyles[1 - (unflippedRow + unflippedCol) % 2], false);
     }
+}
+
+export function clearMoveHighlight(move: Move): void {
+    clearSquareHighlight(move.fromRow, move.fromCol, move.isTile);
+    clearSquareHighlight(move.toRow, move.toCol, move.isTile);
 }
 
 export function clearLastMoveHighlight(): void {
@@ -300,6 +326,5 @@ export function clearLastMoveHighlight(): void {
         return;
     }
     const localLastMove = localGameState.movesLog.at(-1)!;
-    drawSquare(localLastMove.fromRow, localLastMove.fromCol, localLastMove.isTile, null);
-    drawSquare(localLastMove.toRow, localLastMove.toCol, localLastMove.isTile, null);
+    clearMoveHighlight(localLastMove);
 }
