@@ -3,20 +3,23 @@ input[type=number][size="1"]{ width: 2em; }
 
 input[type=number][size="2"]{ width: 3em; }
 
+.boardAndChatContainer {
+    width: fit-content
+}
+
 .boardContainer {
     display: inline-flex; /* Aligns child elements horizontally by default */
+    width: fit-content;
     justify-content: left; /* Distributes space evenly between elements */
-    align-items: center; /* Aligns elements vertically in the center */
+    align-items: stretch; /* Aligns elements vertically in the center */
     border: 1px solid #ccc;
     padding: 10px;
 }
 
 .movesLogContainer {
-    display: grid;
-    place-items: center;
+    display: flex;
+    flex-direction: column;
     width: fit-content;
-    height: fit-content;
-    overflow: auto;
     border: 1px solid #ccc;
 }
 
@@ -27,21 +30,45 @@ input[type=number][size="2"]{ width: 3em; }
 
 .movesLogDiv {
     display: flex;
-    overflow: auto;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
     min-width: 120px;
     background-color: #f0f0f0;
     border: 1px solid #ccc;
 }
 
-
 .movesLogColumn {
     padding: 5px;
 }
 
-.chatDiv {
-    display: inline-flex;
-    justify-content: left; /* Distributes space evenly between elements */
-    align-items: top;
+
+.chatContainer {
+    display: flex;
+    gap: 5px;
+    height: fit-content;
     border: 1px solid #ccc;
     padding: 10px;
+}
+
+.chatDiv {
+    display: grid;
+    flex: 1;
+    height: fit-content;
+    border: 1px solid #ccc;
+}
+
+.chatLog {
+    width: 100%;
+    resize: vertical;
+}
+
+.chatEntryContainer {
+    display: flex;
+    width: 100%;
+    gap: 5px;
+}
+
+.chatEntry {
+    flex-grow: 1;
 }

@@ -76,43 +76,45 @@
             <button id="claimSpectator">Spectators</button><span id="spectatorInfo"></span> <br>
         </div>
 
-        <div id="boardContainer" class="boardContainer">
-            <div>
-                (<span id="initialTimeTop"></span>+<span id="incrementTop"></span>) <span id="timeLeftTop"></span> <br>
-                <canvas id="board" width="600" height="615"></canvas> <br>
-                (<span id="initialTimeBottom"></span>+<span id="incrementBottom"></span>) <span id="timeLeftBottom"></span> <br>
-            </div>
+        <div class="boardAndChatContainer">
+            <div>(<span id="initialTimeTop"></span>+<span id="incrementTop"></span>) <span id="timeLeftTop"></span></div>
+            <div id="boardContainer" class="boardContainer">
+                <div><canvas id="board"></canvas></div>
 
-            <div id="movesLogContainer" class="movesLogContainer">
-                <div class="movesLogDiv" id="movesLogDiv" readonly>
-                    <div class="movesLogColumn" contenteditable="true" id="movesLogColumnNum" readonly></div>
-                    <div class="movesLogColumn" contenteditable="true" id="movesLogColumnWhite" readonly></div>
-                    <div class="movesLogColumn" contenteditable="true" id="movesLogColumnBlack" readonly></div>
-                </div>
-                <br>
-                <div class="movesLogButtonsDiv">
-                    <button id="backwardAll">⏮</button>
-                    <button id="backward">←</button>
-                    <button id="forward">→</button>
-                    <button id="forwardAll">⏭</button>
+                <div id="movesLogContainer" class="movesLogContainer">
+                    <div class="movesLogDiv" id="movesLogDiv" readonly>
+                        <div class="movesLogColumn" contenteditable="true" id="movesLogColumnNum" readonly></div>
+                        <div class="movesLogColumn" contenteditable="true" id="movesLogColumnWhite" readonly></div>
+                        <div class="movesLogColumn" contenteditable="true" id="movesLogColumnBlack" readonly></div>
+                    </div>
+                    <div class="movesLogButtonsDiv">
+                        <button id="backwardAll">⏮</button>
+                        <button id="backward">←</button>
+                        <button id="forward">→</button>
+                        <button id="forwardAll">⏭</button>
+                    </div>
                 </div>
             </div>
-        </div>
+            <div>(<span id="initialTimeBottom"></span>+<span id="incrementBottom"></span>) <span id="timeLeftBottom"></span></div>
 
-        <div>
-            <button id="quitGame">Quit</button>
-            <button id="flipBoard">Flip board view</button>
-            <button id="rewind">Undo</button>
-            <button id="unlockRules">Unlock Rules</button>
-            <button id="pause">Pause</button>
-            <button id="draw">Offer Draw</button>
-            <button id="surrender">Surrender</button> <br>
-        </div>
-        
-        <div id="chatDiv" class="chatDiv">
             <div>
-                <textarea id="chatLog" rows="10" cols="70" readonly></textarea> <br>
-                <input type="text" id="chatEntry" size="67"/> <button id="sendChat">Send</button> <br>
+                <button id="quitGame">Quit</button>
+                <button id="flipBoard">Flip board view</button>
+                <button id="rewind">Undo</button>
+                <button id="unlockRules">Unlock Rules</button>
+                <button id="pause">Pause</button>
+                <button id="draw">Offer Draw</button>
+                <button id="surrender">Surrender</button> <br>
+            </div>
+            
+            <div id="chatContainer" class="chatContainer">
+                <div id="chatDiv" class="chatDiv">
+                    <textarea class="chatLog" id="chatLog" rows="10" readonly></textarea>
+                    <div class="chatEntryContainer">
+                        <input class="chatEntry" type="text" id="chatEntry"/> 
+                        <button id="sendChat">Send</button>
+                    </div>
+                </div>
             </div>
         </div>
 

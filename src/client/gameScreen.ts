@@ -48,6 +48,7 @@ export function showGame(gameId: number, password: string): void {
 // chat
 const sendChatButton = document.getElementById('sendChat') as HTMLButtonElement;
 const chatEntry = document.getElementById('chatEntry') as HTMLInputElement;
+const chatContainer = document.getElementById('chatContainer') as HTMLDivElement;
 sendChatButton!.addEventListener('click', () => {
     if (chatEntry.value.trim() !== '') {
         sendMessage({ type: MESSAGE_TYPES.CHAT,  message: chatEntry.value } satisfies ChatMessage);
@@ -59,6 +60,15 @@ chatEntry!.addEventListener('keypress', function (event) {
         sendChatButton?.click();
     }
 });
+
+const chatLog = document.getElementById('chatLog') as HTMLDivElement;
+const chatDiv = document.getElementById('chatDiv') as HTMLDivElement;
+function setChatHeight(): void {
+    chatContainer.style.height = `${chatDiv.offsetHeight}px`;
+}
+const resizeObserver = new ResizeObserver(setChatHeight);
+resizeObserver.observe(chatLog);
+setChatHeight();
 
 
 

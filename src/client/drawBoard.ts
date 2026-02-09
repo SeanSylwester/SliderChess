@@ -54,25 +54,21 @@ export function setFlip(doFlip: boolean): void {
 }
 
 const movesLogContainer = document.getElementById('movesLogContainer') as HTMLDivElement;
-const chatDiv = document.getElementById('chatDiv') as HTMLDivElement;
+const chatContainer = document.getElementById('chatContainer') as HTMLDivElement;
 const boardContainer = document.getElementById('boardContainer') as HTMLDivElement;
-const chatEntry = document.getElementById('chatEntry') as HTMLInputElement;
 const chatButtons = 400;  
 let isVertical: null | boolean = null;
+
 function setVeritcal(newIsVertical: boolean): void {
     if (newIsVertical === isVertical) return;
 
     isVertical = newIsVertical;
     if (isVertical) {
-        chatLogElement.cols = 35;
-        chatEntry.size = 28;
         try { boardContainer.removeChild(movesLogContainer); } catch {}
-        chatDiv.appendChild(movesLogContainer);
+        chatContainer.appendChild(movesLogContainer);
     } else {
-        try { chatDiv.removeChild(movesLogContainer); } catch {}
+        try { chatContainer.removeChild(movesLogContainer); } catch {}
         boardContainer.appendChild(movesLogContainer);
-        chatLogElement.cols = 70;
-        chatEntry.size = 67;
     }
 }
 export function updateBoardDimensions(): void {
@@ -100,12 +96,15 @@ export function updateBoardDimensions(): void {
     boardSize = pitch * 8;
     canvas.width = boardSize + textSpace;
     canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
+    boardContainer.style.height = `${canvas.height}px`;
 
+    /*
     if (isVertical) {
         movesLogDiv.style.height = '10em';
     } else {
         movesLogDiv.style.height = `${canvas.height - 40}px`;  // TODO: figure out why this is 40
     }
+    */
 
     if (!canvas.width) setTimeout(updateBoardDimensions, 100);
     renderFullBoard();
