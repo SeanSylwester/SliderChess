@@ -72,8 +72,7 @@ function setVeritcal(newIsVertical: boolean): void {
     }
 }
 export function updateBoardDimensions(): void {
-    const movesLogWidth = 215;//parseInt(movesLogElement.style.width.slice(0, -2)) + 20;  // slice off the "px"
-    const padding = 50;  // not sure how to calculate the padding and stuff around all the elements
+    const padding = 75;  // not sure how to calculate the padding and stuff around all the elements
 
     // TODO: make notation box fit better in vertical
     //movesLogElement.style.width = "215px";
@@ -87,7 +86,7 @@ export function updateBoardDimensions(): void {
         boardSpaceX = window.innerWidth - padding; 
     } else {
         setVeritcal(false);
-        boardSpaceX = window.innerWidth - movesLogWidth - padding; 
+        boardSpaceX = window.innerWidth - movesLogContainer.offsetWidth - padding; 
     }
     boardSpaceY = window.innerHeight - chatButtons - padding;
 
