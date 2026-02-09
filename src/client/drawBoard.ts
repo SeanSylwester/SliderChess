@@ -57,7 +57,8 @@ const movesLogContainer = document.getElementById('movesLogContainer') as HTMLDi
 const chatDiv = document.getElementById('chatDiv') as HTMLDivElement;
 const boardContainer = document.getElementById('boardContainer') as HTMLDivElement;
 const chatEntry = document.getElementById('chatEntry') as HTMLInputElement;
-let isVertical: undefined | boolean = undefined;
+const chatButtons = 400;  
+let isVertical: null | boolean = null;
 function setVeritcal(newIsVertical: boolean): void {
     if (newIsVertical === isVertical) return;
 
@@ -77,24 +78,22 @@ function setVeritcal(newIsVertical: boolean): void {
 export function updateBoardDimensions(): void {
     const movesLogWidth = 215;//parseInt(movesLogElement.style.width.slice(0, -2)) + 20;  // slice off the "px"
     const padding = 50;  // not sure how to calculate the padding and stuff around all the elements
-    const chatButtons = 400;  
 
     // TODO: make notation box fit better in vertical
     //movesLogElement.style.width = "215px";
 
-    setVeritcal(window.innerWidth < 600);
+    setVeritcal(window.innerWidth < 600 || window.innerHeight < 2*chatButtons);
 
     let boardSpaceX: number;
     let boardSpaceY: number;
     if (isVertical) {
         setVeritcal(true);
         boardSpaceX = window.innerWidth - padding; 
-        boardSpaceY = window.innerHeight - padding;
     } else {
         setVeritcal(false);
         boardSpaceX = window.innerWidth - movesLogWidth - padding; 
-        boardSpaceY = window.innerHeight - chatButtons - padding;
     }
+    boardSpaceY = window.innerHeight - chatButtons - padding;
 
     boardSize = Math.min(boardWidthMax, Math.min(boardSpaceX, boardSpaceY));
     pitch = Math.floor(boardSize / 8); // size of each square
