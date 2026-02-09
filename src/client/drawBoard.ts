@@ -66,10 +66,10 @@ function setVeritcal(newIsVertical: boolean): void {
     if (isVertical) {
         chatLogElement.cols = 35;
         chatEntry.size = 28;
-        boardContainer.removeChild(movesLogContainer);
+        try { boardContainer.removeChild(movesLogContainer); } catch {}
         chatDiv.appendChild(movesLogContainer);
     } else {
-        chatDiv.removeChild(movesLogContainer);
+        try { chatDiv.removeChild(movesLogContainer); } catch {}
         boardContainer.appendChild(movesLogContainer);
         chatLogElement.cols = 70;
         chatEntry.size = 67;
