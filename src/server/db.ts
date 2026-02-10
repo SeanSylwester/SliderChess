@@ -9,14 +9,16 @@ const table = process.env.DUMMY ? 'games_dummy' : 'games';
 export async function query(text: string, params: any): Promise<QueryArrayResult | undefined> {
   const start = Date.now()
   let res: QueryArrayResult;
+  const showParams = process.env.DUMMY ? params : {}
   try {
     res = await pool.query(text, params);
   } catch (err) {
+    console.log('Failed to execute query', { text, showParams })
     console.log(err);
     return;
   }
   const duration = Date.now() - start
-  console.log('executed query', { text, duration, rows: res.rowCount })
+  console.log('Successfully executed query', { text, showParams, duration, rows: res.rowCount })
   return res
 }
  
@@ -37,9 +39,10 @@ export async function close(): Promise<void> {
 
 // ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 'rules', 'result', 'cause', 'is_active', 'arrayfen', 'use_time_control'];
 export async function saveToDB(game: Game): Promise<QueryArrayResult | undefined> {
-    const colEqVal = game.getDBStr();
+    const {colNames, vals} = game.getDBStr();
+    const valsPlaceholders = vals.map((_, i) => `$${i + 1}`);
     try {
-        const res = await query(`UPDATE ${table} SET ${colEqVal} WHERE id = ${game.id};`, []);
+        const res = await query(`UPDATE ${table} SET (${colNames.join(', ')}) = (${valsPlaceholders.join(', ')}) WHERE id = $${valsPlaceholders.length + 1};`, [...vals, game.id]);
         return res;
     } catch (err) {
         console.log(err);
@@ -47,7 +50,7 @@ export async function saveToDB(game: Game): Promise<QueryArrayResult | undefined
 }
 
 export async function gameFromDB(gameId: number): Promise<Game | undefined> {
-    const db_rows: any = await query(`SELECT * FROM ${table} WHERE id = ${gameId};`, []);
+    const db_rows: any = await query(`SELECT * FROM ${table} WHERE id = $1;`, [gameId]);
     const db_row = db_rows.rows[0];
     if (!db_row) return;
 

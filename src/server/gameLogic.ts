@@ -175,33 +175,30 @@ export class Game {
         }
     }
 
-    public getDBStr(): string {
-        const cols = ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn',
-                      'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 
-                      'rules', 'result', 'cause', 'is_active', 'array_fen', 'use_time_control'];
+    public getDBStr(): {colNames: string[], vals: (string | null)[]} {
+        const colNames = ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn',
+                          'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 
+                          'rules', 'result', 'cause', 'is_active', 'array_fen', 'use_time_control'];
 
         let chatLogStr = this.chatLog.join('|');
         chatLogStr.replace(/\n/g, '|');  // some individual messages will have newlines in them. Replace those too. This will make them be treated as separate messages on reload but oh well
 
-        const vals = [this.password, this.lastNameWhite, this.lastNameBlack, chatLogStr, JSON.stringify(this.movesLog), this.currentTurn === PieceColor.WHITE,
+        const valsRaw = [this.password, this.lastNameWhite, this.lastNameBlack, chatLogStr, JSON.stringify(this.movesLog), this.currentTurn === PieceColor.WHITE,
                       this.initialTimeWhite, this.initialTimeBlack, this.incrementWhite, this.incrementBlack, this.timeLeftWhite, this.timeLeftBlack,
                       JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive, JSON.stringify(this.arrayFEN), this.useTimeControl];
-
-        let colEqVal = '';
-        for (let i = 0; i < cols.length; i++) {
-            if (i) colEqVal += ', ';
-            if (typeof vals[i] === 'string') {
-                colEqVal += `${cols[i]} = '${vals[i]}'`;
-            } else if (typeof vals[i] === 'boolean') {
-                colEqVal += `${cols[i]} = ${vals[i] ? 'TRUE' : 'FALSE'}`;
-            } else if (vals[i] === undefined) {
-                console.error('Undefined value when saving to db:', cols[i], vals[i]);
+        
+        const vals = valsRaw.map((val, i) => {
+            if (typeof val === 'boolean') {
+                return val ? 'TRUE' : 'FALSE';
+            } else if (val === undefined || val === null) {
+                console.error('Undefined or null value when saving to db:', colNames[i], val);
+                return null;
             } else {
-                colEqVal += `${cols[i]} = ${vals[i]}`;
+                return `${val}`;
             }
-        }
+        });
 
-        return colEqVal;
+        return {colNames, vals};
     }
 
     public updateLastNames(): void {
@@ -412,22 +409,22 @@ export class Game {
                 if (match.groups!.time) {
                     // total time is the new time setting plus the already elapsed time
                     const elapsedTime = this.initialTimeWhite - this.timeLeftWhite;
-                    this.timeLeftWhite = parseFloat(match.groups!.time) * 60;
+                    this.timeLeftWhite = parseInt(match.groups!.time) * 60;
                     this.initialTimeWhite = this.timeLeftWhite + elapsedTime;
                 }
                 if (match.groups!.increment) {
-                    this.incrementWhite = parseFloat(match.groups!.increment);
+                    this.incrementWhite = parseInt(match.groups!.increment);
                 }
             }
             if (match.groups!.colors.includes('b')) {
                 if (match.groups!.time) {
                     // total time is the new time setting plus the already elapsed time
                     const elapsedTime = this.initialTimeBlack - this.timeLeftBlack;
-                    this.timeLeftBlack = parseFloat(match.groups!.time) * 60;
+                    this.timeLeftBlack = parseInt(match.groups!.time) * 60;
                     this.initialTimeBlack = this.timeLeftBlack + elapsedTime;
                 }
                 if (match.groups!.increment) {
-                    this.incrementBlack = parseFloat(match.groups!.increment);
+                    this.incrementBlack = parseInt(match.groups!.increment);
                 }
             }
             this.syncTime();

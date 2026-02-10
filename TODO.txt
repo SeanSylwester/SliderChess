@@ -1,12 +1,9 @@
 before sharing:
-    database
-        sanitize inputs
     more admin commands
 
     bug report button
     credits page for SVG attribution
     updates page for version history
-    accept cookies banner
 
     change admin password
     sliderchess.com domain?

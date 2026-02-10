@@ -177,8 +177,8 @@ createConfirmButton!.addEventListener('click', (event) => {
     event.preventDefault();
     sendMessage({ type: MESSAGE_TYPES.CREATE_GAME, 
                   useTimeControl: useTimeControl.checked,
-                  initialTime: 60*parseFloat(createTimeInput.value),
-                  increment: parseFloat(createIncrementInput.value),
+                  initialTime: 60*parseInt(createTimeInput.value),
+                  increment: parseInt(createIncrementInput.value),
                   password: createPasswordInput.value } satisfies CreateGameMessage);
     createGameDialog.close();
 });
