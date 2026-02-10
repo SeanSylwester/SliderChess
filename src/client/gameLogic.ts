@@ -141,12 +141,11 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     chatLogElement.scrollTop = chatLogElement.scrollHeight;
     redrawMovesLog();
 
-    if (localGameState.isActive) {
-        boardToRender = localGameState.board
-        movePointer = Number.POSITIVE_INFINITY;
-    } else {
-        updateMovePointer(localGameState.movesLog.length - 1);
-    }
+    // start with the loaded board, and repoint to the loaded board on move()
+    // updateMovePointer can pull focus to the alternate board
+    boardToRender = localGameState.board
+    movePointer = Number.POSITIVE_INFINITY;
+
     renderFullBoard();
     highlightLastMove();
     selectedSquare = null;
@@ -360,6 +359,13 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         return;
     }
 
+    // if we've been scrolling, then point to the gameState board and redraw to prep for this move
+    if (movePointer !== Number.POSITIVE_INFINITY) {
+        movePointer = Number.POSITIVE_INFINITY;
+        boardToRender = localGameState.board;
+        renderFullBoard();
+    }
+
     // do the move!
     const {oldPiece, newPiece, enPassant} = moveOnBoard(localGameState.board, fromRow, fromCol, toRow, toCol, isTile, promotions);
     if (isTile) {
@@ -445,7 +451,7 @@ export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYP
 // archived game scrolling
 export let boardToRender = getDefaultBoard();
 function scrollToMove(moveNum: number): void {
-    if (!localGameState || localGameState.isActive) return;
+    if (!localGameState) return;
 
     boardToRender = getDefaultBoard();
     for (let i = 0; i < Math.min(moveNum + 1, localGameState.movesLog.length); i++) {
@@ -456,13 +462,13 @@ function scrollToMove(moveNum: number): void {
     if (moveNum >= 0) highlightMove(localGameState.movesLog.at(moveNum)!)
 }
 export function updateMovePointer(newNum: number): void {
-    if (!localGameState || localGameState.isActive) return;
+    if (!localGameState) return;
+
+    if (newNum === Number.POSITIVE_INFINITY) newNum = localGameState.movesLog.length - 2;
 
     movePointer = Math.min(localGameState.movesLog.length - 1, Math.max(newNum, 0));
-    if (localGameState && !localGameState.isActive) {
-        scrollToMove(movePointer);
-        boldMovePointer(movePointer);
-    }
+    scrollToMove(movePointer);
+    boldMovePointer(movePointer);
 }
 const backwardButton = document.getElementById('backward')! as HTMLButtonElement;
 backwardButton.addEventListener('click', () => updateMovePointer(movePointer - 1));
