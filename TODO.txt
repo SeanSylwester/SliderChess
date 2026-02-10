@@ -4,7 +4,6 @@ before sharing:
         only load games from DB as they're requested
         delete game from games<> when the last player disconnects
         don't recreate gameList on every change
-    save oldID and oldName to local storage
     more admin commands
 
     bug report button

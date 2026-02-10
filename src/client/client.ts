@@ -7,7 +7,6 @@ let ws: WebSocket;
 let reconnectAttempts = 0;
 let reconnectMax = 10;
 export let myGameId = 0;
-export let myClientId = 0;
 export let fromHistory = false;
 
 function connectWebSocket(): void {
@@ -19,14 +18,18 @@ function connectWebSocket(): void {
 
     ws.onopen = () => {
         (window as any).ws = ws;
+        const oldName = localStorage.getItem('oldName') || '';
+        const oldId = parseInt(localStorage.getItem('oldId') || '0');
         if (reconnectAttempts) {
             console.log('Successfully reconnected to the WebSocket server!');
             if (localGameState) console.log('Trying to reconnect to my game');
             reconnectAttempts = 0;
-            sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: myClientId, clientName: playerNameEntry.value, gameState: localGameState } satisfies ReconnectMessage);
+            sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: oldId, clientName: oldName!, gameState: localGameState } satisfies ReconnectMessage);
         } else {
             console.log('Connected to WebSocket server');
-            sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: '' } satisfies ChangeNameMessage);  // sync my name with the server
+            sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: oldName } satisfies ChangeNameMessage);  // sync my name with the server
+            
+            // if we're connecting from a URL, then request to join it now
             if (!isNaN(gameId)) {
                 fromHistory = true;
                 requestJoinGame(gameId);
@@ -39,7 +42,8 @@ function connectWebSocket(): void {
         switch (message.type) {
             case MESSAGE_TYPES.CHANGE_NAME:
                 playerNameEntry.value = message.name;
-                if (message.clientId) myClientId = message.clientId;
+                localStorage.setItem('oldName', message.name);
+                localStorage.setItem('oldId', `${message.clientId}`);
                 break;
             case MESSAGE_TYPES.GAME_LIST:
                 updateGameList(message.gameList, message.nClients);

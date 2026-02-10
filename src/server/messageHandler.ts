@@ -184,7 +184,7 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
     serveLobby(client);
 }
 
-function handleChangeName(client: ClientInfo, name: string): void {
+export function handleChangeName(client: ClientInfo, name: string): void {
     const oldName = client.name;
     if (name.startsWith('admin|')) {
         // try to login as admin, with the password after the pipe
@@ -192,10 +192,10 @@ function handleChangeName(client: ClientInfo, name: string): void {
             client.isAdmin = true;
             client.name = 'admin';
             console.log('Someone logged in as admin')
-            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name } satisfies ChangeNameMessage)
+            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name, clientId: client.id } satisfies ChangeNameMessage)
         } else {
             console.error('Someone tried and failed to login as admin');
-            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: 'naughty boy' } satisfies ChangeNameMessage)
+            sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: 'naughty boy', clientId: client.id } satisfies ChangeNameMessage)
         }
         console.log(client.ip);
     } else if (name === '') {
@@ -206,6 +206,6 @@ function handleChangeName(client: ClientInfo, name: string): void {
         client.name = name;
         console.log(`Client ${client.id} changed name from ${oldName} to ${client.name}`);
         updateGameList();
-        sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name } satisfies ChangeNameMessage);
+        sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name, clientId: client.id } satisfies ChangeNameMessage);
     }
 }

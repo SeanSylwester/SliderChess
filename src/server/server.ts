@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 import { Game } from './gameLogic.js';
-import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGame } from './messageHandler.js';
+import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGame, handleChangeName } from './messageHandler.js';
 import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState } from '../shared/types.js';
 import * as db from './db.js';
 import { QueryArrayResult } from 'pg';
@@ -223,7 +223,7 @@ export function handleReconnect(client: ClientInfo, clientOldId: number, clientO
 
     // try to reconnect client to old id and name
     console.log(`Reconnecting client ${client.id} (was ${clientOldId}) to their old name (${clientOldName})`);
-    client.name = clientOldName;
+    handleChangeName(client, clientOldName);
     
     if (!gameState || !gameState.id) return;
 
