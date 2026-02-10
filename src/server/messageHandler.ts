@@ -1,10 +1,10 @@
 import { Game } from './gameLogic.js';
-import { updateGameList as updateGameList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect, loadedFromDB } from './server.js';
+import { updateGameInList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect, getGame, gameList } from './server.js';
 import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState, GameResultCause } from '../shared/types.js';
 import { saveToDB, storeNewGame } from './db.js';
 
 
-export function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): void {
+export async function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): Promise<void> {
     const message = JSON.parse(data.toString());
 
     // lookup the game that the client is in for most message types
@@ -16,7 +16,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             console.error(`Client ${client.id} is not in a game.`);
             return;
         }
-        game = games.get(client.gameId);
+        game = await getGame(client.gameId);
         if (game === undefined) {
             console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
             return;
@@ -25,7 +25,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
     switch (message.type) {
         case MESSAGE_TYPES.CREATE_GAME:
-            handleCreateGame(client, games, message.useTimeControl, message.initialTime, message.increment, message.password);
+            handleCreateGame(client, games, message.useTimeControl, message.initialTime, message.increment, message.password, true);
             break;
 
         case MESSAGE_TYPES.JOIN_GAME:
@@ -34,7 +34,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
 
         case MESSAGE_TYPES.CHANGE_POSITION:
             game!.changePosition(client, message.position);
-            updateGameList();
+            updateGameInList(game!);
             break;
 
         case MESSAGE_TYPES.QUIT_GAME:
@@ -78,7 +78,6 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
             break;
 
         case MESSAGE_TYPES.GAME_LIST:
-            updateGameList();
             sendGameList(client);
             break;
         
@@ -88,6 +87,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
         
         case MESSAGE_TYPES.GAME_PASSWORD:
             game!.setPassword(message.password, client);
+            updateGameInList(game!);
             pushGameList();
             break;
 
@@ -109,7 +109,7 @@ export function handleMessage(data: Buffer, client: ClientInfo, games: Map<numbe
     }
 }
 
-async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, useTimeControl: boolean, initialTime: number, increment: number, password: string): Promise<Game | undefined> {
+async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, useTimeControl: boolean, initialTime: number, increment: number, password: string, pushList: boolean): Promise<Game | undefined> {
     console.log(`Creating game for client ${client.id}`);
 
     // store new game in the DB and get the ID
@@ -120,7 +120,8 @@ async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, us
         games.set(newGame.id, newGame);
 
         handleJoinGame(client, games, newGame.id, password); // note: this will updateGameList() when the client is assigned to a position
-        pushGameList();
+        gameList.push(newGame.getGameInfo());
+        if(pushList) pushGameList();
         return newGame;
     } else {
         console.error('Failed to create new game');
@@ -128,26 +129,27 @@ async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, us
 }
 
 export async function handleCreateGameFromState(client: ClientInfo, games: Map<number, Game>, gameState: GameState): Promise<void> {
-    const game = await handleCreateGame(client, games, gameState.useTimeControl, gameState.initialTimeWhite, gameState.incrementWhite, gameState.password);
+    const game = await handleCreateGame(client, games, gameState.useTimeControl, gameState.initialTimeWhite, gameState.incrementWhite, gameState.password, false);
     if (game) {
         game.loadFromState(gameState);
+        updateGameInList(game);
         pushGameList();
     }
 }
 
-export function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): void {
+export async function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): Promise<void> {
     if (client.gameId) {
         console.error(`Client ${client.id} is already in a game (${client.gameId}), cannot join another.`);
         return;
     }
 
-    const game = games.get(gameId);
+    const game = await getGame(gameId);
     if (game) {
         // allow join to admins, unlocked games, or locked games if the provided password matches
         if (client.isAdmin || !game.password || (password && password === game.password)) {
             game.addPlayer(client);
             client.gameId = gameId;
-            updateGameList();
+            updateGameInList(game);
             serveGameRoom(client, game.password);
         } else {
             sendMessage(client, { type: MESSAGE_TYPES.REJECT_JOIN_GAME, gameId: gameId } satisfies RejectJoinGameMessage);
@@ -158,13 +160,14 @@ export function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gam
     }
 }
 
-export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): void {
+export async function handleQuitGame(client: ClientInfo, games: Map<number, Game>): Promise<void> {
     if (!client.gameId) {
         console.error(`Client ${client.id} is not in a game, cannot quit. Sending them to the lobby`);
         serveLobby(client);
         return;
     }
-    const game = games.get(client.gameId);
+    const position = client.gamePosition;
+    const game = await getGame(client.gameId);
     client.gameId = 0;
     client.gamePosition = PieceColor.NONE;
 
@@ -175,12 +178,13 @@ export function handleQuitGame(client: ClientInfo, games: Map<number, Game>): vo
             if (game.result !== GameResultCause.ONGOING) game.isActive = false;
 
             saveToDB(game);
+            games.delete(game.id);
         }
+        updateGameInList(game);
     } else {
         console.error(`Game with ID ${client.gameId} not found for client ${client.id}`);
     }
 
-    updateGameList();
     serveLobby(client);
 }
 
@@ -205,7 +209,6 @@ export function handleChangeName(client: ClientInfo, name: string): void {
         // normal name change request
         client.name = name;
         console.log(`Client ${client.id} changed name from ${oldName} to ${client.name}`);
-        updateGameList();
         sendMessage(client, { type: MESSAGE_TYPES.CHANGE_NAME, name: client.name, clientId: client.id } satisfies ChangeNameMessage);
     }
 }

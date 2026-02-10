@@ -138,7 +138,6 @@ export const SCREENS = {
 
 
 export enum ADMIN_COMMANDS {
-    GAME_DELETE,
     GAME_GET_IDS,
     GAME_KICK_PLAYER,
     GAME_DEMOTE_PLAYER,

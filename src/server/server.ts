@@ -55,7 +55,24 @@ let clientIdCounter = 1;
 
 // Store list of games
 let games = new Map<number, Game>();
-let gameList: GameInfo[] = [];
+export let gameList: GameInfo[] = [];
+
+export async function getGame(gameId: number): Promise<Game | undefined> {
+    let game: Game | undefined;
+    
+    // first, check our games map in ram
+    game = games.get(gameId);
+    if (game) return game;
+
+    // if it's not loaded, try to load it from the DB
+    game = await db.gameFromDB(gameId);
+    if (game) {
+        games.set(gameId, game);
+        return game;
+    }
+
+    return;
+}
 
 export function sendMessage<T extends Message>(client: ClientInfo, message: T): void {
     if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
@@ -65,10 +82,10 @@ export function sendMessage<T extends Message>(client: ClientInfo, message: T): 
     }
 }
 
-export function updateGameList() {
-    // TODO: probably don't need to recreate the whole array each time...
-    gameList = [];
-    for (const game of games.values()) {
+export function updateGameInList(game: Game): void {
+    const gameListIdx = gameList.findIndex(el => el.gameId === game.id);
+    if (gameListIdx !== -1) {
+        gameList.splice(gameListIdx, 1);
         gameList.push(game.getGameInfo());
     }
 }
@@ -78,7 +95,6 @@ export function sendGameList(client: ClientInfo): void {
 }
 
 export function pushGameList(): void {
-    updateGameList();
     clients.forEach((client) => {
         if (!client.gameId) {
             // only push to clients that aren't in a game
@@ -121,7 +137,7 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
 
     // lookup the game that the client is in for most message types
     let game: Game | undefined;
-    if ([ADMIN_COMMANDS.GAME_DELETE, ADMIN_COMMANDS.GAME_GET_IDS, ADMIN_COMMANDS.GAME_KICK_PLAYER, 
+    if ([ADMIN_COMMANDS.GAME_GET_IDS, ADMIN_COMMANDS.GAME_KICK_PLAYER, 
         ADMIN_COMMANDS.GAME_DEMOTE_PLAYER, ADMIN_COMMANDS.GAME_UNLOCK_RULES].includes(command)) {
         game = games.get(data.gameId);
         if (game === undefined) {
@@ -130,15 +146,6 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
         }
     }
     switch (command) {
-        case ADMIN_COMMANDS.GAME_DELETE:
-            game!.logChatMessage('Server is killing this game. You can stay here but the connection will be broken');
-            for (const client of game!.allClients()) {
-                client.gameId = 0;
-            }
-            games.delete(data.gameId);
-            pushGameList();
-            break;
-
         case ADMIN_COMMANDS.GAME_GET_IDS:
             sendLog(admin, game!.allClients());
             break;
@@ -166,8 +173,7 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
             break;
         
         case ADMIN_COMMANDS.REFRESH_DB:
-            getGamesFromDB();
-            pushGameList();
+            getGamesListFromDB();
             break;
         
         case ADMIN_COMMANDS.FORCE_SAVE_ALL:
@@ -214,7 +220,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     });
 });
 
-export function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState | undefined): void {
+export async function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState | undefined): Promise<void> {
     // wait until we've heard from the DB to do any reconnections
     if (!loadedFromDB) {
         setTimeout(() => handleReconnect(client, clientOldId, clientOldName, gameState), 1000);
@@ -229,7 +235,7 @@ export function handleReconnect(client: ClientInfo, clientOldId: number, clientO
 
     // if the client says that they're in a game, then try to reconnect them
     //   if we don't have the indicated game, then make a new game and load from the client's gameState
-    const game = games.get(gameState.id);
+    const game = await getGame(gameState.id);
     if (game) {
         console.log(` and also connecting client ${client.id} to game ${gameState.id}, if they have the right password`);
         handleJoinGame(client, games, gameState.id, gameState.password);
@@ -255,27 +261,20 @@ server.listen(PORT, () => {
     console.log(`WebSocket server is ready for connections`);
 });
 
-// get games from DB and update the games map
+// get gameInfo[] from DB
 export let loadedFromDB = false;
-async function getGamesFromDB() {
-    const newGames = new Map<number, Game>();
+async function getGamesListFromDB() {
     if (process.env.DUMMY) await db.createDummyTable();
-    const db_rows = await db.gamesFromDB();
-    if(db_rows) {
-        for (let i = 0; i < db_rows.rows.length; i++) {
-            const db_row: any = db_rows.rows[i];
-            const game = new Game(db_row.id, false, 0, 0, '');
-            game.loadFromDB(db_row);
-            newGames.set(db_row.id, game);
-            updateGameList();
-        }
-    }
-    games = newGames;
-    pushGameList();
+
+    const newGameList = await db.gamesListFromDB();
     loadedFromDB = true;  // set this even if it failed
-    console.log(`Loaded ${newGames.size} games from DB`);
+    if(!newGameList) return;
+
+    gameList = newGameList;
+    pushGameList();
+    console.log(`Loaded ${newGameList.length} games from DB`);
 }
-getGamesFromDB();
+getGamesListFromDB();
 
 
 // this line from gemini, not sure if needed :
@@ -301,7 +300,7 @@ async function gracefulExit(term: string) {
             });
         });
 
-        // tell all the games that they're getting shut down
+        // tell all the active games currently in memory that they're getting shut down
         for (const [gameId, game] of games) {
             if (game.isActive && !game.isEmpty()) {
                 game.logChatMessage('SERVER SHUTTING DOWN! Trying to save game to database...|  Keep this tab open just in case the DB write fails to avoid losing your game');
@@ -319,7 +318,7 @@ async function gracefulExit(term: string) {
         await closeServer;
         console.log('  HTTP server closed');
 
-        // save all games
+        // save all active games currently in memory
         console.log('Trying to save games');
         const promises: Promise<QueryArrayResult | undefined>[] = [];
         for (const [gameId, game] of games) {
