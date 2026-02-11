@@ -18,6 +18,16 @@
     <div id="lobby-screen" style="display: block;">
         <h1>SliderChess Lobby (<span id="nClients">1</span> Players Connected)</h1>
         <span>Name:<input type="text" id="playerName"/> <button id="updateName">Update</button></span>
+
+        <h2>Global chat</h2>
+        <div id="globalChatDiv" style="max-width: 600px;">
+            <textarea class="chatLog" id="globalChatLog" rows="10" readonly></textarea>
+            <div class="chatEntryContainer">
+                <input class="chatEntry" type="text" size="1" id="globalChatEntry"/> 
+                <button id="sendGlobalChat">Send</button>
+            </div>
+        </div>
+
         <h2>Game List (<span id="nGames">1</span> Active Games)</h2>
         <button id="refreshGameList">Refresh</button>
         <button id="createGame">Create game</button>

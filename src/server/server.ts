@@ -12,7 +12,7 @@ const __dirname = dirname(__filename);
 
 import { Game } from './gameLogic.js';
 import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGame, handleChangeName } from './messageHandler.js';
-import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState } from '../shared/types.js';
+import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState, GlobalChatMessage } from '../shared/types.js';
 import * as db from './db.js';
 import { QueryArrayResult } from 'pg';
 import { gameInfoFromGameState } from '../shared/utils.js';
@@ -103,6 +103,15 @@ export function pushGameList(): void {
     });
 }
 
+export function sendGlobalChat(message: string): void {
+    clients.forEach((client) => {
+        if (!client.gameId) {
+            // only push to clients that aren't in a game
+            sendMessage(client, { type: MESSAGE_TYPES.GLOBAL_CHAT, message: message } satisfies GlobalChatMessage);
+        }
+    });
+}
+
 // functions to force a client to change screens to a game room (by JOIN_GAME), or the lobby (by QUIT_GAME)
 export function serveGameRoom(client: ClientInfo, password: string): void {
     if (clients.has(client.ws)) {
@@ -139,7 +148,7 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
     let game: Game | undefined;
     if ([ADMIN_COMMANDS.GAME_GET_IDS, ADMIN_COMMANDS.GAME_KICK_PLAYER, 
         ADMIN_COMMANDS.GAME_DEMOTE_PLAYER, ADMIN_COMMANDS.GAME_UNLOCK_RULES].includes(command)) {
-        game = games.get(data.gameId);
+        game = games.get(data.gameId);  // not grabbing game from DB here. Just join the game first to handle the save/load properly elsewhere
         if (game === undefined) {
             console.error(`Game with ID ${data.gameId} not found`);
             return;
@@ -197,6 +206,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
     // send current game list
     sendGameList(clientInfo);
+    sendMessage(clientInfo, { type: MESSAGE_TYPES.GLOBAL_CHAT, message: 'Welcome to SliderChess!' } satisfies GlobalChatMessage);
 
     // Handle messages from client
     ws.on('message', (data: Buffer) => {

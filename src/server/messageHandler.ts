@@ -1,5 +1,5 @@
 import { Game } from './gameLogic.js';
-import { updateGameInList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect, getGame, gameList } from './server.js';
+import { updateGameInList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect, getGame, gameList, sendGlobalChat } from './server.js';
 import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState, GameResultCause } from '../shared/types.js';
 import { saveToDB, storeNewGame } from './db.js';
 
@@ -67,6 +67,10 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
 
         case MESSAGE_TYPES.CHAT:
             game!.logChatMessage(message.message, client);
+            break;
+
+        case MESSAGE_TYPES.GLOBAL_CHAT:
+            sendGlobalChat(`${client.name}: ${message.message}`);
             break;
 
         case MESSAGE_TYPES.RULES:

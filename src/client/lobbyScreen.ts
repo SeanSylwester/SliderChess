@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage, GameScore, GameResultCause, PieceColor } from "../shared/types.js";
+import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage, GameScore, GameResultCause, PieceColor, GlobalChatMessage } from "../shared/types.js";
 import { formatMinSec } from '../shared/utils.js'
 import { sendMessage, fromHistory } from './client.js'
 
@@ -64,6 +64,27 @@ playerNameEntry!.addEventListener('keypress', function (event) {
         updateNameButton?.click();
     }
 });
+
+// global chat
+const sendGlobalChatButton = document.getElementById('sendGlobalChat')! as HTMLButtonElement;
+const globalChatEntry = document.getElementById('globalChatEntry')! as HTMLInputElement;
+sendGlobalChatButton.addEventListener('click', () => {
+    if (globalChatEntry.value.trim() !== '') {
+        sendMessage({ type: MESSAGE_TYPES.GLOBAL_CHAT,  message: globalChatEntry.value } satisfies GlobalChatMessage);
+        globalChatEntry.value = '';
+    }
+});
+globalChatEntry!.addEventListener('keypress', function (event) {
+    if (event.key === "Enter") {
+        sendGlobalChatButton.click();
+    }
+});
+const globalChatLog = document.getElementById('globalChatLog')! as HTMLTextAreaElement;
+export function updateGlobalChat(message: string): void {
+    const atBottom = globalChatLog.scrollHeight - globalChatLog.scrollTop <= globalChatLog.clientHeight + 1;
+    globalChatLog.value += "\n" + message;
+    if (atBottom) globalChatLog.scrollTop = globalChatLog.scrollHeight;
+}
 
 
 // game list

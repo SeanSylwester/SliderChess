@@ -161,6 +161,7 @@ export const MESSAGE_TYPES = {
     PAUSE: 'pause',
     TIME: 'time',
     CHAT: 'chat',
+    GLOBAL_CHAT: 'globalChat',
     GAME_STATE: 'gameState',
     GAME_LIST: 'gameList',
     RULES: 'rules',
@@ -224,6 +225,10 @@ export interface TimeMessage extends Message {
 }
 export interface ChatMessage extends Message {
     type: typeof MESSAGE_TYPES.CHAT;
+    message: string;
+}
+export interface GlobalChatMessage extends Message {
+    type: typeof MESSAGE_TYPES.GLOBAL_CHAT;
     message: string;
 }
 export interface GameStateMessage extends Message {

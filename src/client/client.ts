@@ -1,6 +1,6 @@
 import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage, RulesMessage } from "../shared/types.js";
 import { move, localGameState, initLocalGameState, clearLocalGameState, updateChat } from "./gameLogic.js";
-import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry } from './lobbyScreen.js'
+import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry, updateGlobalChat } from './lobbyScreen.js'
 import { showGame, updatePassword, updateRules, sendRules, updateRulesAgreement } from './gameScreen.js'
 import { syncTime } from "./timer.js";
 let ws: WebSocket;
@@ -70,6 +70,9 @@ function connectWebSocket(): void {
                 break;
             case MESSAGE_TYPES.CHAT:
                 updateChat(message.message);
+                break;
+            case MESSAGE_TYPES.GLOBAL_CHAT:
+                updateGlobalChat(message.message);
                 break;
             case MESSAGE_TYPES.TIME:
                 syncTime(message.clockRunning, message.timeLeftWhite, message.timeLeftBlack, message.initialTimeWhite, message.initialTimeBlack, message.incrementWhite, message.incrementBlack);
