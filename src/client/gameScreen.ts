@@ -217,7 +217,9 @@ function getRules(): Rules {
             ruleIgnoreAll: ruleIgnoreAll.checked};
 }
 export function sendRules(): void {
-    sendMessage({type: MESSAGE_TYPES.RULES, rules: getRules()} satisfies RulesMessage);
+    const newRules = getRules();
+    setRules(newRules);
+    sendMessage({type: MESSAGE_TYPES.RULES, rules: newRules} satisfies RulesMessage);
 }
 export function disableRules(): void {
     if (rulesLocked || (localGameState && !localGameState.isActive) || myColor === PieceColor.NONE) {
