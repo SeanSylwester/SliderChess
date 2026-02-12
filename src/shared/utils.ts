@@ -976,7 +976,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
 
             // check for castling
             // TODO: make castling rules work
-            if (piece.type === PieceType.KING) {
+            if (piece.type === PieceType.KING && !isInCheck) {
                 if (piece.color === PieceColor.WHITE) {
                     if (KW 
                             && board[0][5].type === PieceType.EMPTY && board[0][6].type === PieceType.EMPTY 

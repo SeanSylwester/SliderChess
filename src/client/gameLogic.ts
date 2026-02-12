@@ -267,6 +267,8 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
         highlightLastMove();
 
     }
+    renderFullBoard();
+    highlightLastMove();
     ctx.stroke();
 }
 
@@ -423,6 +425,9 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
     
     // Update the current turn
     localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
+
+    renderFullBoard();
+    highlightLastMove();
 
     ctx.stroke();
 }
