@@ -1,6 +1,6 @@
 export interface Move {
     oldPiece: Piece;
-    newPiece: Piece;
+    newPiece: Piece;  // NOTE: for a promoted pawn, this still is of type PAWN
     fromRow: number;
     fromCol: number;
     toRow: number;
@@ -71,7 +71,7 @@ export enum GameResultCause {
     BLACK_IN_STALEMATE = 'BLACK_IN_STALEMATE',
     THREEFOLD_REPETITION = 'THREEFOLD_REPETITION',
     FIFTY_MOVE = 'FIFTY_MOVE',
-    INSUFFICIENT_MATERIAL = 'INSUFFICIENT_MATERIAL', // todo
+    INSUFFICIENT_MATERIAL = 'INSUFFICIENT_MATERIAL', // TODO
     ONGOING = 'ONGOING',
 }
 export const GameScore = new Map<GameResultCause, string>([

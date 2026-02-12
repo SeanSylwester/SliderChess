@@ -315,7 +315,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
 
 
             // find pieces that can move here
-            const possiblePieces = getPiecesThatCanReach(toRow, toCol, pieceType, color, newBoard, undefined);
+            const possiblePieces = getPiecesThatCanReach(toRow, toCol, pieceType, color, newBoard, movesLog.at(-1));
             if (!possiblePieces) {
                 return `Couldn't find a valid piece to move to this spot ${move}`;
             }
@@ -337,12 +337,15 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
             if (!foundOne) {
                 return `None of the possible pieces match the notation ${move}`;
             }
-            const oldPiece = newBoard[fromRow!][fromCol!];
-            if (pieceType === PieceType.PAWN && oldPiece.type === PieceType.EMPTY) {
-                // TODO: en passant
-            }
+            const newPiece = newBoard[fromRow!][fromCol!];
+            const oldPiece = newBoard[toRow][toCol];
             newBoard[fromRow!][fromCol!] = { type: PieceType.EMPTY, color: PieceColor.NONE };
             newBoard[toRow][toCol] =  {type: pieceType, color: color};
+
+            // en passant: remove pawn
+            if (pieceType === PieceType.PAWN && oldPiece.type === PieceType.EMPTY && move.includes('x')) {
+                newBoard[fromRow!][toCol!] = { type: PieceType.EMPTY, color: PieceColor.NONE };
+            } 
 
             // handle promotion
             const matchPromo = promoRe.exec(move);
@@ -351,7 +354,7 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
                 newBoard[toRow][toCol] = { type: pieceTypeFromChar(matchPromo.groups!.piece), color: color };
                 promotions.push({ row: toRow, col: toCol, piece: newBoard[toRow][toCol] });
             }
-            movesLog.push({oldPiece: oldPiece, newPiece: newBoard[toRow][toCol], fromRow: fromRow!, fromCol: fromCol!, 
+            movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow!, fromCol: fromCol!, 
                            toRow: toRow, toCol: toCol, notation: move, isTile: false, promotions: promotions});
         }
         color = color === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
@@ -842,7 +845,6 @@ export function tileCanMove(row: number, col: number, board: Piece[][], playerCo
     row -= row % 2;
     col -= col % 2;
 
-    // TODO: make tile moving rules work
     const pieces = getPiecesOnTile(row, col, board);
     for (const [idx, piece] of pieces.entries()) {
         // disallow moving own king

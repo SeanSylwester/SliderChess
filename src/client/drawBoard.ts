@@ -73,10 +73,6 @@ function setVeritcal(newIsVertical: boolean): void {
 }
 export function updateBoardDimensions(): void {
     const padding = 75;  // not sure how to calculate the padding and stuff around all the elements
-
-    // TODO: make notation box fit better in vertical
-    //movesLogElement.style.width = "215px";
-
     setVeritcal(window.innerWidth < 600 || window.innerHeight < 2*chatButtons);
 
     let boardSpaceX: number;
@@ -96,14 +92,6 @@ export function updateBoardDimensions(): void {
     canvas.width = boardSize + textSpace;
     canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
     boardContainer.style.height = `${canvas.height}px`;
-
-    /*
-    if (isVertical) {
-        movesLogDiv.style.height = '10em';
-    } else {
-        movesLogDiv.style.height = `${canvas.height - 40}px`;  // TODO: figure out why this is 40
-    }
-    */
 
     if (!canvas.width) setTimeout(updateBoardDimensions, 100);
     renderFullBoard();
