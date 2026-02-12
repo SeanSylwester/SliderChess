@@ -397,6 +397,8 @@ export function findKing(playerColor: PieceColor, board: Piece[][]): [row: numbe
 
 export function getPiecesOnTile(row: number, col: number, board: Piece[][]): Piece[] {
     // order is clockwise starting from the bottom left
+    row -= row % 2;
+    col -= col % 2;
     return [board[row][col], 
             board[row+1][col],
             board[row+1][col+1], 

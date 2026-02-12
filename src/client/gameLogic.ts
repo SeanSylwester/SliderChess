@@ -264,7 +264,6 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
         validSquares = null;
 
         // redo the last move highlight
-        renderFullBoard();  // TODO: remove this once I fix the hover glitch
         highlightLastMove();
 
     }
@@ -284,8 +283,8 @@ function handleHover(offsetX: number, offsetY: number): void {
 
     // clear previous hover
     if (hover.prevWasValid) {
-        clearSquareHighlight(selectedSquare!.row, selectedSquare!.col, true);  // highlight done later
-        clearSquareHighlight(hover.uRow, hover.uCol, true);
+        drawSquare(hover.uRow, hover.uCol, true, getPiecesOnTile(hover.uRow, hover.uCol, localGameState.board))
+        drawSquare(selectedSquare!.row, selectedSquare!.col, true, getPiecesOnTile(selectedSquare!.row, selectedSquare!.col, localGameState.board)) // highlight done later
         highlightSquare(hover.uRow, hover.uCol, "rgb(255 0 0 / 25%)", true);
     }
 
@@ -424,10 +423,6 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
     
     // Update the current turn
     localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
-
-    // TODO: remove this once I fix the hover glitch
-    renderFullBoard();  
-    highlightLastMove();
 
     ctx.stroke();
 }
