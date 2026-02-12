@@ -42,7 +42,10 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
             break;
 
         case MESSAGE_TYPES.MOVE_PIECE:
-            game!.move(client, message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, message.promotions); 
+            if (!game!.move(client, message.fromRow, message.fromCol, message.toRow, message.toCol, message.isTile, message.promotions)) {
+                // if the move failed, then send the game state to the client to clear their predicted move
+                game!.sendGameState(client);
+            }
             break;
 
         case MESSAGE_TYPES.REWIND:

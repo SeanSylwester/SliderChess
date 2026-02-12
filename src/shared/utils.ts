@@ -731,17 +731,26 @@ export function checkCastle(board: Piece[][], QW: boolean, KW: boolean, QB: bool
     return [QW, KW, QB, KB];
 }
 
-export function moveOnBoard(board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): {oldPiece: Piece, newPiece: Piece, enPassant: boolean}{
-    // Move the piece
+export function getPieceOnBoard(board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean): {oldPiece: Piece, newPiece: Piece} {
     let oldPiece: Piece;
     let newPiece: Piece;
     if (isTile) {
         oldPiece = {type: PieceType.TILE, color: PieceColor.NONE};
         newPiece = {type: PieceType.TILE, color: PieceColor.NONE};
-        doTileMove(fromRow, fromCol, toRow, toCol, board, false);
     } else {
         oldPiece = board[toRow][toCol];
         newPiece = board[fromRow][fromCol];
+    }
+
+    return {oldPiece, newPiece}
+}
+
+export function moveOnBoard(board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): {oldPiece: Piece, newPiece: Piece, enPassant: boolean}{
+    // Move the piece
+    const {oldPiece, newPiece} = getPieceOnBoard(board, fromRow, fromCol, toRow, toCol, isTile);
+    if (isTile) {
+        doTileMove(fromRow, fromCol, toRow, toCol, board, false);
+    } else {
         board[toRow][toCol] = newPiece;
         board[fromRow][fromCol] = {type: PieceType.EMPTY, color: PieceColor.NONE};
     }

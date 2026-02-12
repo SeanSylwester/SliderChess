@@ -4,15 +4,15 @@ import { PieceType, PieceColor } from "../shared/types.js";
 
 
 const promoPadding = 8;
-const promoPieceSize = pitch - 2 * promoPadding;
 const promoPiecesOrder = [PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT];
-const promoBoxWidth = pitch - 2 * promoPadding;
-const promoBoxHeight = 4 * pitch - 2 * promoPadding;
-const promoDy = promoPieceSize + promoPadding;
 const promoBackground = "#d2b08c";
 let promoX = 0;
 let promoY = 0;
 export function drawPromotionSelector(unflippedRow: number, unflippedCol: number) {
+    const promoPieceSize = pitch - 2 * promoPadding;
+    const promoBoxWidth = pitch - 2 * promoPadding;
+    const promoBoxHeight = 4 * pitch - 2 * promoPadding;
+
     const color = unflippedRow === 0 ? PieceColor.BLACK : PieceColor.WHITE
     const {x, y} = getXY(unflippedRow, unflippedCol, flip);
     promoX = x;
@@ -43,6 +43,8 @@ export function drawPromotionSelector(unflippedRow: number, unflippedCol: number
 
 export function waitForPromo(): Promise<PieceType> {
     return new Promise(resolve => {
+        const promoPieceSize = pitch - 2 * promoPadding;
+        const promoDy = promoPieceSize + promoPadding;
         // Handle click on the promotion selector
         function handleClickPromotion(event: MouseEvent): void {
             canvas.removeEventListener('mouseup', handleClickPromotion);

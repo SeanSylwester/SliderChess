@@ -107,14 +107,12 @@ export function updateBoardDimensions(): void {
 
     if (!canvas.width) setTimeout(updateBoardDimensions, 100);
     renderFullBoard();
-    highlightLastMove();
 }
 window.addEventListener('resize', updateBoardDimensions);
 //window.visualViewport?.addEventListener('resize', updateBoardDimensions);
 export function flipBoard(): void {
     flip = !flip;
     renderFullBoard();
-    highlightLastMove();
     updateTimeDisplay();
 }
 export function getXY(unflippedRow: number, unflippedCol: number, isFlip: boolean): {x: number, y: number} {
@@ -163,9 +161,9 @@ export function renderFullBoard(): void {
 
     // draw tile borders
     drawAllTileBorders();
+    drawAllTileBorders();  // no idea why this is sometimes needed... some aliasing thing
 
-    // highlight last move
-
+    highlightLastMove();
     ctx.stroke();
 }
 
@@ -293,36 +291,5 @@ export function highlightLastMove(): void {
         highlightMove(localGameState.movesLog.at(movePointer)!);
     } else {
         highlightMove(localGameState.movesLog.at(-1)!);
-    }
-}
-
-export function clearSquareHighlight(unflippedRow: number, unflippedCol: number, isTile: boolean): void {
-    if (isTile) {
-        // force draw index to the top left corner
-        unflippedRow -= unflippedRow % 2;
-        unflippedCol -= unflippedCol % 2;   
-
-        clearSquareHighlight(unflippedRow, unflippedCol, false);
-        clearSquareHighlight(unflippedRow+1, unflippedCol, false);
-        clearSquareHighlight(unflippedRow+1, unflippedCol+1, false);
-        clearSquareHighlight(unflippedRow, unflippedCol+1, false);
-    } else {
-        highlightSquare(unflippedRow, unflippedCol, fillStyles[1 - (unflippedRow + unflippedCol) % 2], false);
-    }
-}
-
-export function clearMoveHighlight(move: Move): void {
-    clearSquareHighlight(move.fromRow, move.fromCol, move.isTile);
-    clearSquareHighlight(move.toRow, move.toCol, move.isTile);
-}
-
-export function clearLastMoveHighlight(): void {
-    if (!localGameState || localGameState.movesLog.length === 0) {
-        return;
-    }
-    if (movePointer !== Number.POSITIVE_INFINITY) {
-        clearMoveHighlight(localGameState.movesLog.at(movePointer)!);
-    } else {
-        clearMoveHighlight(localGameState.movesLog.at(-1)!);
     }
 }

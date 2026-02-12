@@ -1,10 +1,10 @@
 import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Rules, Message } from "../shared/types.js";
 import { sendMessage } from "./client.js";
-import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard } from '../shared/utils.js'
+import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard as getMovePieces, getFEN } from '../shared/utils.js'
 import { gameList, getGame, showLobby } from "./lobbyScreen.js";
-import { disableRules, hideRulesAgreement, updateGameButtons, updateNames, updatePositionButtons, updateRulesAgreement } from "./gameScreen.js";
+import { disableRules, updateGameButtons, updateNames, updatePositionButtons } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
-import { canvas, checkIfTile, clearLastMoveHighlight, clearMoveHighlight, clearSquareHighlight, ctx, drawSquare, flip, getBoardRowCol, highlightLastMove, highlightMove, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
+import { canvas, checkIfTile, ctx, drawSquare, getBoardRowCol, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
 import { syncTime } from "./timer.js";
 
 export let localGameState: GameState | undefined = undefined;
@@ -147,7 +147,6 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
     movePointer = Number.POSITIVE_INFINITY;
 
     renderFullBoard();
-    highlightLastMove();
     selectedSquare = null;
     validSquares = null;
     // updateRules(gameState.rules, myClientId);  // server will send a separate message to negotiate rules
@@ -214,14 +213,10 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
         if (isTile || localGameState.board[uRow][uCol].color === myColor) {
             selectedSquare = {row: uRow, col: uCol, isTile};
             validSquares = getValidMoves(localGameState.board, uRow, uCol, isTile, myColor, false, localGameState.movesLog.at(-1), localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
-            // if it's a tile move, start the hover logic
+            // if it's a tile move, start the hover logic and highlight the bottom left corner 
             if (isTile) {
                 hover = {uRow: uRow, uCol: uCol, prevWasValid: true};
                 handleHover(offsetX, offsetY);
-            }
-
-            // also highlight the bottom left corner of the tile
-            if (isTile) {
                 highlightSquare(uRow, uCol, "rgb(255 0 0 / 75%)", false);
             }
 
@@ -232,9 +227,11 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
             validSquares.forEach(square => {
                 highlightSquare(square.toRow, square.toCol, "rgb(255 0 0 / 25%)", square.isTile);
             })
+            ctx.stroke();
         } 
     } else {
         // try to move piece if we think it's valid. If it's an invalid move, the server will reject it. 
+        let forceRedraw = true;
         if (localGameState.rules.ruleIgnoreAll || (myColor === localGameState.currentTurn && validSquares?.some(square => square.toRow === uRow && square.toCol === uCol))) {
             // if promotion(s) detected, show the dialog(s) and wait for the user to click
             const promoLocations = checkPromotion(localGameState.board, selectedSquare.row, selectedSquare.col, uRow, uCol, isTile);
@@ -243,31 +240,25 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
                 for (const promo of promoLocations) {
                     drawPromotionSelector(promo.row, promo.col);
                     const pieceType: PieceType = await waitForPromo();
-                    if (pieceType !== PieceType.EMPTY) promos.push({row: promo.row, col: promo.col, piece: {type: pieceType, color: myColor}});
+
+                    // waitForPromo returns and empty piece if they click off -> cancel the selection 
+                    if (pieceType === PieceType.EMPTY) break;
+                    else promos.push({row: promo.row, col: promo.col, piece: {type: pieceType, color: myColor}});
                 }
-                renderFullBoard();  // TODO: redraw only the promotion square(s)
             }
             if (promos.length === promoLocations.length) {
                 requestMovePiece(selectedSquare.row, selectedSquare.col, uRow, uCol, isTile, promos);
+                forceRedraw = false;
             }
-        }
-        hover = null;
+        } 
+        
+        // redraw the board on cancel (click invalid or cancel promo) to clear all the highlights
+        if (forceRedraw) renderFullBoard();
 
-        // regardless, clear the highlight
-        clearSquareHighlight(selectedSquare.row, selectedSquare.col, selectedSquare.isTile);
-        if (validSquares) {
-            validSquares.forEach(square => {
-                clearSquareHighlight(square.toRow, square.toCol, square.isTile);
-            })
-        }
+        hover = null;
         selectedSquare = null;
         validSquares = null;
-
-        // redo the last move highlight
-        highlightLastMove();
-
     }
-    ctx.stroke();
 }
 
 const hoverAlpha = 0.5;  // transparency of pieces when hovering a tile move
@@ -346,10 +337,9 @@ function handleHover(offsetX: number, offsetY: number): void {
 }
 
 export function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
-    if (localGameState && !localGameState.isActive) {
-        move(fromRow, fromCol, toRow, toCol, '', isTile, promotions);
-    } else {
+    if (localGameState && localGameState.isActive) {
         sendMessage({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, isTile: isTile, promotions: promotions } satisfies MovePieceMessage);
+        move(fromRow, fromCol, toRow, toCol, '', isTile, promotions);  // optimistically do the move. Server will send game state for us to draw if it's rejected
     }
 }
 
@@ -358,73 +348,57 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         console.error("No local game state to move piece on");
         return;
     }
+    // on the opponent's turn do this whole routine, but on my turn, this can be called either by the server confirming the move, OR us optimistically pre-moving
+    // wait for server confirmation to log the move and actually change the current turn
+    const preMove = localGameState.currentTurn === myColor && !notation;
+    const oppMove = localGameState.currentTurn !== myColor;
+    console.log(preMove, oppMove);
 
-    // if we've been scrolling, then point to the gameState board and redraw to prep for this move
-    if (movePointer !== Number.POSITIVE_INFINITY) {
-        movePointer = Number.POSITIVE_INFINITY;
-        boardToRender = localGameState.board;
-        renderFullBoard();
-    }
+    let oldPiece: Piece;
+    let newPiece: Piece;
+    if (preMove || oppMove) {
+        // if we've been scrolling, then point to the gameState board and redraw to prep for this move
+        if (movePointer !== Number.POSITIVE_INFINITY) {
+            movePointer = Number.POSITIVE_INFINITY;
+            boardToRender = localGameState.board;
+        }
 
-    // do the move!
-    const {oldPiece, newPiece, enPassant} = moveOnBoard(localGameState.board, fromRow, fromCol, toRow, toCol, isTile, promotions);
-    if (isTile) {
-        drawSquare(fromRow, fromCol, true, getPiecesOnTile(fromRow, fromCol, localGameState.board)); // redraw origin
-        drawSquare(toRow, toCol, true, getPiecesOnTile(toRow, toCol, localGameState.board)); // redraw destination
+        // do the move!
+        ({oldPiece, newPiece} = moveOnBoard(localGameState.board, fromRow, fromCol, toRow, toCol, isTile, promotions));
+
+        // check if castling is still allowed
+        [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
     } else {
-        drawSquare(fromRow, fromCol, false, null); // redraw origin
-        drawSquare(toRow, toCol, false, newPiece); // redraw destination
+        ({oldPiece, newPiece} = getMovePieces(localGameState.board, fromRow, fromCol, toRow, toCol, isTile));
     }
 
-    // check if castling is still allowed
-    [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
+    // server confirming our pre-move OR opponent's move
+    if (!preMove) {
+        // log the move
+        localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
+        appendToMovesLog(notation, localGameState.movesLog.length);
+        boldMovePointer(localGameState.movesLog.length - 1);
 
-    // draw promotions
-    for (const promotion of promotions) {
-        drawSquare(promotion.row, promotion.col, false, promotion.piece);
-    }
-
-    // detect castle (king moves twice) and draw the rook
-    const castling = newPiece.type === PieceType.KING && Math.abs(fromCol - toCol) === 2
-    if (castling) {
-        const castleRow = newPiece.color === PieceColor.WHITE ? 0 : 7;
-        if (fromCol > toCol) {
-            // queenside, move a
-            drawSquare(castleRow, 0, false, null);
-            drawSquare(castleRow, 3, false, localGameState.board[castleRow][3]);
-        } else {
-            drawSquare(castleRow, 7, false, null);
-            drawSquare(castleRow, 5, false, localGameState.board[castleRow][5]);
+        // check for checkmate/stalemate/timer
+        let checkmate = false;
+        let stalemate = false;
+        if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules)) {
+            if (inCheck(myColor, localGameState.board)) {
+                checkmate = true;
+            } else {
+                stalemate = true;
+            }
         }
-    }
-
-    // log the move and handle highlights
-    clearLastMoveHighlight();
-    localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
-    highlightLastMove();
-
-    // check for checkmate/stalemate/timer
-    let checkmate = false;
-    let stalemate = false;
-    if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules)) {
-        if (inCheck(myColor, localGameState.board)) {
-            checkmate = true;
-        } else {
-            stalemate = true;
+        if (checkmate || stalemate || (localGameState.useTimeControl && (localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0))) {
+            sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
         }
-    }
-    if (checkmate || stalemate || (localGameState.useTimeControl && (localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0))) {
-        sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
+        
+        // Update the current turn
+        localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
     }
 
-    // update the move log text
-    appendToMovesLog(notation, localGameState.movesLog.length);
-    boldMovePointer(localGameState.movesLog.length - 1);
-    
-    // Update the current turn
-    localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
-
-    ctx.stroke();
+    // always redraw
+    renderFullBoard();
 }
 
 export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYPES]): void {
@@ -459,7 +433,6 @@ function scrollToMove(moveNum: number): void {
         moveOnBoard(boardToRender, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
     }
     renderFullBoard();
-    if (moveNum >= 0) highlightMove(localGameState.movesLog.at(moveNum)!)
 }
 export function updateMovePointer(newNum: number): void {
     if (!localGameState) return;
