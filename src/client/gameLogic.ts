@@ -264,11 +264,10 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
         validSquares = null;
 
         // redo the last move highlight
+        renderFullBoard();  // TODO: remove this once I fix the hover glitch
         highlightLastMove();
 
     }
-    renderFullBoard();
-    highlightLastMove();
     ctx.stroke();
 }
 
@@ -426,7 +425,8 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
     // Update the current turn
     localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
 
-    renderFullBoard();
+    // TODO: remove this once I fix the hover glitch
+    renderFullBoard();  
     highlightLastMove();
 
     ctx.stroke();
