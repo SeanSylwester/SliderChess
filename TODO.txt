@@ -11,11 +11,7 @@ before sharing:
     subreddit
     post on chess reddit
 
-    fix undo on enemy turn
-
-    fix tile highlight
-    tile hover cancel click
-    disallow castling in check
+    reduce the number of times we send the full gamesState
 
 implement special rules for castling
 implement special rules for en passant
@@ -27,5 +23,4 @@ offline play: flag on create game to instead run a game locally, controlling bla
 
 unit tests on LOCAL
 refactor to just send the whole game state every move, minus the notation and chat logs
-refactor to just redraw the whole board each move
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)

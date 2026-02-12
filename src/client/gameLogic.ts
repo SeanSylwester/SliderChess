@@ -212,7 +212,7 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
         // selecting a new piece
         if (isTile || localGameState.board[uRow][uCol].color === myColor) {
             selectedSquare = {row: uRow, col: uCol, isTile};
-            validSquares = getValidMoves(localGameState.board, uRow, uCol, isTile, myColor, false, localGameState.movesLog.at(-1), localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
+            validSquares = getValidMoves(localGameState.board, uRow, uCol, isTile, myColor, false, localGameState.movesLog.at(-1), localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules, localGameState.arrayFEN);
             // if it's a tile move, start the hover logic and highlight the bottom left corner 
             if (isTile) {
                 hover = {uRow: uRow, uCol: uCol, prevWasValid: true};
@@ -225,7 +225,7 @@ async function handleClick(offsetX: number, offsetY: number, isRightClick: boole
 
             // highlight the valid moves
             validSquares.forEach(square => {
-                highlightSquare(square.toRow, square.toCol, "rgb(255 0 0 / 25%)", square.isTile);
+                highlightSquare(square.toRow, square.toCol, "rgb(255 0 0 / 25%)", square.isTileSwap);
             })
             ctx.stroke();
         } 
@@ -289,6 +289,7 @@ function handleHover(offsetX: number, offsetY: number): void {
         highlightSquare(selectedSquare!.row, selectedSquare!.col, "rgb(255 0 0 / 75%)", false);
         highlightSquare(selectedSquare!.row, selectedSquare!.col, "rgb(255 0 0 / 75%)", true);
         for (const square of validSquares!) {
+            // highlight the valid rotation squares
             if (square.toRow - square.toRow % 2 === selectedSquare!.row && square.toCol - square.toCol % 2 === selectedSquare!.col){
                 highlightSquare(square.toRow, square.toCol, "rgb(255 0 0 / 25%)", false);
             }
@@ -378,11 +379,18 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         localGameState.movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions});
         appendToMovesLog(notation, localGameState.movesLog.length);
         boldMovePointer(localGameState.movesLog.length - 1);
+        
+        // Update the current turn
+        localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
+
+        // update arrayFEN (ignore the move clocks)
+        const {fen} = getFEN(localGameState.board, localGameState.currentTurn, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, 0, 0);
+        localGameState.arrayFEN.push(fen);
 
         // check for checkmate/stalemate/timer
         let checkmate = false;
         let stalemate = false;
-        if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules)) {
+        if (!anyValidMoves(myColor, localGameState.board, localGameState.movesLog.at(-1), localGameState.rules, localGameState.arrayFEN)) {
             if (inCheck(myColor, localGameState.board)) {
                 checkmate = true;
             } else {
@@ -392,9 +400,6 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         if (checkmate || stalemate || (localGameState.useTimeControl && (localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0))) {
             sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
         }
-        
-        // Update the current turn
-        localGameState.currentTurn = (localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE);
     }
 
     // always redraw

@@ -1,6 +1,6 @@
 import { QueryResult } from 'pg';
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor, checkRules } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
 const undoText = 'Your opponent has requested an undo.';
@@ -734,25 +734,9 @@ export class Game {
         // reject if it's not the player's turn
         if (c !== this.getPlayer(this.currentTurn)) return false;
 
-        if (!this.rules.ruleIgnoreAll) {
-            // reject if the piece doesn't belong to the player
-            if (!isTile && !sameColor(this.board[fromRow][fromCol].color, this.currentTurn)) return false;
-
-            // reject if they'd be in check after
-            if (wouldBeInCheck(this.currentTurn, this.board, fromRow, fromCol, toRow, toCol, isTile)) return false;
-
-            // reject tile move if either tile is pinned
-            const currentlyInCheck = inCheck(this.currentTurn, this.board);
-            if (isTile && (!tileCanMove(fromRow, fromCol, this.board, this.currentTurn, currentlyInCheck, this.rules)
-                            || !tileCanMove(toRow, toCol, this.board, this.currentTurn, currentlyInCheck, this.rules))) return false;
-            
-            // reject piece move if it's impossible for the piece to reach (ignoring checks and rules)
-            if (!isTile && !pieceCanMoveTo(fromRow, fromCol, toRow, toCol, this.board, this.movesLog.at(-1))) return false;
-            if (isTile && !tileCanMoveTo(fromRow, fromCol, toRow, toCol)) return false;
-
-            // reject if it would completely undo the previous move
-            if (this.rules.ruleUndoTileMove && isTile && tileMoveWouldUndo(fromRow, fromCol, toRow, toCol, this.board, this.arrayFEN)) return false;
-        }
+        // reject invalid moves
+        const isInCheck = inCheck(this.currentTurn, this.board);
+        if (!checkRules(this.board, fromRow, fromCol, toRow, toCol, isTile, this.currentTurn, this.rules, this.movesLog.at(-1), this.arrayFEN, isInCheck)) return false;
 
         // before moving, grab the disambiguation info
         const disambiguation = isTile ? '' : getMoveDisambiguationStr(fromRow, fromCol, toRow, toCol, this.board[fromRow][fromCol].type, this.currentTurn, this.board);
@@ -890,7 +874,7 @@ export class Game {
     }
 
     public checkGameOver(): void {
-        if (!anyValidMoves(this.currentTurn, this.board, this.movesLog.at(-1), this.rules)) {
+        if (!anyValidMoves(this.currentTurn, this.board, this.movesLog.at(-1), this.rules, this.arrayFEN)) {
             const playerName = this.currentTurn === PieceColor.WHITE ? this.playerWhite?.name : this.playerBlack?.name;
             if (inCheck(this.currentTurn, this.board)) {
                 if (this.currentTurn === PieceColor.WHITE) {

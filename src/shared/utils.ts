@@ -868,29 +868,57 @@ export function tileCanMove(row: number, col: number, board: Piece[][], playerCo
     return true;
 }
 
+export function checkRules(board: Piece[][], fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, currentTurn: PieceColor, rules: Rules, lastMove: Move | undefined, arrayFEN: string[], isInCheck: boolean): boolean {
+    if (rules.ruleIgnoreAll) return true;
 
-export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number, isTile: boolean, tileColorFallback: PieceColor, returnFirst: boolean, lastMove: Move | undefined, QW: boolean, KW: boolean, QB: boolean, KB: boolean, rules: Rules): { toRow: number, toCol: number, isTile: boolean }[] {
-    const piece = isTile ? { type: PieceType.TILE, color: tileColorFallback } : board[fromRow][fromCol];
-    let validMoves: { toRow: number, toCol: number, isTile: boolean }[] = [];
+    // reject if they'd be in check after
+    if (wouldBeInCheck(currentTurn, board, fromRow, fromCol, toRow, toCol, isTile)) return false;
+
+    if (isTile) {
+        // reject tile move if either tile is pinned (only check the "to tile" if it's not a rotation)
+        if (!tileCanMove(fromRow, fromCol, board, currentTurn, isInCheck, rules)) return false;
+        if ((toRow - toRow % 2 !== fromRow || toCol - toCol % 2 !== fromCol) && !tileCanMove(toRow, toCol, board, currentTurn, isInCheck, rules)) return false;
+        
+        // reject if it's impossible for the tile to reach (ignoring checks and rules)
+        if (!tileCanMoveTo(fromRow, fromCol, toRow, toCol)) return false;
+        
+        // reject if it would completely undo the previous move
+        if (rules.ruleUndoTileMove && tileMoveWouldUndo(fromRow, fromCol, toRow, toCol, board, arrayFEN)) return false;
+    } else {
+        // reject if the piece doesn't belong to the player
+        if (!sameColor(board[fromRow][fromCol].color, currentTurn)) return false;
+
+        // reject if it's impossible for the piece to reach (ignoring checks and rules)
+        if (!pieceCanMoveTo(fromRow, fromCol, toRow, toCol, board, lastMove)) return false;
+    }
+
+
+    return true;
+}
+
+
+export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number, isTile: boolean, currentTurn: PieceColor, returnFirst: boolean, lastMove: Move | undefined, QW: boolean, KW: boolean, QB: boolean, KB: boolean, rules: Rules, arrayFEN: string[]): { toRow: number, toCol: number, isTileSwap: boolean }[] {
+    const piece = isTile ? { type: PieceType.TILE, color: currentTurn } : board[fromRow][fromCol];
+    let validMoves: { toRow: number, toCol: number, isTileSwap: boolean }[] = [];
 
     // need to check every possible move for if we'd be (still) in check afterwards
-    const isInCheck = inCheck(isTile ? tileColorFallback : piece.color, board);
-    function pushValidIfNotCheck(toRow: number, toCol: number, isTile=false, markAsTile=false): void {
-        if (!wouldBeInCheck(piece.color, board, fromRow, fromCol, toRow, toCol, isTile)) {
-            validMoves.push({ toRow: toRow, toCol: toCol, isTile: markAsTile });
+    const isInCheck = inCheck(isTile ? currentTurn : piece.color, board);
+    function pushIfRulesValid(toRow: number, toCol: number, isTile=false, isTileSwap=false): void {
+        if (checkRules(board, fromRow, fromCol, toRow, toCol, isTile, currentTurn, rules, lastMove, arrayFEN, isInCheck)) {
+            validMoves.push({ toRow, toCol, isTileSwap });
         }
     }
 
     switch (piece.type) {
         case PieceType.TILE:
-            // first, check if we can move this piece at all (no kings or piece of different color)
+            // first, check if we can move this piece at all
             const hasPieces = tileHasPieces(fromRow, fromCol, board);
-            if (tileCanMove(fromRow, fromCol, board, tileColorFallback, isInCheck, rules)) {
+            if (tileCanMove(fromRow, fromCol, board, currentTurn, isInCheck, rules)) {
                 // rotations of this tile
                 if (hasPieces) {
-                    pushValidIfNotCheck(fromRow+1, fromCol, true, false);
-                    pushValidIfNotCheck(fromRow+1, fromCol+1, true, false);
-                    pushValidIfNotCheck(fromRow, fromCol+1, true, false);
+                    pushIfRulesValid(fromRow+1, fromCol, true, false);
+                    pushIfRulesValid(fromRow+1, fromCol+1, true, false);
+                    pushIfRulesValid(fromRow, fromCol+1, true, false);
                 }
 
                 // swap with orthogonal directions
@@ -898,9 +926,8 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                     const toRow = fromRow + 2*direction[0];
                     const toCol = fromCol + 2*direction[1];
                     if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7 
-                            && (hasPieces || tileHasPieces(toRow, toCol, board)) 
-                            && tileCanMove(toRow, toCol, board, tileColorFallback, isInCheck, rules)) {
-                        pushValidIfNotCheck(toRow, toCol, true, true);
+                            && (hasPieces || tileHasPieces(toRow, toCol, board))) {
+                        pushIfRulesValid(toRow, toCol, true, true);
                     }
                 }
             }
@@ -912,7 +939,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
             // check one square forward
             const toRow = fromRow + direction;
             if (toRow >= 0 && toRow <= 7 && board[toRow][fromCol].type === PieceType.EMPTY) {
-                pushValidIfNotCheck(toRow, fromCol);
+                pushIfRulesValid(toRow, fromCol);
                 if (returnFirst && validMoves.length) {return validMoves}
 
                 // also check 2 squares forward if we're in the starting position and the next square is empty
@@ -921,7 +948,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                 if (toRow2 >= 0 && toRow2 <= 7
                         && fromRow === (piece.color === PieceColor.WHITE ? 1 : 6)
                         && board[toRow2][fromCol].type === PieceType.EMPTY) {
-                    pushValidIfNotCheck(toRow2, fromCol); 
+                    pushIfRulesValid(toRow2, fromCol); 
                     if (returnFirst && validMoves.length) {return validMoves}
                 }
             }
@@ -931,7 +958,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                 const toCol = fromCol + colOffset;
                 if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7 
                         && oppositeColor(piece.color, board[toRow][toCol].color)) {
-                    pushValidIfNotCheck(toRow, toCol); 
+                    pushIfRulesValid(toRow, toCol); 
                     if (returnFirst && validMoves.length) {return validMoves}
                 }
             }
@@ -942,7 +969,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                 // the last pawn must be in an adjacent column, have moved two rows, and have moved to the correct row (white: 4, black: 5)
                 if (lastMove.newPiece.type === PieceType.PAWN && Math.abs(fromCol - lastMove.toCol) === 1 && Math.abs(lastMove.fromRow - lastMove.toRow) === 2 
                         && ((lastMove.newPiece.color === PieceColor.WHITE && lastMove.toRow === 3) || (lastMove.newPiece.color === PieceColor.BLACK && fromRow === 4))) {
-                    pushValidIfNotCheck(toRow, lastMove.toCol); 
+                    pushIfRulesValid(toRow, lastMove.toCol); 
                 }
             }
             
@@ -955,7 +982,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                 const toCol = fromCol + knightMove[1];
                 if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7
                         && !sameColor(piece.color, board[toRow][toCol].color)) {
-                    pushValidIfNotCheck(toRow, toCol); 
+                    pushIfRulesValid(toRow, toCol); 
                     if (returnFirst && validMoves.length) {return validMoves}
                 }
             }
@@ -975,7 +1002,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                         // walked off the board or into a friendly piece
                         break;
                     } 
-                    pushValidIfNotCheck(toRow, toCol); 
+                    pushIfRulesValid(toRow, toCol); 
                     if (returnFirst && validMoves.length) {return validMoves}
                     
                     if (oppositeColor(piece.color, board[toRow][toCol].color)) {
@@ -992,23 +1019,23 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
                     if (KW 
                             && board[0][5].type === PieceType.EMPTY && board[0][6].type === PieceType.EMPTY 
                             && !wouldBeInCheck(PieceColor.WHITE, board, 0, 4, 0, 5, false)) {
-                        pushValidIfNotCheck(0, 6);
+                        pushIfRulesValid(0, 6);
                     }
                     if (QW 
                             && board[0][1].type === PieceType.EMPTY && board[0][2].type === PieceType.EMPTY && board[0][3].type === PieceType.EMPTY 
                             && !wouldBeInCheck(PieceColor.WHITE, board, 0, 4, 0, 3, false)) {
-                        pushValidIfNotCheck(0, 2);
+                        pushIfRulesValid(0, 2);
                     }
                 } else {
                     if (KB 
                             && board[7][5].type === PieceType.EMPTY && board[7][6].type === PieceType.EMPTY 
                             && !wouldBeInCheck(PieceColor.WHITE, board, 7, 4, 7, 5, false)) {
-                        pushValidIfNotCheck(7, 6);
+                        pushIfRulesValid(7, 6);
                     }
                     if (QB
                             && board[7][1].type === PieceType.EMPTY && board[7][2].type === PieceType.EMPTY && board[7][3].type === PieceType.EMPTY 
                             && !wouldBeInCheck(PieceColor.WHITE, board, 7, 4, 7, 3, false)) {
-                        pushValidIfNotCheck(7, 2);
+                        pushIfRulesValid(7, 2);
                     }
                 }
             }
@@ -1022,7 +1049,7 @@ export function getValidMoves(board: Piece[][], fromRow: number, fromCol: number
     return validMoves;
 }
 
-export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMove: Move | undefined, rules: Rules): boolean {
+export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMove: Move | undefined, rules: Rules, arrayFEN: string[]): boolean {
     if (playerColor === PieceColor.NONE) {
         //console.error("Invalid player color for checking for moves")
         return true;
@@ -1038,7 +1065,7 @@ export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMov
         for (col = 0; col < 8; col++) {
             const piece = board[row][col];
             if (piece.color === playerColor) {
-                if (getValidMoves(board, row, col, false, playerColor, true, lastMove, false, false, false, false, rules).length > 0) return true;
+                if (getValidMoves(board, row, col, false, playerColor, true, lastMove, false, false, false, false, rules, arrayFEN).length > 0) return true;
             }
         }
     }
@@ -1046,7 +1073,7 @@ export function anyValidMoves(playerColor: PieceColor, board: Piece[][], lastMov
     // tile moves
     for (row = 0; row < 8; row += 2) {
         for (col = 0; col < 8; col += 2) {
-            if (getValidMoves(board, row, col, true, playerColor, true, lastMove, false, false, false, false, rules).length > 0) return true;
+            if (getValidMoves(board, row, col, true, playerColor, true, lastMove, false, false, false, false, rules, arrayFEN).length > 0) return true;
         }
     }
 
