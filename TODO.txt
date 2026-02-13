@@ -11,8 +11,6 @@ before sharing:
     subreddit
     post on chess reddit
 
-    undo on gameover
-
 implement special rules for castling
 implement special rules for en passant
 gameover screen

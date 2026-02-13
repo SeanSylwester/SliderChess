@@ -29,7 +29,7 @@ export class Game {
     clockRunning = false;
 
     lastMoveTime = 0;  // not sent to client
-    waitingForUndoResponse = false;
+    waitingForUndoResponse = 0;  // number shows how many rewinds they're requesting
     waitingForUnlockRulesResponse = false;
     rulesLocked = false;
     rulesMap = new Map<ClientInfo, Rules>();
@@ -654,7 +654,6 @@ export class Game {
         this.logChatMessage(chatMessage);
         this.clockRunning = false;
         this.sendGameStateToAll();
-        this.currentTurn = PieceColor.NONE;
     }
 
     public draw(client: ClientInfo): void {
@@ -743,7 +742,7 @@ export class Game {
         if (fromRow === toRow && fromCol === toCol) return false;
 
         // reject if the game is over
-        if (this.currentTurn === PieceColor.NONE) return false;
+        if (this.result !== GameResultCause.ONGOING) return false;
 
         // reject if it's not the player's turn
         if (c !== this.getPlayer(this.currentTurn)) return false;
@@ -800,10 +799,9 @@ export class Game {
         switch (message.text) {
             case undoText:
                 if (this.waitingForUndoResponse) {
-                    this.waitingForUndoResponse = false;
                     if (message.button === 'Approve') {
                         this.logChatMessage('has approved the undo.', client);
-                        this.rewind();
+                        for ( ;this.waitingForUndoResponse; this.waitingForUndoResponse--) this.rewind();
                     } else {
                         this.logChatMessage('has rejected the undo.', client);
                     }
@@ -833,18 +831,19 @@ export class Game {
     public requestUndo(client: ClientInfo): void {
         // you can only request an undo on your opponent's turn
         let opp: ClientInfo | null;
+        let double = false;
         if (client === this.playerWhite) {
-            if (this.currentTurn !== PieceColor.BLACK) return;
+            double = this.currentTurn === PieceColor.WHITE;
             opp = this.playerBlack;
         } else if (client === this.playerBlack) {
-            if (this.currentTurn !== PieceColor.WHITE) return;
+            double = this.currentTurn === PieceColor.BLACK;
             opp = this.playerWhite;
         } else {
             return;
         }
         if (!opp) return;
         this.logChatMessage('has requested an undo.', client);
-        this.waitingForUndoResponse = true;
+        this.waitingForUndoResponse = double ? 2 : 1;
         
         sendMessage(opp, { type: MESSAGE_TYPES.POPUP, text: undoText, button: ['Approve', 'Reject']} satisfies PopupMessage);
     }
@@ -855,8 +854,6 @@ export class Game {
             //console.log('Ignoring rewind with no moves played yet');
             return;
         }
-        // set the turn by counting the moves rather than this.currentTurn, because this.currentTurn may have been set to PieceColor.NONE by this.endGame
-        this.currentTurn = this.movesLog.length % 2 ? PieceColor.BLACK : PieceColor.WHITE;
         const lastMove = this.movesLog.pop()!;
 
         // undo draw conditions
@@ -876,15 +873,15 @@ export class Game {
             [this.QW, this.KW, this.QB, this.KB] = checkCastle(this.board, this.QW, this.KW, this.QB, this.KB, this.rules);
         }
 
-        // TODO: make this work on gameover when PieceColor is NONE
         // if it's currently a white turn, then we're undoing a black move, so black loses their increment
         if (this.currentTurn === PieceColor.WHITE) this.timeLeftBlack -= this.incrementBlack;
         else this.timeLeftWhite -= this.incrementWhite;
 
-        // update the current turn (this will undo an end-of-game set to PieceColor.NONE)
+        // update the current turn
         this.changeTurn(false);
 
         // resend the game state
+        this.result = GameResultCause.ONGOING;
         this.sendGameStateToAll();
     }
 
@@ -892,12 +889,6 @@ export class Game {
         if (!anyValidMoves(this.currentTurn, this.board, this.movesLog.at(-1), this.rules, this.arrayFEN)) {
             const playerName = this.currentTurn === PieceColor.WHITE ? this.playerWhite?.name : this.playerBlack?.name;
             if (inCheck(this.currentTurn, this.board)) {
-                if (this.currentTurn === PieceColor.WHITE) {
-                    this.endGame(GameResultCause.WHITE_IN_CHECKMATE, `${playerName} (White) is in checkmate!`);
-                } else {
-                    this.endGame(GameResultCause.BLACK_IN_CHECKMATE, `${playerName} (Black) is in checkmate!`);
-                }
-
                 if (this.movesLog.at(-1)) {
                     if (this.movesLog.at(-1)!.notation.endsWith('+')) {
                         this.movesLog.at(-1)!.notation = this.movesLog.at(-1)!.notation.slice(0, -1) + '#';
@@ -906,13 +897,20 @@ export class Game {
                         this.movesLog.at(-1)!.notation += '#';
                     }
                 }
+
+                if (this.currentTurn === PieceColor.WHITE) {
+                    this.endGame(GameResultCause.WHITE_IN_CHECKMATE, `${playerName} (White) is in checkmate!`);
+                } else {
+                    this.endGame(GameResultCause.BLACK_IN_CHECKMATE, `${playerName} (Black) is in checkmate!`);
+                }
             } else {
+                if (this.movesLog.at(-1)) this.movesLog.at(-1)!.notation += '$';
+
                 if (this.currentTurn === PieceColor.WHITE) {
                     this.endGame(GameResultCause.WHITE_IN_STALEMATE, `${playerName} (White) is in stalemate!`);
                 } else {
                     this.endGame(GameResultCause.BLACK_IN_STALEMATE, `${playerName} (Black) is in stalemate!`);
                 }
-                if (this.movesLog.at(-1)) this.movesLog.at(-1)!.notation += '$';
             }
         }
         if (this.useTimeControl) {
