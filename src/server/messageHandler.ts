@@ -1,7 +1,7 @@
 import { Game } from './gameLogic.js';
 import { updateGameInList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect, getGame, gameList, sendGlobalChat } from './server.js';
 import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState, GameResultCause } from '../shared/types.js';
-import { saveToDB, storeNewGame } from './db.js';
+import { saveToDB, storeNewGame, storeNewGameWithId } from './db.js';
 
 
 export async function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): Promise<void> {
@@ -25,7 +25,7 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
 
     switch (message.type) {
         case MESSAGE_TYPES.CREATE_GAME:
-            handleCreateGame(client, games, message.useTimeControl, message.initialTime, message.increment, message.password, true);
+            handleCreateGame(client, games, message.useTimeControl, message.initialTime, message.increment, message.password, undefined);
             break;
 
         case MESSAGE_TYPES.JOIN_GAME:
@@ -116,19 +116,21 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
     }
 }
 
-async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, useTimeControl: boolean, initialTime: number, increment: number, password: string, pushList: boolean): Promise<Game | undefined> {
-    console.log(`Creating game for client ${client.id}`);
+async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, useTimeControl: boolean, initialTime: number, increment: number, password: string, gameState: GameState | undefined): Promise<Game | undefined> {
+    const forceId = gameState ? gameState.id : 0;
+    console.log(`Creating game for client ${client.id}${forceId ? ` with specific id ${forceId}` : ''}`);
 
     // store new game in the DB and get the ID
-    const gameId = await storeNewGame();
+    const gameId = await ((forceId) ? storeNewGameWithId(forceId) : storeNewGame());
     if (gameId) {
         // only make the Game object if we were successful with the DB
         const newGame = new Game(gameId, useTimeControl, initialTime, increment, password);
+        if (gameState) newGame.loadFromState(gameState);
         games.set(newGame.id, newGame);
 
         handleJoinGame(client, games, newGame.id, password); // note: this will updateGameList() when the client is assigned to a position
         gameList.push(newGame.getGameInfo());
-        if(pushList) pushGameList();
+        pushGameList();
         return newGame;
     } else {
         console.error('Failed to create new game');
@@ -136,12 +138,7 @@ async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, us
 }
 
 export async function handleCreateGameFromState(client: ClientInfo, games: Map<number, Game>, gameState: GameState): Promise<void> {
-    const game = await handleCreateGame(client, games, gameState.useTimeControl, gameState.initialTimeWhite, gameState.incrementWhite, gameState.password, false);
-    if (game) {
-        game.loadFromState(gameState);
-        updateGameInList(game);
-        pushGameList();
-    }
+    await handleCreateGame(client, games, gameState.useTimeControl, gameState.initialTimeWhite, gameState.incrementWhite, gameState.password, gameState);
 }
 
 export async function handleJoinGame(client: ClientInfo, games: Map<number, Game>, gameId: number, password: string): Promise<void> {

@@ -230,12 +230,14 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     });
 });
 
+let reconnectingSomeone = false;
 export async function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState | undefined): Promise<void> {
     // wait until we've heard from the DB to do any reconnections
-    if (!loadedFromDB) {
-        setTimeout(() => handleReconnect(client, clientOldId, clientOldName, gameState), 1000);
+    if (!loadedFromDB || reconnectingSomeone) {
+        setTimeout(() => handleReconnect(client, clientOldId, clientOldName, gameState), !loadedFromDB ? 1000 : 100);
         return;
     }
+    reconnectingSomeone = true;  // TODO: does this make a race condition?
 
     // try to reconnect client to old id and name
     console.log(`Reconnecting client ${client.id} (was ${clientOldId}) to their old name (${clientOldName})`);
@@ -248,12 +250,13 @@ export async function handleReconnect(client: ClientInfo, clientOldId: number, c
     const game = await getGame(gameState.id);
     if (game) {
         console.log(` and also connecting client ${client.id} to game ${gameState.id}, if they have the right password`);
-        handleJoinGame(client, games, gameState.id, gameState.password);
+        await handleJoinGame(client, games, gameState.id, gameState.password);
     } else {
         // recreate the game with a new id if it wasn't found on the DB at startup
         console.log(` but we couldn't find their game (${gameState.id}), so we're recreating from client state with a new ID`);
-        handleCreateGameFromState(client, games, gameState);
+        await handleCreateGameFromState(client, games, gameState);
     } 
+    reconnectingSomeone = false;
 }
 
 // Serve static files

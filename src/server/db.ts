@@ -92,11 +92,38 @@ export async function gamesListFromDB(): Promise<GameInfo[] | undefined> {
     return gameList;
 }
 
+export async function hasGame(gameId: number): Promise<boolean> {
+    const res = await query(`SELECT EXISTS(SELECT 1 FROM ${table} WHERE id=$1)`, [gameId]);
+
+    return res !== undefined && (res?.rows[0] as any).exists;
+}
+
 export async function storeNewGame(): Promise<number | undefined> {
     const res: any = await query(`INSERT INTO ${table} DEFAULT VALUES RETURNING id;`, []);
     if (!res) return;
     
     return res.rows[0].id;
+}
+
+export async function storeNewGameWithId(gameId: number): Promise<number | undefined> {
+    // create a new game, update its ID, then set the sequence to be above the specified ID (if required)
+
+    if (await hasGame(gameId)) {
+        console.log(`Cannot create new game with ID ${gameId} because it already exists!`);
+        return;
+    }
+
+    const gameIdToReplace = await storeNewGame();
+    if (!gameIdToReplace) return;
+
+    await query(`UPDATE ${table} SET id=$1 WHERE id=$2`, [gameId, gameIdToReplace]);
+    
+    // set the sequence value to be above gameId
+    if (gameIdToReplace < gameId) {
+        await query(`alter sequence ${table}_id_seq restart with ${gameId+1}`, []);
+    }
+
+    return gameId;
 }
 
 export async function createDummyTable(): Promise<void> {

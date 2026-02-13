@@ -104,6 +104,8 @@ export class Game {
     public loadFromState(gameState: GameState): void {
         this.id = gameState.id;
         this.password = gameState.password;
+        this.lastNameWhite = gameState.playerWhiteName || '';
+        this.lastNameBlack = gameState.playerBlackName || '';
         this.board = gameState.board;
         this.chatLog = gameState.chatLog;
         this.movesLog = gameState.movesLog;
@@ -130,6 +132,8 @@ export class Game {
         this.arrayFEN = [];
         this.mapFEN = new Map<string, number>();
         for (const fen of gameState.arrayFEN) this.updateFEN(fen, fenStripMoves(fen));
+
+        this.sendGameStateToAll();
     }
 
     public loadFromDB(row: any) {
