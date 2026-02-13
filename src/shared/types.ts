@@ -168,6 +168,7 @@ export const MESSAGE_TYPES = {
     RECONNECT: 'reconnect',
     POPUP: 'popup',
     UNLOCK_RULES: 'unlockRules',
+    GAME_NAMES: 'gameNames',
 } as const;
 
 // Message type definitions
@@ -277,4 +278,11 @@ export interface PopupMessage extends Message {
     type: typeof MESSAGE_TYPES.POPUP;
     text: string;
     button: string[] | string;  // server sends list of button names, client sends back the selected name. String must match exactly. Be sure to include a "Cancel" or "Ok" or whatever
+}
+export interface GameNamesMessage extends Message {
+    type: typeof MESSAGE_TYPES.GAME_NAMES;
+    playerWhiteName: string | null;
+    playerBlackName: string | null;
+    spectatorNames: string[];
+    yourColor: PieceColor;
 }

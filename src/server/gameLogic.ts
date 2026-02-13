@@ -1,5 +1,5 @@
 import { QueryResult } from 'pg';
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo } from '../shared/types.js';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage } from '../shared/types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor, checkRules } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
@@ -258,18 +258,19 @@ export class Game {
         const ret = getBoardFromMessage(notationString, newBoard);
         if (typeof ret === 'string') {
             return ret;
-        } else {
-            this.movesLog = ret.movesLog;
-            this.currentTurn = ret.color;
-            this.QW = ret.QW;
-            this.KW = ret.KW;
-            this.QB = ret.QB;
-            this.KB = ret.KB;
-            this.board = newBoard;
-            this.halfmoveClock = ret.halfmoveClock;
-            this.mapFEN = ret.mapFEN;
-            this.arrayFEN = ret.arrayFEN;
         }
+
+        this.movesLog = ret.movesLog;
+        this.currentTurn = ret.color;
+        this.QW = ret.QW;
+        this.KW = ret.KW;
+        this.QB = ret.QB;
+        this.KB = ret.KB;
+        this.board = newBoard;
+        this.halfmoveClock = ret.halfmoveClock;
+        this.mapFEN = ret.mapFEN;
+        this.arrayFEN = ret.arrayFEN;
+        this.sendGameStateToAll();
     }
 
     public getPlayer(color: PieceColor): ClientInfo | undefined {
@@ -312,7 +313,8 @@ export class Game {
             this.logChatMessage(`Player ${player.name} has joined as ${color === PieceColor.NONE ? 'a spectator' : PieceColor[color]}.`);
         }
         this.updateLastNames();
-        this.sendGameStateToAll();  // this really just needs to send the full state to "player", and the name/position update to the rest
+        this.sendNamesToAll();
+        this.sendGameState(player);
 
         // send the latest rules when they first join
         sendMessage(player, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);  
@@ -371,7 +373,7 @@ export class Game {
         this.logChatMessage(`${c.name} has moved from position ${originalPosition === PieceColor.NONE ? 'spectator' : PieceColor[originalPosition]} to ${position === PieceColor.NONE ? 'spectator' : PieceColor[position]}.`);
 
         this.updateLastNames();
-        this.sendGameStateToAll();  // this really just needs to send the name/position update to the rest
+        this.sendNamesToAll();
         if (this.isActive && !this.rulesLocked && (position != PieceColor.NONE || originalPosition != PieceColor.NONE)) this.sendRulesAgreement();
     }
 
@@ -392,7 +394,17 @@ export class Game {
             }
             this.logChatMessage(`${player.name} has disconnected.`);
         }
-        this.sendGameStateToAll();
+        this.sendNamesToAll();
+    }
+
+    public sendNamesToAll(): void {
+        for (const client of this.allClients()) {
+            sendMessage(client, { type: MESSAGE_TYPES.GAME_NAMES, 
+                playerWhiteName: this.playerWhite?.name ?? null,
+                playerBlackName: this.playerBlack?.name ?? null,
+                spectatorNames: this.spectators.map(s => s.name),
+                yourColor: this.getColor(client)} satisfies GameNamesMessage);
+        }
     }
 
     public sendMessageToAll<T extends Message>(message: T): void {
@@ -477,7 +489,6 @@ export class Game {
                 }
                 return;
             }
-            this.sendGameStateToAll();
             message = 'loaded board from notation';
         }
 
@@ -638,7 +649,7 @@ export class Game {
         this.result = result;
         this.logChatMessage(chatMessage);
         this.clockRunning = false;
-        this.syncTime();
+        this.sendGameStateToAll();
         this.currentTurn = PieceColor.NONE;
     }
 
@@ -899,7 +910,6 @@ export class Game {
                 }
                 if (this.movesLog.at(-1)) this.movesLog.at(-1)!.notation += '$';
             }
-            this.sendGameStateToAll();
         }
         if (this.useTimeControl) {
             if (this.timeLeftBlack < 0) {

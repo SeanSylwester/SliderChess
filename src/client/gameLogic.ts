@@ -113,6 +113,24 @@ function boldMovePointer(moveNum: number): void {
     }
 }
 
+export function setNames(playerWhiteName: string | null, playerBlackName: string | null, spectatorNames: string[], yourColor: PieceColor): void {
+    if (!localGameState) return;
+
+    localGameState.playerWhiteName = playerWhiteName;
+    localGameState.playerBlackName = playerBlackName;
+    localGameState.spectatorNames = spectatorNames;
+    updateNames(localGameState.playerWhiteName, localGameState.playerBlackName, localGameState.spectatorNames, !localGameState.isActive);
+
+    if (myColor !== yourColor) {
+        if (yourColor === PieceColor.WHITE) {
+            setFlip(false);
+        } else if (yourColor === PieceColor.BLACK) {
+            setFlip(true);
+        }
+    }
+    myColor = yourColor;
+}
+
 
 
 
