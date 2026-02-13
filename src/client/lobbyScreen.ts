@@ -1,6 +1,7 @@
 import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage, GameScore, GameResultCause, PieceColor, GlobalChatMessage } from "../shared/types.js";
 import { formatMinSec } from '../shared/utils.js'
 import { sendMessage, fromHistory } from './client.js'
+import { moveGlobalChat } from "./gameScreen.js";
 
 
 const lobbyScreen = document.getElementById('lobby-screen');
@@ -10,6 +11,7 @@ export function showLobby(): void {
     gameScreen!.style.display = 'none';
     if (!fromHistory) window.history.pushState({}, '', window.location.origin);
     globalChatLog.scrollTop = globalChatLog.scrollHeight;
+    moveGlobalChat(false);
 }
 
 // functions to handle joining a game (from the list or directly from an ID that we know somehow)

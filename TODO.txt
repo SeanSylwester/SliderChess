@@ -11,7 +11,6 @@ before sharing:
     subreddit
     post on chess reddit
 
-    global chat tab on game screen
     undo on gameover
 
 implement special rules for castling

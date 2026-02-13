@@ -49,15 +49,6 @@ export const movesLogColumnNum = document.getElementById('movesLogColumnNum') as
 export const movesLogColumnWhite = document.getElementById('movesLogColumnWhite') as HTMLDivElement;
 export const movesLogColumnBlack = document.getElementById('movesLogColumnBlack') as HTMLDivElement;
 
-export function updateChat(message: string): void {
-    if (!localGameState) {
-        return;
-    }
-    localGameState.chatLog.push(message);
-    chatLogElement.value += "\n" + message;
-    chatLogElement.scrollTop = chatLogElement.scrollHeight;
-}
-
 function appendToMovesLog(notation: string, moveNum: number): void {
     if (!localGameState) {
         console.error("No local game state to log move to");

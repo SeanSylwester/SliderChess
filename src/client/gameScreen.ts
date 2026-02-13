@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause, Rules, RulesMessage } from "../shared/types.js";
+import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause, Rules, RulesMessage, GlobalChatMessage } from "../shared/types.js";
 import { handleButton, localGameState, myColor, setRules } from "./gameLogic.js";
 import { sendMessage, fromHistory, myGameId } from "./client.js";
 import { getGame, gameList } from "./lobbyScreen.js"
@@ -46,12 +46,32 @@ export function showGame(gameId: number, password: string): void {
 
 
 // chat
+let showGlobal = false;
+const chatLog = document.getElementById('chatLog') as HTMLTextAreaElement;
+const chatDiv = document.getElementById('chatDiv') as HTMLDivElement;
+const chatContainer = document.getElementById('chatContainer') as HTMLDivElement;
+function setChatHeight(): void {
+    chatContainer.style.height = `${chatDiv.offsetHeight}px`;
+}
+const resizeObserver = new ResizeObserver(setChatHeight);
+resizeObserver.observe(chatLog);
+setChatHeight();
+
+export function updateChat(message: string): void {
+    if (!localGameState) {
+        return;
+    }
+    localGameState.chatLog.push(message);
+    chatLog.value += "\n" + message;
+    chatLog.scrollTop = chatLog.scrollHeight;
+}
+
 const sendChatButton = document.getElementById('sendChat') as HTMLButtonElement;
 const chatEntry = document.getElementById('chatEntry') as HTMLInputElement;
-const chatContainer = document.getElementById('chatContainer') as HTMLDivElement;
 sendChatButton!.addEventListener('click', () => {
     if (chatEntry.value.trim() !== '') {
-        sendMessage({ type: MESSAGE_TYPES.CHAT,  message: chatEntry.value } satisfies ChatMessage);
+        if (showGlobal) sendMessage({ type: MESSAGE_TYPES.GLOBAL_CHAT,  message: chatEntry.value } satisfies GlobalChatMessage);
+        else sendMessage({ type: MESSAGE_TYPES.CHAT,  message: chatEntry.value } satisfies ChatMessage);
         chatEntry.value = '';
     }
 });
@@ -61,14 +81,27 @@ chatEntry!.addEventListener('keypress', function (event) {
     }
 });
 
-const chatLog = document.getElementById('chatLog') as HTMLDivElement;
-const chatDiv = document.getElementById('chatDiv') as HTMLDivElement;
-function setChatHeight(): void {
-    chatContainer.style.height = `${chatDiv.offsetHeight}px`;
+const showGlobalButton = document.getElementById('showGlobalChat') as HTMLButtonElement;
+const globalChatLog = document.getElementById('globalChatLog')! as HTMLTextAreaElement;
+const gameChatName = document.getElementById('gameChatName') as HTMLSpanElement;
+const globalChatDiv = document.getElementById('globalChatDiv') as HTMLDivElement;
+const chatEntryContainer = document.getElementById('chatEntryContainer') as HTMLDivElement;
+const globalChatEntryContainer = document.getElementById('globalChatEntryContainer') as HTMLDivElement;
+showGlobalButton!.addEventListener('click', () => {
+    showGlobal = !showGlobal;
+    gameChatName.textContent = showGlobal ? 'Global' : 'Game'
+    showGlobalButton.textContent = showGlobal ? 'Show Game' : 'Show Global'
+    moveGlobalChat(showGlobal);
+});
+export function moveGlobalChat(toGameScreen: boolean): void {
+    if (toGameScreen) {
+        chatLog.hidden = true;
+        chatDiv.insertBefore(globalChatLog, chatEntryContainer);
+    } else {
+        chatLog.hidden = false;
+        globalChatDiv.insertBefore(globalChatLog, globalChatEntryContainer);
+    }
 }
-const resizeObserver = new ResizeObserver(setChatHeight);
-resizeObserver.observe(chatLog);
-setChatHeight();
 
 
 

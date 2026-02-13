@@ -1,7 +1,7 @@
 import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage, RulesMessage } from "../shared/types.js";
-import { move, localGameState, initLocalGameState, clearLocalGameState, updateChat, setNames } from "./gameLogic.js";
+import { move, localGameState, initLocalGameState, clearLocalGameState, setNames } from "./gameLogic.js";
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry, updateGlobalChat } from './lobbyScreen.js'
-import { showGame, updatePassword, updateRules, sendRules, updateRulesAgreement } from './gameScreen.js'
+import { showGame, updatePassword, updateRules, updateChat, updateRulesAgreement } from './gameScreen.js'
 import { syncTime } from "./timer.js";
 let ws: WebSocket;
 let reconnectAttempts = 0;

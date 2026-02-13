@@ -22,7 +22,7 @@
         <h2>Global chat</h2>
         <div id="globalChatDiv" style="max-width: 600px;">
             <textarea class="chatLog" id="globalChatLog" rows="10" readonly></textarea>
-            <div class="chatEntryContainer">
+            <div id="globalChatEntryContainer" class="chatEntryContainer">
                 <input class="chatEntry" type="text" size="1" id="globalChatEntry"/> 
                 <button id="sendGlobalChat">Send</button>
             </div>
@@ -119,10 +119,12 @@
             
             <div id="chatContainer" class="chatContainer">
                 <div id="chatDiv" class="chatDiv">
+                    <strong><span id="gameChatName">Game</span> Chat</strong>
                     <textarea class="chatLog" id="chatLog" rows="10" readonly></textarea>
-                    <div class="chatEntryContainer">
+                    <div id="chatEntryContainer" class="chatEntryContainer">
                         <input class="chatEntry" type="text" size="1" id="chatEntry"/> 
                         <button id="sendChat">Send</button>
+                        <button id="showGlobalChat">Show Global</button>
                     </div>
                 </div>
             </div>
