@@ -67,6 +67,7 @@ function connectWebSocket(): void {
                 break;
             case MESSAGE_TYPES.MOVE_PIECE:
                 move(message.fromRow, message.fromCol, message.toRow, message.toCol, message.notation, message.isTile, message.promotions);
+                syncTime(message.clockRunning, message.timeLeftWhite, message.timeLeftBlack);
                 break;
             case MESSAGE_TYPES.CHAT:
                 updateChat(message.message);

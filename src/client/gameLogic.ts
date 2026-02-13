@@ -339,7 +339,8 @@ function handleHover(offsetX: number, offsetY: number): void {
 
 export function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
     if (localGameState && localGameState.isActive) {
-        sendMessage({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, isTile: isTile, promotions: promotions } satisfies MovePieceMessage);
+        // time stuff is ignored on the server
+        sendMessage({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow, fromCol, toRow, toCol, isTile, promotions, notation: '', timeLeftWhite: localGameState.timeLeftWhite, timeLeftBlack: localGameState.timeLeftBlack, clockRunning: localGameState.clockRunning } satisfies MovePieceMessage);
         move(fromRow, fromCol, toRow, toCol, '', isTile, promotions);  // optimistically do the move. Server will send game state for us to draw if it's rejected
     }
 }
@@ -353,7 +354,6 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
     // wait for server confirmation to log the move and actually change the current turn
     const preMove = localGameState.currentTurn === myColor && !notation;
     const oppMove = localGameState.currentTurn !== myColor;
-    console.log(preMove, oppMove);
 
     let oldPiece: Piece;
     let newPiece: Piece;

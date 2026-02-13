@@ -699,10 +699,9 @@ export class Game {
             this.currentTurn = PieceColor.WHITE;
         }
 
-        // start clock (in case it was paused) and sync time
+        // start clock (in case it was paused)
         if (this.useTimeControl) {
             this.clockRunning = true;
-            this.syncTime();
         }
     }
 
@@ -767,9 +766,6 @@ export class Game {
             }
         }
 
-        // Send move to all players and spectators
-        this.sendMessageToAll({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: notation, isTile: isTile, promotions: promotions } satisfies MovePieceMessage);
-
         // change turns and handle clock
         this.changeTurn(true);
 
@@ -778,6 +774,9 @@ export class Game {
 
         // usually players check if they're in checkmate themselves. If the next player is absent, we need to check ourselves
         if (!this.getPlayer(this.currentTurn)) this.checkGameOver();
+
+        // Send move to all players and spectators
+        this.sendMessageToAll({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow, fromCol, toRow, toCol, notation, isTile, promotions, timeLeftWhite: this.timeLeftWhite, timeLeftBlack: this.timeLeftBlack, clockRunning: this.clockRunning } satisfies MovePieceMessage);
 
         return true;
     }
@@ -862,6 +861,7 @@ export class Game {
             [this.QW, this.KW, this.QB, this.KB] = checkCastle(this.board, this.QW, this.KW, this.QB, this.KB, this.rules);
         }
 
+        // TODO: make this work on gameover when PieceColor is NONE
         // if it's currently a white turn, then we're undoing a black move, so black loses their increment
         if (this.currentTurn === PieceColor.WHITE) this.timeLeftBlack -= this.incrementBlack;
         else this.timeLeftWhite -= this.incrementWhite;

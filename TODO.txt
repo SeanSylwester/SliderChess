@@ -12,6 +12,8 @@ before sharing:
     post on chess reddit
 
     reduce the number of times we send the full gamesState
+    global chat tab on game screen
+    undo on gameover
 
 implement special rules for castling
 implement special rules for en passant

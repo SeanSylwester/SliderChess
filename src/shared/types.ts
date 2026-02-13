@@ -131,12 +131,6 @@ export interface Piece {
 }
 
 
-export const SCREENS = {
-    LOBBY: 'lobby',
-    GAME_ROOM: 'gameRoom'
-};
-
-
 export enum ADMIN_COMMANDS {
     GAME_GET_IDS,
     GAME_KICK_PLAYER,
@@ -208,9 +202,14 @@ export interface MovePieceMessage extends Message {
     fromCol: number;
     toRow: number;
     toCol: number; 
-    notation?: string; // only calculated at the server and sent back
     isTile: boolean;
     promotions: {row: number, col: number, piece: Piece}[];
+
+    // only calculated at the server and sent back
+    notation: string; 
+    clockRunning: boolean;
+    timeLeftWhite: number;
+    timeLeftBlack: number;
 }
 export interface TimeMessage extends Message {
     type: typeof MESSAGE_TYPES.TIME;

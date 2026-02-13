@@ -53,16 +53,18 @@ export function updateTimeDisplay(): void{
     }
 }
 
-export function syncTime( clockRunning: boolean, timeLeftWhite: number, timeLeftBlack: number, initialTimeWhite: number, initialTimeBlack: number, incrementWhite: number, incrementBlack: number): void {
+export function syncTime( clockRunning: boolean, timeLeftWhite: number, timeLeftBlack: number, initialTimeWhite?: number, initialTimeBlack?: number, incrementWhite?: number, incrementBlack?: number): void {
     if (!localGameState) {
         return;
     }
     localGameState.clockRunning = clockRunning;
-    localGameState.initialTimeWhite = initialTimeWhite;
-    localGameState.initialTimeBlack = initialTimeBlack;
-    localGameState.incrementWhite = incrementWhite;
-    localGameState.incrementBlack = incrementBlack;
     localGameState.timeLeftWhite = timeLeftWhite;
     localGameState.timeLeftBlack = timeLeftBlack;
+    if (initialTimeWhite !== undefined) {
+        localGameState.initialTimeWhite = initialTimeWhite!;
+        localGameState.initialTimeBlack = initialTimeBlack!;
+        localGameState.incrementWhite = incrementWhite!;
+        localGameState.incrementBlack = incrementBlack!;
+    }
     updateTimeDisplay();
 }
