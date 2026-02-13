@@ -9,6 +9,7 @@ export function showLobby(): void {
     lobbyScreen!.style.display = 'block';
     gameScreen!.style.display = 'none';
     if (!fromHistory) window.history.pushState({}, '', window.location.origin);
+    globalChatLog.scrollTop = globalChatLog.scrollHeight;
 }
 
 // functions to handle joining a game (from the list or directly from an ID that we know somehow)
@@ -82,7 +83,8 @@ globalChatEntry!.addEventListener('keypress', function (event) {
 const globalChatLog = document.getElementById('globalChatLog')! as HTMLTextAreaElement;
 export function updateGlobalChat(message: string): void {
     const atBottom = globalChatLog.scrollHeight - globalChatLog.scrollTop <= globalChatLog.clientHeight + 1;
-    globalChatLog.value += "\n" + message;
+    if (globalChatLog.value) globalChatLog.value += "\n"
+    globalChatLog.value += message;
     if (atBottom) globalChatLog.scrollTop = globalChatLog.scrollHeight;
 }
 

@@ -1,7 +1,7 @@
 import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Rules, Message } from "../shared/types.js";
 import { sendMessage } from "./client.js";
 import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard as getMovePieces, getFEN } from '../shared/utils.js'
-import { gameList, getGame, showLobby } from "./lobbyScreen.js";
+import { gameList, getGame } from "./lobbyScreen.js";
 import { disableRules, updateGameButtons, updateNames, updatePositionButtons } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
 import { canvas, checkIfTile, ctx, drawSquare, getBoardRowCol, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
@@ -428,7 +428,6 @@ export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYP
     switch (type) {
         case MESSAGE_TYPES.QUIT_GAME:
             sendMessage({ type: type } satisfies Message);
-            showLobby();  // just in case
             break;
         case MESSAGE_TYPES.REWIND:
         case MESSAGE_TYPES.UNLOCK_RULES:

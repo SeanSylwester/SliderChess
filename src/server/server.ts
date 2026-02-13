@@ -103,12 +103,14 @@ export function pushGameList(): void {
     });
 }
 
+const globalChatBufferMaxLength = 100;
+const globalChatBuffer: string[] = [];
 export function sendGlobalChat(message: string): void {
+    if (globalChatBuffer.length >= globalChatBufferMaxLength) globalChatBuffer.shift();
+    globalChatBuffer.push(message);
+
     clients.forEach((client) => {
-        if (!client.gameId) {
-            // only push to clients that aren't in a game
-            sendMessage(client, { type: MESSAGE_TYPES.GLOBAL_CHAT, message: message } satisfies GlobalChatMessage);
-        }
+        sendMessage(client, { type: MESSAGE_TYPES.GLOBAL_CHAT, message: message } satisfies GlobalChatMessage);
     });
 }
 
@@ -206,7 +208,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
     // send current game list
     sendGameList(clientInfo);
-    sendMessage(clientInfo, { type: MESSAGE_TYPES.GLOBAL_CHAT, message: 'Welcome to SliderChess!' } satisfies GlobalChatMessage);
+    sendMessage(clientInfo, { type: MESSAGE_TYPES.GLOBAL_CHAT, message: [...globalChatBuffer, 'Welcome to SliderChess!'].join('\n') } satisfies GlobalChatMessage);
 
     // Handle messages from client
     ws.on('message', (data: Buffer) => {
