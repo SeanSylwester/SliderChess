@@ -12,6 +12,7 @@ export function showGame(gameId: number, password: string): void {
     lobbyScreen!.style.display = 'none';
     gameScreen!.style.display = '';
     if (!fromHistory) window.history.pushState({}, '', window.location.origin + `/${gameId}`);
+    chatLog.scrollTop = chatLog.scrollHeight;
 
     updatePassword(password);
     const game = getGame(gameId);

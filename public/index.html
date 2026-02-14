@@ -15,7 +15,49 @@
 </head>
 
 <body>
+    <dialog id="aboutDialog">
+        <h2 style="margin: 0;">Rules:</h2>
+        <ul style="margin: 0;">
+            <li>On your turn, you may move a piece OR a tile.</li>
+            <li>Tiles can be rotated in-place or swapped with an adjacent tile</li>
+            <li>By default, you can't tile-move your king or your opponent's pieces.</li>
+            <li>Extra rules are available to set per-game using the checkboxes on the game screen. </li>
+                <ul style="margin: 0;">
+                    <li>Both players must agree on all the rules before beginning.</li>
+                    <ul style="margin: 0;">
+                        <li>Rules that you and your opponent have a different selection for are indicated with a ❌.</li>
+                        <li>The rules lock on the first move, but they can be unlocked at any time if both players agree.</li>
+                    </ul>
+                    <li>There are a few rules that I haven't implemented yet regarding castling, double pawn moves, 
+                        and en passant. The current behavior is described in the state of the disabled checkboxes.</li>
+                    <li>The indented rules are only used if the parent rule is unchecked. 
+                        Otherwise, the checkbox is disabled.</li>
+                </ul>
+        </ul>
+
+        <h2 style="margin-bottom: 0;">Controls:</h2>
+        <ul style="margin: 0;">
+            <li><strong>Select a tile:</strong> click the edge of a square, or right-click/long-press anywhere.</li>
+            <li><strong>Swap two tiles:</strong> with a tile selected, click on an orthogonally adjacent tile.</li>
+            <li><strong>Rotate a tile:</strong> with a tile selected, click within the same tile. The bold highlighted square is rotated to the square that you click on.</li>
+            <li><strong>Deselect a tile or piece:</strong> click any invalid target location.</li>
+            <li><strong>Valid moves</strong> for a selected piece/tile are highlighted in light red.</li>
+            <li><strong>The previous move</strong> is highlighted in green.</li>
+        </ul>
+
+        <h2 style="margin-bottom: 0;">Credits:</h2>
+        <ul style="margin: 0;">
+            <li><strong>Created by:</strong> Sean Sylwester</li>
+            <li><strong>Inspired by:</strong> <a href="https://xkcd.com/3139/">XKCD #3139</a> by Randall Munroe</spalin>
+            <li><strong>Pieces by:</strong> <a href="https://commons.wikimedia.org/wiki/File:Chess_Pieces_Sprite.svg">Wikipedia user Cburnett</a> </li>
+            <li>Last updated: 2026-02-13</li>
+        </ul>
+
+        <button onclick="document.getElementById('aboutDialog').close()" style="width: 100%">Close</button>
+    </dialog>
+
     <div id="lobby-screen">
+        <button class="aboutButton" onclick="document.getElementById('aboutDialog').showModal()">?</button>
         <h1 style="margin: 0">SliderChess Lobby</h1>
         <p style="margin-top: 0">(<span id="nClients">1</span> Players Connected)</p>
         <span>Name:<input type="text" id="playerName"/> <button id="updateName">Update</button></span>
@@ -24,7 +66,7 @@
         <div id="globalChatDiv" style="max-width: 600px;">
             <textarea class="chatLog" id="globalChatLog" rows="10" readonly></textarea>
             <div id="globalChatEntryContainer" class="chatEntryContainer">
-                <input class="chatEntry" type="text" size="1" id="globalChatEntry"/> 
+                <input class="chatEntry" type="text" id="globalChatEntry"/> 
                 <button id="sendGlobalChat">Send</button>
             </div>
         </div>
@@ -61,15 +103,15 @@
         </p>
         <p>
             <label for="createTimeInput">Time:</label>
-            <input type="number" id="createTimeInput" name="createTimeInput" value="60" size="2" min="0">
+            <input type="number" id="createTimeInput" value="60" class="timeEntry" min="0">
             <label for="createTimeInput"> (min)</label>
             <label for="createIncrementInput">+</label>
-            <input type="number" id="createIncrementInput" name="createIncrementInput" value="0" size="2" min="0">
+            <input type="number" id="createIncrementInput" value="0" class="timeEntry" min="0">
             <label for="createIncrementInput"> (sec)</label>
         </p>
         <p>
             <label for="createPasswordInput">Password:</label>
-            <input type="text" id="createPasswordInput" name="createPasswordInput">
+            <input type="text" id="createPasswordInput">
         </p>
         <div>
             <button id="createCancelButton" type="button">Cancel</button>
@@ -83,7 +125,8 @@
     </dialog>
 
     <div id="game-screen">
-        <h1>Game Room #<span id="gameIdDisplay"></span></h1>
+        <button class="aboutButton" onclick="document.getElementById('aboutDialog').showModal()">?</button>
+        <h1 style="margin: 0">Game Room #<span id="gameIdDisplay"></span></h1>
         <div>
             <span>Game password:<input type="text" id="gamePassword"/> <button id="updateGamePassword">Update</button></span> <br>
             <button id="claimWhite">White</button><span id="whitePlayerInfo"></span> <br>
@@ -127,7 +170,7 @@
                     <strong><span id="gameChatName">Game</span> Chat</strong>
                     <textarea class="chatLog" id="chatLog" rows="10" readonly></textarea>
                     <div id="chatEntryContainer" class="chatEntryContainer">
-                        <input class="chatEntry" type="text" size="1" id="chatEntry"/> 
+                        <input class="chatEntry" type="text" id="chatEntry"/> 
                         <button id="sendChat">Send</button>
                         <button id="showGlobalChat">Show Global</button>
                     </div>

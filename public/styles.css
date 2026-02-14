@@ -1,12 +1,19 @@
-
-input[type=number][size="1"]{ width: 2em; }
-
-input[type=number][size="2"]{ width: 3em; }
-
 html, body {
     margin: 0;
     padding: 0;
 }
+
+.aboutButton {
+    border-radius: 50%;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: large;
+}
+#aboutDialog {
+    max-width: 500px;
+}
+
 #lobby-screen {
     box-sizing: border-box;
     display: flex;
@@ -18,6 +25,7 @@ html, body {
     border: 1px solid #ccc;
     height: calc(100vh - 22px);
     min-height: 529px; /* TODO: figure out how to do this automatically */
+    position: relative;
 }
 #gameListDiv {
     flex: 1;
@@ -30,6 +38,9 @@ html, body {
 .timeControlButton {
     min-width: 5em;
 }
+.timeEntry {
+    width: 3em;
+}
 
 
 #game-screen {
@@ -38,6 +49,7 @@ html, body {
     margin: 10px auto;
     padding: 10px;
     border: 1px solid #ccc;
+    position: relative;
 }
 #boardAndChatContainer {
     width: fit-content;
@@ -95,8 +107,10 @@ html, body {
 }
 
 .chatLog {
-    width: 100%;
     resize: none;
+}
+#globalChatLog {
+    width: 100%;
 }
 
 .chatEntryContainer {
@@ -110,7 +124,8 @@ html, body {
 }
 
 #rulesDiv {
-    max-width: 550px;
+    max-width: 525px;
+    margin-top: 5px;
 }
 
 .rule {

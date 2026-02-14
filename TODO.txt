@@ -1,9 +1,8 @@
 before sharing:
     more admin commands
+    paged game list
 
     bug report button
-    credits page for SVG attribution
-    updates page for version history
 
     change admin password
     sliderchess.com domain?
