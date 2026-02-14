@@ -7,7 +7,7 @@ import { moveGlobalChat } from "./gameScreen.js";
 const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 export function showLobby(): void {
-    lobbyScreen!.style.display = 'block';
+    lobbyScreen!.style.display = '';
     gameScreen!.style.display = 'none';
     if (!fromHistory) window.history.pushState({}, '', window.location.origin);
     globalChatLog.scrollTop = globalChatLog.scrollHeight;

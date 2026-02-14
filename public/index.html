@@ -15,11 +15,12 @@
 </head>
 
 <body>
-    <div id="lobby-screen" style="display: block;">
-        <h1>SliderChess Lobby (<span id="nClients">1</span> Players Connected)</h1>
+    <div id="lobby-screen">
+        <h1 style="margin: 0">SliderChess Lobby</h1>
+        <p style="margin-top: 0">(<span id="nClients">1</span> Players Connected)</p>
         <span>Name:<input type="text" id="playerName"/> <button id="updateName">Update</button></span>
 
-        <h2>Global chat</h2>
+        <h2 style="margin-bottom: 0">Global chat</h2>
         <div id="globalChatDiv" style="max-width: 600px;">
             <textarea class="chatLog" id="globalChatLog" rows="10" readonly></textarea>
             <div id="globalChatEntryContainer" class="chatEntryContainer">
@@ -28,10 +29,14 @@
             </div>
         </div>
 
-        <h2>Game List (<span id="nGames">1</span> Active Games)</h2>
-        <button id="refreshGameList">Refresh</button>
-        <button id="createGame">Create game</button>
-        <ol id="gameList"></ol>
+        <h2 style="margin-bottom: 0">Game List (<span id="nGames">1</span> Active Games)</h2>
+        <div>
+            <button id="refreshGameList">Refresh</button>
+            <button id="createGame">Create game</button>
+        </div>
+        <div id="gameListDiv">
+            <ol id="gameList"></ol>
+        </div>
     </div>
 
     <dialog id="createGameDialog">
@@ -77,27 +82,27 @@
         <div id="popupButtonsDiv"></div>
     </dialog>
 
-    <div id="game-screen" style="display: none;">
+    <div id="game-screen">
         <h1>Game Room #<span id="gameIdDisplay"></span></h1>
-        <div class="gameInfo">
+        <div>
             <span>Game password:<input type="text" id="gamePassword"/> <button id="updateGamePassword">Update</button></span> <br>
             <button id="claimWhite">White</button><span id="whitePlayerInfo"></span> <br>
             <button id="claimBlack">Black</button><span id="blackPlayerInfo"></span> <br>
             <button id="claimSpectator">Spectators</button><span id="spectatorInfo"></span> <br>
         </div>
 
-        <div class="boardAndChatContainer">
+        <div id="boardAndChatContainer">
             <div>(<span id="initialTimeTop"></span>+<span id="incrementTop"></span>) <span id="timeLeftTop"></span></div>
             <div id="boardContainer" class="boardContainer">
                 <div><canvas id="board"></canvas></div>
 
-                <div id="movesLogContainer" class="movesLogContainer">
-                    <div class="movesLogDiv" id="movesLogDiv" readonly>
+                <div id="movesLogContainer">
+                    <div id="movesLogDiv" readonly>
                         <div class="movesLogColumn" contenteditable="true" id="movesLogColumnNum" readonly></div>
                         <div class="movesLogColumn" contenteditable="true" id="movesLogColumnWhite" readonly></div>
                         <div class="movesLogColumn" contenteditable="true" id="movesLogColumnBlack" readonly></div>
                     </div>
-                    <div class="movesLogButtonsDiv">
+                    <div id="movesLogButtonsDiv">
                         <button id="backwardAll">⏮</button>
                         <button id="backward">←</button>
                         <button id="forward">→</button>
@@ -117,8 +122,8 @@
                 <button id="surrender">Surrender</button> <br>
             </div>
             
-            <div id="chatContainer" class="chatContainer">
-                <div id="chatDiv" class="chatDiv">
+            <div id="chatContainer">
+                <div id="chatDiv">
                     <strong><span id="gameChatName">Game</span> Chat</strong>
                     <textarea class="chatLog" id="chatLog" rows="10" readonly></textarea>
                     <div id="chatEntryContainer" class="chatEntryContainer">
@@ -130,25 +135,67 @@
             </div>
         </div>
 
-        <div class="rulesDiv">
-            <input type="checkbox" id="ruleMoveOwnKing" checked="true"/><span id="ruleMoveOwnKingDisagree">❌</span><label for="ruleMoveOwnKing">Forbid tile-moving your own king?</label> <br>
-            <dd>
-                <input type="checkbox" id="ruleMoveOwnKingInCheck" checked="true"/><span id="ruleMoveOwnKingInCheckDisagree">❌</span><label for="ruleMoveOwnKingInCheck">Just forbid tile-moving your own king when you're in check?</label>
-            </dd>
-            <input type="checkbox" id="ruleMoveOpp" checked="true"/><span id="ruleMoveOppDisagree">❌</span><label for="ruleMoveOpp">Forbid tile-moving any of your opponent's pieces?</label> <br>
-            <dd>
-                <input type="checkbox" id="ruleUndoTileMove" checked="true"/><span id="ruleUndoTileMoveDisagree">❌</span><label for="ruleUndoTileMove">Forbid undoing a tile move?</label> <br>
-                <input type="checkbox" id="ruleMoveOppKing" checked="true"/><span id="ruleMoveOppKingDisagree">❌</span><label for="ruleMoveOppKing">Forbid tile-moving your opponent's king?</label> <br>
-                <input type="checkbox" id="ruleMoveOppCheck" checked="true"/><span id="ruleMoveOppCheckDisagree">❌</span><label for="ruleMoveOppCheck">Forbid tile-moving an opponent piece that's giving check?</label> <br>
-            </dd>
-            <input type="checkbox" id="ruleDoubleMovePawn" checked="true"/><span id="ruleDoubleMovePawnDisagree">❌</span><label for="ruleDoubleMovePawn">Allow pawns to double move from their original rank after being tile-moved?</label> <br>
-            <input type="checkbox" id="ruleCastleNormal"/><span id="ruleCastleNormalDisagree">❌</span><label for="ruleCastleNormal">Allow castling after your king or rook tile-moves, but only if they are tile-moved back to their original spots?</label> <br>
-            <input type="checkbox" id="ruleCastleMoved"/><span id="ruleCastleMovedDisagree">❌</span><label for="ruleCastleMoved">Allow castling after your king or rook tile-moves, even if they're not in their original spots?</label> <br>
-            <input type="checkbox" id="ruleEnPassantTile"/><span id="ruleEnPassantTileDisagree">❌</span><label for="ruleEnPassantTile">Allow en passant from any similar tile move?</label> <br>
-            <dd>
-                <input type="checkbox" id="ruleEnPassantTileHome"/><span id="ruleEnPassantTileHomeDisagree">❌</span><label for="ruleEnPassantTileHome">Allow en passant from a tile move from the captured pawn's original rank?</label> <br>
-            </dd>
-            <input type="checkbox" id="ruleIgnoreAll"/><span id="ruleIgnoreAllDisagree">❌</span><label for="ruleIgnoreAll">Ignore all movement rules?</label> <br>
+        <div id="rulesDiv">
+            <div class="rule">
+                <input type="checkbox" id="ruleMoveOwnKing" checked="true"/>
+                <span id="ruleMoveOwnKingDisagree">❌</span>
+                <label for="ruleMoveOwnKing">Forbid tile-moving your own king?</label>
+            </div>
+                <div class="rule indented-rule">
+                    <input type="checkbox" id="ruleMoveOwnKingInCheck" checked="true"/>
+                    <span id="ruleMoveOwnKingInCheckDisagree">❌</span>
+                    <label for="ruleMoveOwnKingInCheck">Just forbid tile-moving your own king when you're in check?</label>
+                </div>
+            <div class="rule">
+                <input type="checkbox" id="ruleMoveOpp" checked="true"/>
+                <span id="ruleMoveOppDisagree">❌</span>
+                <label for="ruleMoveOpp">Forbid tile-moving any of your opponent's pieces?</label>
+            </div>
+                <div class="rule indented-rule">
+                    <input type="checkbox" id="ruleUndoTileMove" checked="true"/>
+                    <span id="ruleUndoTileMoveDisagree">❌</span>
+                    <label for="ruleUndoTileMove">Forbid undoing a tile move?</label>
+                </div>
+                <div class="rule indented-rule">
+                    <input type="checkbox" id="ruleMoveOppKing" checked="true"/>
+                    <span id="ruleMoveOppKingDisagree">❌</span>
+                    <label for="ruleMoveOppKing">Forbid tile-moving your opponent's king?</label>
+                </div>
+                <div class="rule indented-rule">
+                    <input type="checkbox" id="ruleMoveOppCheck" checked="true"/>
+                    <span id="ruleMoveOppCheckDisagree">❌</span>
+                    <label for="ruleMoveOppCheck">Forbid tile-moving an opponent piece that's giving check?</label>
+                </div>
+            <div class="rule">
+                <input type="checkbox" id="ruleDoubleMovePawn" checked="true"/>
+                <span id="ruleDoubleMovePawnDisagree">❌</span>
+                <label for="ruleDoubleMovePawn">Allow pawns to double move from their original rank after being tile-moved?</label>
+            </div>
+            <div class="rule">
+                <input type="checkbox" id="ruleCastleNormal"/>
+                <span id="ruleCastleNormalDisagree">❌</span>
+                <label for="ruleCastleNormal">Allow castling after your king or rook tile-moves, but only if they are tile-moved back to their original spots?</label>
+            </div>
+            <div class="rule">
+                <input type="checkbox" id="ruleCastleMoved"/>
+                <span id="ruleCastleMovedDisagree">❌</span>
+                <label for="ruleCastleMoved">Allow castling after your king or rook tile-moves, even if they're not in their original spots?</label>
+            </div>
+            <div class="rule">
+                <input type="checkbox" id="ruleEnPassantTile"/>
+                <span id="ruleEnPassantTileDisagree">❌</span>
+                <label for="ruleEnPassantTile">Allow en passant from any similar tile move?</label>
+            </div>
+                <div class="rule indented-rule">
+                    <input type="checkbox" id="ruleEnPassantTileHome"/>
+                    <span id="ruleEnPassantTileHomeDisagree">❌</span>
+                    <label for="ruleEnPassantTileHome">Allow en passant from a tile move from the captured pawn's original rank?</label>
+                </div>
+            <div class="rule">
+                <input type="checkbox" id="ruleIgnoreAll"/>
+                <span id="ruleIgnoreAllDisagree">❌</span>
+                <label for="ruleIgnoreAll">Ignore all movement rules?</label>
+            </div>
         </div>
     </div>
 

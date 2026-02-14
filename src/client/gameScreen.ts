@@ -7,9 +7,10 @@ import { flipBoard, updateBoardDimensions } from "./drawBoard.js";
 
 const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
+gameScreen!.style.display = 'none';
 export function showGame(gameId: number, password: string): void {
     lobbyScreen!.style.display = 'none';
-    gameScreen!.style.display = 'block';
+    gameScreen!.style.display = '';
     if (!fromHistory) window.history.pushState({}, '', window.location.origin + `/${gameId}`);
 
     updatePassword(password);

@@ -71,7 +71,9 @@ function setVeritcal(newIsVertical: boolean): void {
         boardContainer.appendChild(movesLogContainer);
     }
 }
+const gameScreen = document.getElementById('game-screen');
 export function updateBoardDimensions(): void {
+    if(gameScreen!.style.display === 'none') return;
     const padding = 75;  // not sure how to calculate the padding and stuff around all the elements
     setVeritcal(window.innerWidth < 600 || window.innerHeight < 2*chatButtons);
 
