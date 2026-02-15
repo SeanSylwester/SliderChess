@@ -2,7 +2,6 @@ before sharing:
     paged game list
 
     bug report button
-    kofi
 
     improve visuals (backgrounds, borders, padding, etc.)
 
