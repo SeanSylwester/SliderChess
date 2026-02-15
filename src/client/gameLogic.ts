@@ -170,16 +170,29 @@ export let movePointer = Number.POSITIVE_INFINITY;  // will be set to max value 
 
 export function initLocalGameState(compressedGameState: CompressedGameState, yourColor: PieceColor): void {
     localGameState = {...localGameState, ...compressedGameState};
-    
-    const ret = parseFEN(compressedGameState.arrayFEN.at(-1));
-    localGameState.board = ret.board;
-    localGameState.QW = ret.QW;
-    localGameState.KW = ret.KW;
-    localGameState.QB = ret.QB;
-    localGameState.KB = ret.KB;
-    localGameState.halfmoveClock = ret.halfmoveClock;
 
+    // reconstruct from compressedMovesLog: movesLog, board, arrayFEN, QW, KW, QB, KB, halfmoveClock
     localGameState.movesLog = decompressMovesLog(compressedGameState.compressedMovesLog);
+    localGameState.board = getDefaultBoard();
+    localGameState.currentTurn = PieceColor.WHITE;
+    const {fen} = getFEN(localGameState.board, localGameState.currentTurn, true, true, true, true, 0, 1);
+    localGameState.arrayFEN = [fen];
+    for (const [i, move] of localGameState.movesLog.entries()) {
+        moveOnBoard(localGameState.board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
+
+        localGameState.currentTurn = localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
+        [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
+        
+        if ((move.oldPiece.type !== PieceType.EMPTY && move.oldPiece.type !== PieceType.TILE) || move.newPiece.type === PieceType.PAWN) {
+            localGameState.halfmoveClock = 0;
+        } else {
+            localGameState.halfmoveClock += 1;
+        }
+
+        const {fen} = getFEN(localGameState.board, localGameState.currentTurn, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.halfmoveClock, Math.floor((i + 1) / 2) + 1 );
+        localGameState.arrayFEN.push(fen);
+    }
+    delete (localGameState as any).compressedMovesLog;
 
     myColor = yourColor;
     if (myColor === PieceColor.WHITE) {

@@ -41,10 +41,11 @@ export interface GameState {
     creationTime: number;
     isActive: boolean;
 }
+// rules and names sent separately
+// strips out some unnecessary stuff that we can parse from the compressedMovesLog: 
+//   movesLog, board, arrayFEN, QW, KW, QB, KB, halfmoveClock
+// technically, sending notation would be smaller than compressedMovesLog, but I don't want to have to maintain that feature
 export interface CompressedGameState {
-    playerWhiteName: string | null;
-    playerBlackName: string | null;
-    spectatorNames: string[];
     id: number;
     password: string;
     chatLog: string[];
@@ -60,10 +61,9 @@ export interface CompressedGameState {
     clockRunning: boolean;
     drawWhite: boolean;
     drawBlack: boolean;
-    arrayFEN: string[];
     creationTime: number;
     isActive: boolean;
-}  // strips out some unnecessary stuff that we can parse from arrayFEN, and compresses the movesLog
+}  
 export interface GameInfo {
     hasPassword: boolean;
     password?: string;  // client will store known passwords here
@@ -256,7 +256,7 @@ export interface GlobalChatMessage extends Message {
 }
 export interface GameStateMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_STATE;
-    gameState: CompressedGameState;
+    compressedGameState: CompressedGameState;
     yourColor: PieceColor;
 }
 export interface gameListMessage extends Message {
@@ -267,6 +267,7 @@ export interface gameListMessage extends Message {
 export interface RulesMessage extends Message {
     type: typeof MESSAGE_TYPES.RULES;
     rules: Rules;
+    rulesLocked: boolean;
 }
 export interface RulesAgreementMessage extends Message {
     type: typeof MESSAGE_TYPES.RULES_AGREEMENT;

@@ -233,7 +233,6 @@ const ruleIgnoreAll = document.getElementById("ruleIgnoreAll") as HTMLInputEleme
 const ruleIgnoreAllDisagree = document.getElementById("ruleIgnoreAllDisagree") as HTMLInputElement;
 ruleIgnoreAll.addEventListener('change', sendRules);
 
-let rulesLocked = false;
 function getRules(): Rules {
     return {ruleMoveOwnKing: ruleMoveOwnKing.checked,
             ruleMoveOwnKingInCheck: ruleMoveOwnKingInCheck.checked,
@@ -250,10 +249,10 @@ function getRules(): Rules {
 }
 function sendRules(): void {
     localGameState.rules = getRules();
-    sendMessage({type: MESSAGE_TYPES.RULES, rules: localGameState.rules} satisfies RulesMessage);
+    sendMessage({type: MESSAGE_TYPES.RULES, rules: localGameState.rules, rulesLocked: localGameState.rulesLocked} satisfies RulesMessage);
 }
 export function disableRules(): void {
-    if (rulesLocked || (localGameState && !localGameState.isActive) || myColor === PieceColor.NONE) {
+    if (localGameState.rulesLocked || !localGameState.isActive || myColor === PieceColor.NONE) {
         ruleMoveOwnKing.disabled = true;
         ruleMoveOwnKingInCheck.disabled = true;
         ruleMoveOpp.disabled = true;
@@ -295,9 +294,9 @@ function hideRulesAgreement(): void {
     ruleEnPassantTileHomeDisagree.hidden = true;
     ruleIgnoreAllDisagree.hidden = true;
 }
-export function updateRulesAgreement(rulesAgreement: Rules, newRulesLocked: boolean): void {
-    rulesLocked = newRulesLocked;
-    if (rulesLocked || (localGameState && !localGameState.isActive) || myColor === PieceColor.NONE) {
+export function updateRulesAgreement(rulesAgreement: Rules, rulesLocked: boolean): void {
+    localGameState.rulesLocked = rulesLocked;
+    if (localGameState.rulesLocked || !localGameState.isActive || myColor === PieceColor.NONE) {
         hideRulesAgreement();
     } else {
         ruleMoveOwnKingDisagree.hidden = rulesAgreement.ruleMoveOwnKing;
@@ -316,7 +315,8 @@ export function updateRulesAgreement(rulesAgreement: Rules, newRulesLocked: bool
 
     disableRules();
 }
-export function updateRules(rules: Rules): void {
+export function updateRules(rules: Rules, rulesLocked: boolean): void {
+    localGameState.rulesLocked = rulesLocked;
     ruleMoveOwnKing.checked = rules.ruleMoveOwnKing;
     ruleMoveOwnKingInCheck.checked = rules.ruleMoveOwnKingInCheck;
     ruleMoveOpp.checked = rules.ruleMoveOpp;

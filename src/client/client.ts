@@ -49,7 +49,7 @@ function connectWebSocket(): void {
                 updateGameList(message.gameList, message.nClients);
                 break;
             case MESSAGE_TYPES.GAME_STATE:
-                initLocalGameState(message.gameState, message.yourColor);
+                initLocalGameState(message.compressedGameState, message.yourColor);
                 break;
             case MESSAGE_TYPES.GAME_NAMES:
                 setNames(message.playerWhiteName, message.playerBlackName, message.spectatorNames, message.yourColor);
@@ -82,7 +82,7 @@ function connectWebSocket(): void {
                 syncTime(message.clockRunning, message.timeLeftWhite, message.timeLeftBlack, message.initialTimeWhite, message.initialTimeBlack, message.incrementWhite, message.incrementBlack);
                 break;
             case MESSAGE_TYPES.RULES:
-                updateRules(message.rules);
+                updateRules(message.rules, message.rulesLocked);
                 break;
             case MESSAGE_TYPES.RULES_AGREEMENT:
                 updateRulesAgreement(message.rulesAgreement, message.rulesLocked);

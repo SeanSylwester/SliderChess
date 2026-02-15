@@ -312,13 +312,17 @@ export class Game {
             this.logChatMessage(`Player ${player.name} has joined as ${color === PieceColor.NONE ? 'a spectator' : PieceColor[color]}.`);
         }
         this.updateLastNames();
-        this.sendNamesToAll();
-        this.sendGameState(player);
 
         // send the latest rules when they first join
-        sendMessage(player, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);  
+        sendMessage(player, {type: MESSAGE_TYPES.RULES, rules: this.rules, rulesLocked: this.rulesLocked} satisfies RulesMessage);  
         this.rulesMap.set(player, { ...this.rules });
         if (this.isActive && !this.rulesLocked && checkRules) this.sendRulesAgreement();
+
+        // send names to everyone AND this player
+        this.sendNamesToAll();
+
+        // send the compressed game state, excluding rules and names
+        this.sendGameState(player);
     }
 
     public changePosition(c: ClientInfo, position: PieceColor): void {
@@ -521,10 +525,7 @@ export class Game {
     }
 
     public sendGameState(client: ClientInfo): void {
-        const gameState: CompressedGameState = {
-            playerWhiteName: this.playerWhite?.name ?? null,
-            playerBlackName: this.playerBlack?.name ?? null,
-            spectatorNames: this.spectators.map(s => s.name),
+        const compressedGameState: CompressedGameState = {
             id: this.id,
             password: this.password,
             chatLog: this.chatLog,
@@ -540,12 +541,11 @@ export class Game {
             clockRunning: this.clockRunning,
             drawWhite: this.drawWhite,
             drawBlack: this.drawBlack,
-            arrayFEN: this.arrayFEN,
             creationTime: this.creationTime,
             isActive: this.isActive
         };
         const clientColor = this.getColor(client);
-        sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, gameState: gameState, yourColor: clientColor } satisfies GameStateMessage);
+        sendMessage(client, { type: MESSAGE_TYPES.GAME_STATE, compressedGameState: compressedGameState, yourColor: clientColor } satisfies GameStateMessage);
     }
 
     public sendGameStateToAll(): void {
@@ -626,12 +626,12 @@ export class Game {
 
             // update the rules of all the spectators (whose checkboxes should be disabled!) but not the other player
             for (const spectator of this.spectators) {
-                sendMessage(spectator, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);
+                sendMessage(spectator, {type: MESSAGE_TYPES.RULES, rules: this.rules, rulesLocked: this.rulesLocked} satisfies RulesMessage);
                 this.rulesMap.set(spectator, this.rules);
             }
         } else {
             // if the rules aren't changeable, then this will uncheck whatever rules they're trying to send
-            sendMessage(client, {type: MESSAGE_TYPES.RULES, rules: this.rules} satisfies RulesMessage);
+            sendMessage(client, {type: MESSAGE_TYPES.RULES, rules: this.rules, rulesLocked: this.rulesLocked} satisfies RulesMessage);
         }
     }
 
