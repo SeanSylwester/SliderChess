@@ -3,6 +3,9 @@ before sharing:
     paged game list
 
     bug report button
+    kofi
+
+    improve visuals (backgrounds, borders, padding, etc.)
 
     change admin password
     sliderchess.com domain?
@@ -20,3 +23,4 @@ offline play: flag on create game to instead run a game locally, controlling bla
 
 unit tests on LOCAL
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)
+refactor rules to all be handled in JS

@@ -1,6 +1,6 @@
 import { QueryResult } from 'pg';
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor, checkRules } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor, checkRules, compressMovesLog, decompressMovesLog } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
 const undoText = 'Your opponent has requested an undo.';
@@ -150,7 +150,7 @@ export class Game {
         try {
             this.lastNameWhite = row.white;
             this.lastNameBlack = row.black;
-            this.chatLog = row.chat_log.split('|');
+            this.chatLog = row.chat_log.split('\n');
 
             // get board, castling permission, and draw conditions from the last recorded FEN
             const arrayFEN = JSON.parse(row.array_fen);
@@ -160,11 +160,11 @@ export class Game {
             if (this.arrayFEN.length) this.setBoardFromFEN(this.arrayFEN.at(-1)!);
             else console.error('Failed to parse arrayFEN loaded from DB:', arrayFEN);
 
-            this.movesLog = JSON.parse(row.moves_log);
+            this.movesLog = decompressMovesLog(row.moves_log);
             this.rules = {...this.rules, ...JSON.parse(row.rules)};
             this.rulesLocked = this.movesLog.length > 0;
 
-            this.useTimeControl = row.use_time_control;  // note: games before this waws added default to true in the DB
+            this.useTimeControl = row.use_time_control;  // note: games before this was added default to true in the DB
             this.initialTimeWhite = row.initial_time_white;
             this.initialTimeBlack = row.initial_time_black;
             this.incrementWhite = row.increment_white;
@@ -184,10 +184,7 @@ export class Game {
                           'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 
                           'rules', 'result', 'cause', 'is_active', 'array_fen', 'use_time_control'];
 
-        let chatLogStr = this.chatLog.join('|');
-        chatLogStr.replace(/\n/g, '|');  // some individual messages will have newlines in them. Replace those too. This will make them be treated as separate messages on reload but oh well
-
-        const valsRaw = [this.password, this.lastNameWhite, this.lastNameBlack, chatLogStr, JSON.stringify(this.movesLog), this.currentTurn === PieceColor.WHITE,
+        const valsRaw = [this.password, this.lastNameWhite, this.lastNameBlack, this.chatLog.join('\n'), compressMovesLog(this.movesLog), this.currentTurn === PieceColor.WHITE,
                       this.initialTimeWhite, this.initialTimeBlack, this.incrementWhite, this.incrementBlack, this.timeLeftWhite, this.timeLeftBlack,
                       JSON.stringify(this.rules), GameScore.get(this.result), this.result, this.isActive, JSON.stringify(this.arrayFEN), this.useTimeControl];
         

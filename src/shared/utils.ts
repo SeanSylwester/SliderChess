@@ -44,9 +44,20 @@ export function pieceTypeFromChar(char: string): PieceType {
     return PieceType.EMPTY;
 }
 export function charFromPieceType(pieceType: PieceType, isFEN: boolean): string {
+    // returns 'E' for PieceType.EMPTY
     return pieceType === PieceType.PAWN   ? (isFEN ? 'P' : '') 
         : (pieceType === PieceType.KNIGHT ? 'N' 
                                           : PieceType[pieceType][0]);
+}
+export function pieceFromChar(char: string): Piece {
+    const charUpper = char.toUpperCase()
+    const pieceType = pieceTypeFromChar(charUpper);
+    const pieceColor = ['T', 'E'].includes(charUpper) ? PieceColor.NONE : (char === charUpper ? PieceColor.WHITE : PieceColor.BLACK);
+    return { type: pieceType, color: pieceColor };
+}
+export function charFromPiece(piece: Piece, isFEN: boolean): string {
+    const pieceChar = charFromPieceType(piece.type, isFEN);
+    return piece.color !== PieceColor.BLACK ? pieceChar : pieceChar.toLowerCase();
 }
 
 export function getFEN(board: Piece[][], currentTurn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, fullmoveNumber: number ): {fen: string, fenNoMoves: string} {
@@ -65,8 +76,7 @@ export function getFEN(board: Piece[][], currentTurn: PieceColor, QW: boolean, K
                 }
                 spaces = 0;
                 
-                pieceChar = charFromPieceType(piece.type, true);
-                s += piece.color === PieceColor.WHITE ? pieceChar : pieceChar.toLowerCase();
+                s += charFromPiece(piece, true);
             }
         }
         if (spaces) {
@@ -1099,4 +1109,67 @@ export function gameInfoFromGameState(game: GameState): GameInfo {
         useTimeControl: game.useTimeControl,
         currentTurn: game.currentTurn
     };
+}
+
+export function compressMovesLog(movesLog: Move[]): string {
+    const movesLogStrs: string[] = [];
+    for (const move of movesLog) {
+        let s = '';
+        s += charFromPiece(move.oldPiece, true);
+        s += charFromPiece(move.newPiece, true);
+        s += `${move.fromRow}${move.fromCol}${move.toRow}${move.toCol}`;
+        s += move.notation;
+        //s += move.isTile ? 't' : 'f';  // redundant, use oldPiece.type === PieceType.TILE
+        if (move.promotions.length) {
+            s += '|'
+            for (const promo of move.promotions) {
+                s += `${promo.row}${promo.col}${charFromPiece(promo.piece, true)}`;
+            }
+        }
+        movesLogStrs.push(s);
+    }
+    /*
+    if (JSON.stringify(movesLog) !== JSON.stringify(decompressMovesLog(movesLogStrs.join(',')))) {
+        console.error('Error compressing movesLog!')
+        console.error(movesLog);
+        console.error(movesLogStrs.join(','));
+    }
+    */
+
+    return movesLogStrs.join(',');
+
+}
+
+export function decompressMovesLog(movesLogStr: string): Move[] {
+    const movesLog: Move[] = [];
+    for (const move of movesLogStr.trim().split(',')) {
+        const oldPiece = pieceFromChar(move[0])
+
+        const pipe = move.indexOf('|');
+        const promotions: {row: number, col: number, piece: Piece}[] = [];
+        if (pipe > -1) {
+            const promoStr = move.slice(pipe + 1);
+            for (let i = 0; i < promoStr.length; i += 3) {
+                promotions.push({
+                    row: parseInt(promoStr[i]),
+                    col: parseInt(promoStr[i + 1]),
+                    piece: pieceFromChar(promoStr[i + 2]),
+                });
+            }
+        }
+
+        movesLog.push({
+            oldPiece: oldPiece,
+            newPiece: pieceFromChar(move[1]),
+            fromRow: parseInt(move[2]),
+            fromCol: parseInt(move[3]),
+            toRow: parseInt(move[4]),
+            toCol: parseInt(move[5]),
+            notation: pipe > -1 ? move.slice(6, pipe) : move.slice(6),
+            isTile: oldPiece.type === PieceType.TILE,
+            promotions: promotions,
+        });
+    }
+
+    return movesLog;
 }
