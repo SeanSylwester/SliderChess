@@ -58,12 +58,12 @@
 
     <div id="lobby-screen">
         <button class="aboutButton" onclick="document.getElementById('aboutDialog').showModal()">?</button>
-        <h1 style="margin: 0">SliderChess Lobby</h1>
+        <h1 style="margin: 0; max-width: calc(100% - 40px)">SliderChess Lobby</h1>
         <p style="margin-top: 0">(<span id="nClients">1</span> Players Connected)</p>
         <span>Name:<input type="text" id="playerName"/> <button id="updateName">Update</button></span>
 
         <h2 style="margin-bottom: 0">Global chat</h2>
-        <div id="globalChatDiv" style="max-width: 600px;">
+        <div id="globalChatDiv">
             <textarea class="chatLog" id="globalChatLog" rows="10" readonly></textarea>
             <div id="globalChatEntryContainer" class="chatEntryContainer">
                 <input class="chatEntry" type="text" id="globalChatEntry"/> 
@@ -137,7 +137,7 @@
 
         <div id="boardAndChatContainer">
             <div>(<span id="initialTimeTop"></span>+<span id="incrementTop"></span>) <span id="timeLeftTop"></span></div>
-            <div id="boardContainer" class="boardContainer">
+            <div id="boardContainer">
                 <div><canvas id="board"></canvas></div>
 
                 <div id="movesLogContainer">
@@ -156,7 +156,7 @@
             </div>
             <div>(<span id="initialTimeBottom"></span>+<span id="incrementBottom"></span>) <span id="timeLeftBottom"></span></div>
 
-            <div>
+            <div id="gameButtonsDiv">
                 <button id="quitGame">Quit</button>
                 <button id="flipBoard">Flip board view</button>
                 <button id="rewind">Undo</button>
@@ -168,12 +168,14 @@
             
             <div id="chatContainer">
                 <div id="chatDiv">
-                    <strong><span id="gameChatName">Game</span> Chat</strong>
+                    <div>
+                        <strong><span id="gameChatName">Game</span> Chat</strong> 
+                        <button id="showGlobalChat" style="white-space: nowrap;">Show Global</button>
+                    </div>
                     <textarea class="chatLog" id="chatLog" rows="10" readonly></textarea>
                     <div id="chatEntryContainer" class="chatEntryContainer">
                         <input class="chatEntry" type="text" id="chatEntry"/> 
                         <button id="sendChat">Send</button>
-                        <button id="showGlobalChat">Show Global</button>
                     </div>
                 </div>
             </div>

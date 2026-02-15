@@ -18,22 +18,24 @@ html, body {
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    width: 80%;
     max-width: 600px;
-    margin: 10px auto;
+    margin: 0 auto;
     padding: 10px;
-    border: 1px solid #ccc;
-    height: calc(100vh - 22px);
-    min-height: 529px; /* TODO: figure out how to do this automatically */
+    height: 100dvh;
+    min-height: 400px;
     position: relative;
 }
 #gameListDiv {
     flex: 1;
-    min-height: 7em;
-    max-width: 600px;
+    min-height: 10em;
     overflow: auto;
     white-space: nowrap;
     border: 1px solid #ccc;
+}
+#globalChatDiv {
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
 }
 .timeControlButton {
     min-width: 5em;
@@ -55,13 +57,22 @@ html, body {
     width: fit-content;
 }
 
-.boardContainer {
+#boardContainer {
     display: inline-flex; /* Aligns child elements horizontally by default */
     width: fit-content;
     justify-content: left; /* Distributes space evenly between elements */
     align-items: stretch; /* Aligns elements vertically in the center */
     border: 1px solid #ccc;
-    padding: 10px;
+    padding: 0px;
+}
+#gameButtonsDiv {
+    display: flex;
+    overflow: auto;
+    gap: 5px;
+    width: calc(100dvw - 40px);
+}
+#gameButtonsDiv button {
+    white-space: nowrap;
 }
 
 #movesLogContainer {
@@ -74,6 +85,7 @@ html, body {
 #movesLogButtonsDiv {
     width: fit-content;
     margin: 0 auto;
+    white-space: nowrap;
 }
 
 #movesLogDiv {
@@ -109,18 +121,17 @@ html, body {
 .chatLog {
     resize: none;
 }
-#globalChatLog {
-    width: 100%;
-}
 
 .chatEntryContainer {
     display: flex;
     width: 100%;
     gap: 5px;
+    flex-wrap: wrap;
 }
 
 .chatEntry {
     flex-grow: 1;
+    width: 100px;
 }
 
 #rulesDiv {

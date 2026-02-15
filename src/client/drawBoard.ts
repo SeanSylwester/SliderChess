@@ -20,6 +20,7 @@ const highlightSpace = 2;
 export const lineSpace = 1;
 const textSpace = 20;
 const textMargin = 4;
+const boardWidthMin = 160;
 const boardWidthMax = 1000;
 let boardSize = canvas.width - textSpace;
 export let pitch = Math.floor(boardSize / 8); // size of each square
@@ -56,7 +57,7 @@ export function setFlip(doFlip: boolean): void {
 const movesLogContainer = document.getElementById('movesLogContainer') as HTMLDivElement;
 const chatContainer = document.getElementById('chatContainer') as HTMLDivElement;
 const boardContainer = document.getElementById('boardContainer') as HTMLDivElement;
-const chatButtons = 400;  
+const chatButtons = 315;
 let isVertical: null | boolean = null;
 
 function setVeritcal(newIsVertical: boolean): void {
@@ -74,21 +75,21 @@ function setVeritcal(newIsVertical: boolean): void {
 const gameScreen = document.getElementById('game-screen');
 export function updateBoardDimensions(): void {
     if(gameScreen!.style.display === 'none') return;
-    const padding = 75;  // not sure how to calculate the padding and stuff around all the elements
+    const padding = 10;
     setVeritcal(window.innerWidth < 600 || window.innerHeight < 2*chatButtons);
 
     let boardSpaceX: number;
     let boardSpaceY: number;
     if (isVertical) {
         setVeritcal(true);
-        boardSpaceX = window.innerWidth - padding; 
+        boardSpaceX = window.innerWidth - 4 * padding; 
     } else {
         setVeritcal(false);
-        boardSpaceX = window.innerWidth - movesLogContainer.offsetWidth - padding; 
+        boardSpaceX = window.innerWidth - movesLogContainer.offsetWidth - 8 * padding; 
     }
     boardSpaceY = window.innerHeight - chatButtons - padding;
 
-    boardSize = Math.min(boardWidthMax, Math.min(boardSpaceX, boardSpaceY));
+    boardSize = Math.min(boardWidthMax, Math.max(boardWidthMin, Math.min(boardSpaceX, boardSpaceY)));
     pitch = Math.floor(boardSize / 8); // size of each square
     boardSize = pitch * 8;
     canvas.width = boardSize + textSpace;

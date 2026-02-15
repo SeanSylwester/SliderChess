@@ -1,5 +1,5 @@
 before sharing:
-    fix mobile screen width
+    fix game buttons disabled
     paged game list
 
     bug report button
