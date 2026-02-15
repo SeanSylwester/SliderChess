@@ -1,5 +1,5 @@
 before sharing:
-    more admin commands
+    fix mobile screen width
     paged game list
 
     bug report button
@@ -7,6 +7,7 @@ before sharing:
 
     improve visuals (backgrounds, borders, padding, etc.)
 
+    more admin commands
     change admin password
     sliderchess.com domain?
     discord channel
@@ -24,3 +25,6 @@ offline play: flag on create game to instead run a game locally, controlling bla
 unit tests on LOCAL
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)
 refactor rules to all be handled in JS
+
+fix the array_fen of the first 4 games
+fix the whites_turn of the first 6 games
