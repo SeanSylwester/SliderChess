@@ -22,7 +22,7 @@ function connectWebSocket(): void {
         const oldId = parseInt(localStorage.getItem('oldId') || '0');
         if (reconnectAttempts) {
             console.log('Successfully reconnected to the WebSocket server!');
-            if (localGameState) console.log('Trying to reconnect to my game');
+            if (localGameState.id) console.log('Trying to reconnect to my game');
             reconnectAttempts = 0;
             sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: oldId, clientName: oldName!, gameState: localGameState } satisfies ReconnectMessage);
         } else {

@@ -1,5 +1,5 @@
 import { QueryResult } from 'pg';
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage } from '../shared/types.js';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage, CompressedGameState } from '../shared/types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor, checkRules, compressMovesLog, decompressMovesLog } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
@@ -157,8 +157,7 @@ export class Game {
             this.arrayFEN = [];
             this.mapFEN = new Map<string, number>();
             for (const fen of arrayFEN) this.updateFEN(fen, fenStripMoves(fen));
-            if (this.arrayFEN.length) this.setBoardFromFEN(this.arrayFEN.at(-1)!);
-            else console.error('Failed to parse arrayFEN loaded from DB:', arrayFEN);
+            this.setBoardFromFEN(this.arrayFEN.at(-1));
 
             this.movesLog = decompressMovesLog(row.moves_log);
             this.rules = {...this.rules, ...JSON.parse(row.rules)};
@@ -244,7 +243,7 @@ export class Game {
         return clients;
     }
 
-    public setBoardFromFEN(fen: string): void {
+    public setBoardFromFEN(fen: string | undefined): void {
         const ret = parseFEN(fen);
         this.board = ret.board;
         this.QW = ret.QW;
@@ -523,15 +522,14 @@ export class Game {
     }
 
     public sendGameState(client: ClientInfo): void {
-        const gameState: GameState = {
+        const gameState: CompressedGameState = {
             playerWhiteName: this.playerWhite?.name ?? null,
             playerBlackName: this.playerBlack?.name ?? null,
             spectatorNames: this.spectators.map(s => s.name),
             id: this.id,
             password: this.password,
-            board: this.board,
             chatLog: this.chatLog,
-            movesLog: this.movesLog,
+            compressedMovesLog: compressMovesLog(this.movesLog),
             currentTurn: this.currentTurn,
             useTimeControl: this.useTimeControl,
             initialTimeWhite: this.initialTimeWhite,
@@ -541,15 +539,8 @@ export class Game {
             timeLeftWhite: this.timeLeftWhite,
             timeLeftBlack: this.timeLeftBlack,
             clockRunning: this.clockRunning,
-            KW: this.KW,
-            QW: this.QW,
-            KB: this.KB,
-            QB: this.QB,
             drawWhite: this.drawWhite,
             drawBlack: this.drawBlack,
-            rules: this.rules,  // TODO: this is ignored. Remove?
-            rulesLocked: this.rulesLocked,  // TODO: this is ignored. Remove?
-            halfmoveClock: this.halfmoveClock,
             arrayFEN: this.arrayFEN,
             creationTime: this.creationTime,
             isActive: this.isActive

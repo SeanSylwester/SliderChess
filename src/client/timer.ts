@@ -14,7 +14,7 @@ const clockPeriod = 100; // in ms
 setInterval(countClock, clockPeriod);
 
 function countClock(): void {
-    if (localGameState?.clockRunning) {
+    if (localGameState.clockRunning) {
         if (localGameState.currentTurn === PieceColor.WHITE) {
             localGameState.timeLeftWhite -= clockPeriod / 1000;
         } else if (localGameState.currentTurn === PieceColor.BLACK) {
@@ -32,10 +32,6 @@ function countClock(): void {
 }
 
 export function updateTimeDisplay(): void{
-    if (!localGameState) {
-        return;
-    }
-    
     if (flip) {
         initialTimeTopText.textContent = formatMinSec(localGameState.initialTimeWhite, 0);
         initialTimeBottomText.textContent = formatMinSec(localGameState.initialTimeBlack, 0);
@@ -54,9 +50,6 @@ export function updateTimeDisplay(): void{
 }
 
 export function syncTime( clockRunning: boolean, timeLeftWhite: number, timeLeftBlack: number, initialTimeWhite?: number, initialTimeBlack?: number, incrementWhite?: number, incrementBlack?: number): void {
-    if (!localGameState) {
-        return;
-    }
     localGameState.clockRunning = clockRunning;
     localGameState.timeLeftWhite = timeLeftWhite;
     localGameState.timeLeftBlack = timeLeftBlack;

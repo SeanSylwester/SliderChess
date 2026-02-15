@@ -37,10 +37,33 @@ export interface GameState {
     rules: Rules;
     rulesLocked: boolean;
     halfmoveClock: number;
-    arrayFEN: string[];  // converted from Map<string, number> to string[], with each copy of string being copied number times
+    arrayFEN: string[];
     creationTime: number;
     isActive: boolean;
 }
+export interface CompressedGameState {
+    playerWhiteName: string | null;
+    playerBlackName: string | null;
+    spectatorNames: string[];
+    id: number;
+    password: string;
+    chatLog: string[];
+    compressedMovesLog: string;
+    currentTurn: PieceColor;
+    useTimeControl: boolean;
+    initialTimeWhite: number; // in seconds
+    initialTimeBlack: number; // in seconds
+    incrementWhite: number;   // in seconds
+    incrementBlack: number;   // in seconds
+    timeLeftWhite: number; // in seconds
+    timeLeftBlack: number; // in seconds
+    clockRunning: boolean;
+    drawWhite: boolean;
+    drawBlack: boolean;
+    arrayFEN: string[];
+    creationTime: number;
+    isActive: boolean;
+}  // strips out some unnecessary stuff that we can parse from arrayFEN, and compresses the movesLog
 export interface GameInfo {
     hasPassword: boolean;
     password?: string;  // client will store known passwords here
@@ -233,7 +256,7 @@ export interface GlobalChatMessage extends Message {
 }
 export interface GameStateMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_STATE;
-    gameState: GameState;
+    gameState: CompressedGameState;
     yourColor: PieceColor;
 }
 export interface gameListMessage extends Message {

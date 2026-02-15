@@ -60,9 +60,6 @@ resizeObserver.observe(chatLog);
 setChatHeight();
 
 export function updateChat(message: string): void {
-    if (!localGameState) {
-        return;
-    }
     localGameState.chatLog.push(message);
     chatLog.value += "\n" + message;
     chatLog.scrollTop = chatLog.scrollHeight;

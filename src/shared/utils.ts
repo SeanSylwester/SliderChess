@@ -107,8 +107,12 @@ export function getFEN(board: Piece[][], currentTurn: PieceColor, QW: boolean, K
 export function fenStripMoves(fen: string): string {
     return fen.split(' ').slice(0, -2).join(' ');
 }
-export function parseFEN(fen: string): {board: Piece[][], turn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number} {
+export function parseFEN(fen: string | undefined): {board: Piece[][], turn: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number} {
     const board = getDefaultBoard();
+    if (fen === undefined) {
+        return {board, turn: PieceColor.WHITE, QW: true, KW: true, QB: true, KB: true, halfmoveClock: 0};
+    }
+
     const [boardStr, turnStr, castleStr, enPassant, halfmoveClockStr, fullmoveNumberStr] = fen.split(' ');
     const turn = turnStr === 'w' ? PieceColor.WHITE : PieceColor.BLACK;
     const KW = castleStr.includes('K');
@@ -1142,6 +1146,9 @@ export function compressMovesLog(movesLog: Move[]): string {
 
 export function decompressMovesLog(movesLogStr: string): Move[] {
     const movesLog: Move[] = [];
+
+    if (!movesLogStr) return movesLog;
+
     for (const move of movesLogStr.trim().split(',')) {
         const oldPiece = pieceFromChar(move[0])
 

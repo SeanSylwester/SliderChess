@@ -1,13 +1,60 @@
-import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Rules, Message } from "../shared/types.js";
+import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Rules, Message, CompressedGameState } from "../shared/types.js";
 import { sendMessage } from "./client.js";
-import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard as getMovePieces, getFEN } from '../shared/utils.js'
+import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard as getMovePieces, getFEN, parseFEN, decompressMovesLog } from '../shared/utils.js'
 import { gameList, getGame } from "./lobbyScreen.js";
 import { disableRules, updateGameButtons, updateNames, updatePositionButtons } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
 import { canvas, checkIfTile, ctx, drawSquare, getBoardRowCol, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
 import { syncTime } from "./timer.js";
 
-export let localGameState: GameState | undefined = undefined;
+
+function getDefaultGameState(): GameState {
+    return {
+        playerWhiteName: null,
+        playerBlackName: null,
+        spectatorNames: [],
+        id: 0,
+        password: '',
+        board: getDefaultBoard(),
+        chatLog: [],
+        movesLog: [],
+        currentTurn: PieceColor.WHITE,
+        useTimeControl: true,
+        initialTimeWhite: 0,
+        initialTimeBlack: 0,
+        incrementWhite: 0,
+        incrementBlack: 0,
+        timeLeftWhite: 0,
+        timeLeftBlack: 0,
+        clockRunning: false,
+        KW: true,
+        QW: true,
+        KB: true,
+        QB: true,
+        drawWhite: false,
+        drawBlack: false,
+        rules: {
+            ruleMoveOwnKing: true,
+            ruleMoveOwnKingInCheck: true,
+            ruleMoveOpp: true,
+            ruleUndoTileMove: true,
+            ruleMoveOppKing: true,
+            ruleMoveOppCheck: true,
+            ruleDoubleMovePawn: true,
+            ruleCastleNormal: false,
+            ruleCastleMoved: false,
+            ruleEnPassantTile: false,
+            ruleEnPassantTileHome: false,
+            ruleIgnoreAll: false
+        },
+        rulesLocked: false,
+        halfmoveClock: 0,
+        arrayFEN: [],
+        creationTime: 0,
+        isActive: true
+    };
+}
+export let localGameState = getDefaultGameState();
 
 
 
@@ -50,11 +97,6 @@ export const movesLogColumnWhite = document.getElementById('movesLogColumnWhite'
 export const movesLogColumnBlack = document.getElementById('movesLogColumnBlack') as HTMLDivElement;
 
 function appendToMovesLog(notation: string, moveNum: number): void {
-    if (!localGameState) {
-        console.error("No local game state to log move to");
-        return;
-    }
-    
     if (moveNum % 2 === 1) {
         movesLogColumnNum.innerHTML += `${Math.floor(moveNum / 2) + 1}.<br>`;
         movesLogColumnWhite.innerHTML += `${notation}<br>`;
@@ -65,10 +107,6 @@ function appendToMovesLog(notation: string, moveNum: number): void {
 }
 
 function redrawMovesLog(): void {
-    if (!localGameState) {
-        console.error("No local game state to log move to");
-        return;
-    }
     movesLogColumnNum.innerHTML = '';
     movesLogColumnWhite.innerHTML = '';
     movesLogColumnBlack.innerHTML = '';
@@ -105,8 +143,6 @@ function boldMovePointer(moveNum: number): void {
 }
 
 export function setNames(playerWhiteName: string | null, playerBlackName: string | null, spectatorNames: string[], yourColor: PieceColor): void {
-    if (!localGameState) return;
-
     localGameState.playerWhiteName = playerWhiteName;
     localGameState.playerBlackName = playerBlackName;
     localGameState.spectatorNames = spectatorNames;
@@ -132,21 +168,32 @@ let validSquares: ReturnType<typeof getValidMoves> | null;
 let hover: {uRow: number, uCol: number, prevWasValid: boolean} | null = null;  // grabs initial hover tile from handleClick, then updated on mousemove from handleHover
 export let movePointer = Number.POSITIVE_INFINITY;  // will be set to max value once we have a gameState
 
-export function initLocalGameState(gameState: GameState, yourColor: PieceColor): void {
-    localGameState = gameState;
+export function initLocalGameState(compressedGameState: CompressedGameState, yourColor: PieceColor): void {
+    localGameState = {...localGameState, ...compressedGameState};
+    
+    const ret = parseFEN(compressedGameState.arrayFEN.at(-1));
+    localGameState.board = ret.board;
+    localGameState.QW = ret.QW;
+    localGameState.KW = ret.KW;
+    localGameState.QB = ret.QB;
+    localGameState.KB = ret.KB;
+    localGameState.halfmoveClock = ret.halfmoveClock;
+
+    localGameState.movesLog = decompressMovesLog(compressedGameState.compressedMovesLog);
+
     myColor = yourColor;
     if (myColor === PieceColor.WHITE) {
         setFlip(false);
     } else if (myColor === PieceColor.BLACK) {
         setFlip(true);
     }
-    updateGameButtons(!gameState.isActive || yourColor === PieceColor.NONE);
-    updatePositionButtons(!gameState.isActive);
+    updateGameButtons(!localGameState.isActive || yourColor === PieceColor.NONE);
+    updatePositionButtons(!localGameState.isActive);
 
-    document.getElementById('gameIdDisplay')!.textContent = `${gameState.id}`;
-    updateNames(gameState.playerWhiteName, gameState.playerBlackName, gameState.spectatorNames, !gameState.isActive);
-    syncTime(gameState.clockRunning, gameState.timeLeftWhite, gameState.timeLeftBlack, gameState.initialTimeWhite, gameState.initialTimeBlack, gameState.incrementWhite, gameState.incrementBlack);
-    chatLogElement.value = gameState.chatLog.join("\n");
+    document.getElementById('gameIdDisplay')!.textContent = `${localGameState.id}`;
+    updateNames(localGameState.playerWhiteName, localGameState.playerBlackName, localGameState.spectatorNames, !localGameState.isActive);
+    syncTime(localGameState.clockRunning, localGameState.timeLeftWhite, localGameState.timeLeftBlack, localGameState.initialTimeWhite, localGameState.initialTimeBlack, localGameState.incrementWhite, localGameState.incrementBlack);
+    chatLogElement.value = localGameState.chatLog.join("\n");
     chatLogElement.scrollTop = chatLogElement.scrollHeight;
     redrawMovesLog();
 
@@ -162,15 +209,15 @@ export function initLocalGameState(gameState: GameState, yourColor: PieceColor):
 
     // if we don't have this game in our list, create it locally 
     if (!getGame(localGameState.id)) {
-        const game = gameInfoFromGameState(gameState);
-        game.password = gameState.password;
+        const game = gameInfoFromGameState(localGameState);
+        game.password = localGameState.password;
         gameList.push(game);
     }
     if (myColor === PieceColor.NONE) disableRules();
 }
 
 export function clearLocalGameState(): void {
-    localGameState = undefined;
+    localGameState = getDefaultGameState();;
     myColor = PieceColor.NONE;
     movePointer = Number.POSITIVE_INFINITY;
     selectedSquare = null;
@@ -181,14 +228,10 @@ export function clearLocalGameState(): void {
 }
 
 export function setRules(rules: Rules): void {
-    if (localGameState) localGameState.rules = rules;
+    localGameState.rules = rules;
 }
 
 async function handleClick(offsetX: number, offsetY: number, isRightClick: boolean): Promise<void> {
-    if (!localGameState) {
-        console.error("No board to get piece from");
-        return;
-    }
     if (myColor === PieceColor.NONE) {
         return;
     }
@@ -347,7 +390,7 @@ function handleHover(offsetX: number, offsetY: number): void {
 }
 
 export function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
-    if (localGameState && localGameState.isActive) {
+    if (localGameState.isActive) {
         // time stuff is ignored on the server
         sendMessage({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow, fromCol, toRow, toCol, isTile, promotions, notation: '', timeLeftWhite: localGameState.timeLeftWhite, timeLeftBlack: localGameState.timeLeftBlack, clockRunning: localGameState.clockRunning } satisfies MovePieceMessage);
         move(fromRow, fromCol, toRow, toCol, '', isTile, promotions);  // optimistically do the move. Server will send game state for us to draw if it's rejected
@@ -355,10 +398,6 @@ export function requestMovePiece(fromRow: number, fromCol: number, toRow: number
 }
 
 export function move(fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
-    if (!localGameState) {
-        console.error("No local game state to move piece on");
-        return;
-    }
     // on the opponent's turn do this whole routine, but on my turn, this can be called either by the server confirming the move, OR us optimistically pre-moving
     // wait for server confirmation to log the move and actually change the current turn
     const preMove = localGameState.currentTurn === myColor && !notation;
@@ -425,7 +464,7 @@ export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYP
         case MESSAGE_TYPES.PAUSE:
         case MESSAGE_TYPES.DRAW:
         case MESSAGE_TYPES.SURRENDER:
-            if (localGameState && localGameState.isActive && myColor !== PieceColor.NONE) {
+            if (localGameState.isActive && myColor !== PieceColor.NONE) {
                 sendMessage({ type: type } satisfies Message);
             }
             break;
@@ -438,8 +477,6 @@ export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYP
 // archived game scrolling
 export let boardToRender = getDefaultBoard();
 function scrollToMove(moveNum: number): void {
-    if (!localGameState) return;
-
     boardToRender = getDefaultBoard();
     for (let i = 0; i < Math.min(moveNum + 1, localGameState.movesLog.length); i++) {
         const move = localGameState.movesLog.at(i)!;
@@ -448,8 +485,6 @@ function scrollToMove(moveNum: number): void {
     renderFullBoard();
 }
 export function updateMovePointer(newNum: number): void {
-    if (!localGameState) return;
-
     if (newNum === Number.POSITIVE_INFINITY) newNum = localGameState.movesLog.length - 2;
 
     movePointer = Math.min(localGameState.movesLog.length - 1, Math.max(newNum, 0));

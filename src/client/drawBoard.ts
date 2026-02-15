@@ -274,7 +274,7 @@ export function highlightMove(move: Move): void {
 }
 
 export function highlightLastMove(): void {
-    if (!localGameState || localGameState.movesLog.length === 0) {
+    if (localGameState.movesLog.length === 0) {
         return;
     }
     if (movePointer !== Number.POSITIVE_INFINITY) {
