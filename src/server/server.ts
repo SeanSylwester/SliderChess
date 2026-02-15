@@ -15,7 +15,6 @@ import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGam
 import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState, GlobalChatMessage } from '../shared/types.js';
 import * as db from './db.js';
 import { QueryArrayResult } from 'pg';
-import { gameInfoFromGameState } from '../shared/utils.js';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -277,7 +276,7 @@ server.listen(PORT, () => {
 });
 
 // get gameInfo[] from DB
-export let loadedFromDB = false;
+let loadedFromDB = false;
 async function getGamesListFromDB() {
     if (process.env.DUMMY) await db.createDummyTable();
 

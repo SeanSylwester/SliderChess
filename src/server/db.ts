@@ -1,4 +1,4 @@
-import { Pool, Client, PoolClient, QueryArrayResult, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryArrayResult } from 'pg';
 import { Game } from './gameLogic.js'
 import { GameInfo, PieceColor } from '../shared/types.js';
 
@@ -6,7 +6,7 @@ import { GameInfo, PieceColor } from '../shared/types.js';
 const pool = new Pool({ ssl: { rejectUnauthorized: false } });
 const table = process.env.DUMMY ? 'games_dummy' : 'games';
 
-export async function query(text: string, params: any): Promise<QueryArrayResult | undefined> {
+async function query(text: string, params: any): Promise<QueryArrayResult | undefined> {
   const start = Date.now()
   let res: QueryArrayResult;
   const showParams = process.env.DUMMY ? params : {}
@@ -22,20 +22,14 @@ export async function query(text: string, params: any): Promise<QueryArrayResult
   return res
 }
  
-export async function getClient(): Promise<PoolClient> {
+async function getClient(): Promise<PoolClient> {
   return pool.connect()
 }
 
-export async function testConnection(): Promise<void> {
+async function testConnection(): Promise<void> {
     const res = await query('SELECT NOW();', []);
     console.log(res)
-}
-
-export async function close(): Promise<void> {
-    await pool.end();
-    console.log('Database closed');
-}
-    
+}    
 
 // ['password', 'white', 'black', 'chat_log', 'moves_log', 'whites_turn', 'initial_time_white', 'initial_time_black', 'increment_white', 'increment_black', 'time_left_white', 'time_left_black', 'rules', 'result', 'cause', 'is_active', 'arrayfen', 'use_time_control'];
 export async function saveToDB(game: Game): Promise<QueryArrayResult | undefined> {
@@ -57,10 +51,6 @@ export async function gameFromDB(gameId: number): Promise<Game | undefined> {
     const game = new Game(db_row.id, false, 0, 0, '');
     game.loadFromDB(db_row);
     return game;
-}
-
-export async function gamesFromDB(): Promise<QueryArrayResult | undefined> {
-    return await query(`SELECT * FROM ${table};`, []);
 }
 
 const infoColumns = ['password', 'id', 'white', 'black', 'time_left_white', 'time_left_black', 'creation_timestamp',
@@ -92,7 +82,7 @@ export async function gamesListFromDB(): Promise<GameInfo[] | undefined> {
     return gameList;
 }
 
-export async function hasGame(gameId: number): Promise<boolean> {
+async function hasGame(gameId: number): Promise<boolean> {
     const res = await query(`SELECT EXISTS(SELECT 1 FROM ${table} WHERE id=$1)`, [gameId]);
 
     return res !== undefined && (res?.rows[0] as any).exists;

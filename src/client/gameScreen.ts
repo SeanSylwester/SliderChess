@@ -1,5 +1,5 @@
 import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause, Rules, RulesMessage, GlobalChatMessage } from "../shared/types.js";
-import { handleButton, localGameState, myColor, setRules } from "./gameLogic.js";
+import { handleButton, localGameState, myColor } from "./gameLogic.js";
 import { sendMessage, fromHistory, myGameId } from "./client.js";
 import { getGame, gameList } from "./lobbyScreen.js"
 import { flipBoard, updateBoardDimensions } from "./drawBoard.js";
@@ -248,10 +248,9 @@ function getRules(): Rules {
             ruleEnPassantTileHome: ruleEnPassantTileHome.checked,
             ruleIgnoreAll: ruleIgnoreAll.checked};
 }
-export function sendRules(): void {
-    const newRules = getRules();
-    setRules(newRules);
-    sendMessage({type: MESSAGE_TYPES.RULES, rules: newRules} satisfies RulesMessage);
+function sendRules(): void {
+    localGameState.rules = getRules();
+    sendMessage({type: MESSAGE_TYPES.RULES, rules: localGameState.rules} satisfies RulesMessage);
 }
 export function disableRules(): void {
     if (rulesLocked || (localGameState && !localGameState.isActive) || myColor === PieceColor.NONE) {
@@ -282,7 +281,7 @@ export function disableRules(): void {
         ruleIgnoreAll.disabled = false;
     }
 }
-export function hideRulesAgreement(): void {
+function hideRulesAgreement(): void {
     ruleMoveOwnKingDisagree.hidden = true;
     ruleMoveOwnKingInCheckDisagree.hidden = true;
     ruleMoveOppDisagree.hidden = true;
@@ -330,7 +329,7 @@ export function updateRules(rules: Rules): void {
     ruleEnPassantTile.checked = rules.ruleEnPassantTile;
     ruleEnPassantTileHome.checked = rules.ruleEnPassantTileHome;
     ruleIgnoreAll.checked = rules.ruleIgnoreAll;
-
-    setRules(getRules());
+    
+    localGameState.rules = getRules();
     disableRules();
 }

@@ -1,6 +1,5 @@
-import { QueryResult } from 'pg';
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage, CompressedGameState } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, tileCanMove, wouldBeInCheck, sameColor, pieceCanMoveTo, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, tileCanMoveTo, tileMoveWouldUndo, fenStripMoves, parseFEN, splitMovesFromNotation, oppositeColor, checkRules, compressMovesLog, decompressMovesLog } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, fenStripMoves, parseFEN, checkRules, compressMovesLog, decompressMovesLog } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
 const undoText = 'Your opponent has requested an undo.';

@@ -1,6 +1,6 @@
 import { Move, Piece, PieceType } from "../shared/types.js";
 import { col0ToFile } from "../shared/utils.js";
-import { boardToRender, chatLogElement, localGameState, movePointer, movesLogDiv } from "./gameLogic.js";
+import { boardToRender, localGameState, movePointer } from "./gameLogic.js";
 import { updateTimeDisplay } from "./timer.js";
 
 // init canvas
@@ -264,7 +264,7 @@ export function highlightSquare(unflippedRow: number, unflippedCol: number, styl
                    (isTile ? 2 : 1)*pitch - ctx.lineWidth - 2*highlightSpace);
 }
 
-export function highlightMove(move: Move): void {
+function highlightMove(move: Move): void {
     highlightSquare(move.fromRow, move.fromCol, "rgb(0 255 0 / 25%)", move.isTile);
     highlightSquare(move.toRow, move.toCol, "rgb(0 255 0 / 75%)", move.isTile);
     if (move.isTile) {
@@ -273,7 +273,7 @@ export function highlightMove(move: Move): void {
     }
 }
 
-export function highlightLastMove(): void {
+function highlightLastMove(): void {
     if (localGameState.movesLog.length === 0) {
         return;
     }

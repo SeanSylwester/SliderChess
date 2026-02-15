@@ -1,6 +1,6 @@
-import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Rules, Message, CompressedGameState } from "../shared/types.js";
+import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Message, CompressedGameState } from "../shared/types.js";
 import { sendMessage } from "./client.js";
-import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard as getMovePieces, getFEN, parseFEN, decompressMovesLog } from '../shared/utils.js'
+import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard, getFEN, parseFEN, decompressMovesLog } from '../shared/utils.js'
 import { gameList, getGame } from "./lobbyScreen.js";
 import { disableRules, updateGameButtons, updateNames, updatePositionButtons } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
@@ -90,11 +90,11 @@ canvas.addEventListener('touchmove', handleTouchMoveEvent);
 
 
 // UI stuff
-export const chatLogElement = document.getElementById("chatLog") as HTMLTextAreaElement;
-export const movesLogDiv = document.getElementById('movesLogDiv') as HTMLDivElement;
-export const movesLogColumnNum = document.getElementById('movesLogColumnNum') as HTMLDivElement;
-export const movesLogColumnWhite = document.getElementById('movesLogColumnWhite') as HTMLDivElement;
-export const movesLogColumnBlack = document.getElementById('movesLogColumnBlack') as HTMLDivElement;
+const chatLogElement = document.getElementById("chatLog") as HTMLTextAreaElement;
+const movesLogDiv = document.getElementById('movesLogDiv') as HTMLDivElement;
+const movesLogColumnNum = document.getElementById('movesLogColumnNum') as HTMLDivElement;
+const movesLogColumnWhite = document.getElementById('movesLogColumnWhite') as HTMLDivElement;
+const movesLogColumnBlack = document.getElementById('movesLogColumnBlack') as HTMLDivElement;
 
 function appendToMovesLog(notation: string, moveNum: number): void {
     if (moveNum % 2 === 1) {
@@ -225,10 +225,6 @@ export function clearLocalGameState(): void {
     chatLogElement.value = "";
     // clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-export function setRules(rules: Rules): void {
-    localGameState.rules = rules;
 }
 
 async function handleClick(offsetX: number, offsetY: number, isRightClick: boolean): Promise<void> {
@@ -389,7 +385,7 @@ function handleHover(offsetX: number, offsetY: number): void {
 
 }
 
-export function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
+function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
     if (localGameState.isActive) {
         // time stuff is ignored on the server
         sendMessage({ type: MESSAGE_TYPES.MOVE_PIECE, fromRow, fromCol, toRow, toCol, isTile, promotions, notation: '', timeLeftWhite: localGameState.timeLeftWhite, timeLeftBlack: localGameState.timeLeftBlack, clockRunning: localGameState.clockRunning } satisfies MovePieceMessage);
@@ -418,7 +414,7 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         // check if castling is still allowed
         [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
     } else {
-        ({oldPiece, newPiece} = getMovePieces(localGameState.board, fromRow, fromCol, toRow, toCol, isTile));
+        ({oldPiece, newPiece} = getPieceOnBoard(localGameState.board, fromRow, fromCol, toRow, toCol, isTile));
     }
 
     // server confirming our pre-move OR opponent's move
@@ -484,7 +480,7 @@ function scrollToMove(moveNum: number): void {
     }
     renderFullBoard();
 }
-export function updateMovePointer(newNum: number): void {
+function updateMovePointer(newNum: number): void {
     if (newNum === Number.POSITIVE_INFINITY) newNum = localGameState.movesLog.length - 2;
 
     movePointer = Math.min(localGameState.movesLog.length - 1, Math.max(newNum, 0));

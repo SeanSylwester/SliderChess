@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage, RulesMessage } from "../shared/types.js";
+import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage } from "../shared/types.js";
 import { move, localGameState, initLocalGameState, clearLocalGameState, setNames } from "./gameLogic.js";
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry, updateGlobalChat } from './lobbyScreen.js'
 import { showGame, updatePassword, updateRules, updateChat, updateRulesAgreement } from './gameScreen.js'
