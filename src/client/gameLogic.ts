@@ -156,6 +156,7 @@ export function setNames(playerWhiteName: string | null, playerBlackName: string
         }
     }
     myColor = yourColor;
+    updateGameButtons(!localGameState.isActive || yourColor === PieceColor.NONE);
 }
 
 

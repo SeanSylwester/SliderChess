@@ -1,5 +1,4 @@
 before sharing:
-    fix game buttons disabled
     paged game list
 
     bug report button
