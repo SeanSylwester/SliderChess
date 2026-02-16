@@ -1,8 +1,8 @@
-import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause, Rules, RulesMessage, GlobalChatMessage } from "../shared/types.js";
+import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause, Rules, RulesMessage, GlobalChatMessage, Piece, PieceType } from "../shared/types.js";
 import { handleButton, localGameState, myColor } from "./gameLogic.js";
 import { sendMessage, fromHistory, myGameId } from "./client.js";
 import { getGame, gameList } from "./lobbyScreen.js"
-import { flipBoard, updateBoardDimensions } from "./drawBoard.js";
+import { flip, flipBoard, updateBoardDimensions } from "./drawBoard.js";
 
 
 const lobbyScreen = document.getElementById('lobby-screen');
@@ -44,6 +44,27 @@ export function showGame(gameId: number, password: string): void {
     hideRulesAgreement();
 }
 
+
+// captured pieces
+const capturesTop = document.getElementById('capturesTop') as HTMLSpanElement;
+const capturesBottom = document.getElementById('capturesBottom') as HTMLSpanElement;
+const piecesOrder = [PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT, PieceType.PAWN];
+const whitePieces = ['♕', '♖', '♗', '♘', '♙'];
+const blackPieces = ['♛', '♜', '♝', '♞', '♟'];
+export function updateCaptures(pieces: Piece[]): void {
+    // NOTE: this intentionally mutates the provided list!
+    pieces.sort((a, b) => piecesOrder.indexOf(a.type) - piecesOrder.indexOf(b.type));
+    capturesTop.innerText = '';
+    capturesBottom.innerText = '';
+
+    const capturesWhite = flip ? capturesTop : capturesBottom;
+    const capturesBlack = flip ? capturesBottom : capturesTop;
+    for (const piece of pieces) {
+        const pieceIdx = piecesOrder.indexOf(piece.type)
+        if (piece.color === PieceColor.WHITE) capturesBlack.innerText += whitePieces[pieceIdx];
+        else capturesWhite.innerText += blackPieces[pieceIdx];
+    }
+}
 
 
 

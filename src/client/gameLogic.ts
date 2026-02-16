@@ -2,7 +2,7 @@ import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessag
 import { sendMessage } from "./client.js";
 import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard, getFEN, parseFEN, decompressMovesLog } from '../shared/utils.js'
 import { gameList, getGame } from "./lobbyScreen.js";
-import { disableRules, updateGameButtons, updateNames, updatePositionButtons } from "./gameScreen.js";
+import { disableRules, updateCaptures, updateGameButtons, updateNames, updatePositionButtons } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
 import { canvas, checkIfTile, ctx, drawSquare, getBoardRowCol, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
 import { syncTime } from "./timer.js";
@@ -168,9 +168,11 @@ let selectedSquare: {row: number, col: number, isTile: boolean} | null = null;
 let validSquares: ReturnType<typeof getValidMoves> | null;
 let hover: {uRow: number, uCol: number, prevWasValid: boolean} | null = null;  // grabs initial hover tile from handleClick, then updated on mousemove from handleHover
 export let movePointer = Number.POSITIVE_INFINITY;  // will be set to max value once we have a gameState
+let captures: Piece[] = [];
 
 export function initLocalGameState(compressedGameState: CompressedGameState, yourColor: PieceColor): void {
     localGameState = {...localGameState, ...compressedGameState};
+    captures = [];
 
     // reconstruct from compressedMovesLog: movesLog, board, arrayFEN, QW, KW, QB, KB, halfmoveClock
     localGameState.movesLog = decompressMovesLog(compressedGameState.compressedMovesLog);
@@ -181,6 +183,7 @@ export function initLocalGameState(compressedGameState: CompressedGameState, you
     for (const [i, move] of localGameState.movesLog.entries()) {
         moveOnBoard(localGameState.board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
 
+        // update arrayFEN
         localGameState.currentTurn = localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
         [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
         
@@ -189,9 +192,14 @@ export function initLocalGameState(compressedGameState: CompressedGameState, you
         } else {
             localGameState.halfmoveClock += 1;
         }
-
+        
         const {fen} = getFEN(localGameState.board, localGameState.currentTurn, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.halfmoveClock, Math.floor((i + 1) / 2) + 1 );
         localGameState.arrayFEN.push(fen);
+
+        // append captured pieces
+        if (move.oldPiece.color !== PieceColor.NONE) {
+            captures.push(move.oldPiece);
+        }
     }
     delete (localGameState as any).compressedMovesLog;
 
@@ -201,6 +209,7 @@ export function initLocalGameState(compressedGameState: CompressedGameState, you
     } else if (myColor === PieceColor.BLACK) {
         setFlip(true);
     }
+    updateCaptures(captures);
     updateGameButtons(!localGameState.isActive || yourColor === PieceColor.NONE);
     updatePositionButtons(!localGameState.isActive);
 
@@ -213,7 +222,7 @@ export function initLocalGameState(compressedGameState: CompressedGameState, you
 
     // start with the loaded board, and repoint to the loaded board on move()
     // updateMovePointer can pull focus to the alternate board
-    boardToRender = localGameState.board
+    boardToRender = localGameState.board;
     movePointer = Number.POSITIVE_INFINITY;
 
     renderFullBoard();
@@ -242,7 +251,10 @@ export function clearLocalGameState(): void {
 }
 
 async function handleClick(offsetX: number, offsetY: number, isRightClick: boolean): Promise<void> {
-    if (myColor === PieceColor.NONE) {
+    if (myColor === PieceColor.NONE || movePointer !== Number.POSITIVE_INFINITY) {
+        hover = null;
+        selectedSquare = null;
+        validSquares = null;
         return;
     }
 
@@ -407,6 +419,7 @@ function requestMovePiece(fromRow: number, fromCol: number, toRow: number, toCol
     }
 }
 
+let storedOldPiece: Piece = {type: PieceType.EMPTY, color: PieceColor.NONE};
 export function move(fromRow: number, fromCol: number, toRow: number, toCol: number, notation: string, isTile: boolean, promotions: {row: number, col: number, piece: Piece}[]): void {
     // on the opponent's turn do this whole routine, but on my turn, this can be called either by the server confirming the move, OR us optimistically pre-moving
     // wait for server confirmation to log the move and actually change the current turn
@@ -420,15 +433,20 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         if (movePointer !== Number.POSITIVE_INFINITY) {
             movePointer = Number.POSITIVE_INFINITY;
             boardToRender = localGameState.board;
+            updateCaptures(captures);
         }
 
         // do the move!
         ({oldPiece, newPiece} = moveOnBoard(localGameState.board, fromRow, fromCol, toRow, toCol, isTile, promotions));
+        storedOldPiece = oldPiece;
 
         // check if castling is still allowed
         [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
     } else {
         ({oldPiece, newPiece} = getPieceOnBoard(localGameState.board, fromRow, fromCol, toRow, toCol, isTile));
+        // we already did the move, so the actual newPiece that we want is in the oldPiece slot, and we saved the oldPiece that we want
+        newPiece = oldPiece;
+        oldPiece = storedOldPiece;
     }
 
     // server confirming our pre-move OR opponent's move
@@ -457,6 +475,12 @@ export function move(fromRow: number, fromCol: number, toRow: number, toCol: num
         }
         if (checkmate || stalemate || (localGameState.useTimeControl && (localGameState.timeLeftBlack < 0 || localGameState.timeLeftWhite < 0))) {
             sendMessage({ type: MESSAGE_TYPES.GAME_OVER } satisfies Message);
+        }
+
+        // append captured pieces
+        if (oldPiece.color !== PieceColor.NONE) {
+            captures.push(oldPiece);
+            updateCaptures(captures);
         }
     }
 
@@ -488,25 +512,39 @@ export function handleButton(type: typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYP
 export let boardToRender = getDefaultBoard();
 function scrollToMove(moveNum: number): void {
     boardToRender = getDefaultBoard();
+    captures = [];
     for (let i = 0; i < Math.min(moveNum + 1, localGameState.movesLog.length); i++) {
         const move = localGameState.movesLog.at(i)!;
         moveOnBoard(boardToRender, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
+
+        // append captured pieces
+        if (move.oldPiece.color !== PieceColor.NONE) {
+            captures.push(move.oldPiece);
+        }
     }
+    updateCaptures(captures);
     renderFullBoard();
 }
-function updateMovePointer(newNum: number): void {
-    if (newNum === Number.POSITIVE_INFINITY) newNum = localGameState.movesLog.length - 2;
+function updateMovePointer(delta: number): void {
+    const present = localGameState.movesLog.length - 1;
+    if (movePointer === Number.POSITIVE_INFINITY) movePointer = present;
 
-    movePointer = Math.min(localGameState.movesLog.length - 1, Math.max(newNum, 0));
+    movePointer = Math.min(present, Math.max(movePointer + delta, 0));
     scrollToMove(movePointer);
     boldMovePointer(movePointer);
+
+    // if we skip to max or step to the latest, then exit scrolling mode
+    if (movePointer === present) {
+        movePointer = Number.POSITIVE_INFINITY;
+        boardToRender = localGameState.board;
+    }
 }
 const backwardButton = document.getElementById('backward')! as HTMLButtonElement;
-backwardButton.addEventListener('click', () => updateMovePointer(movePointer - 1));
+backwardButton.addEventListener('click', () => updateMovePointer(-1));
 const forwardButton = document.getElementById('forward')! as HTMLButtonElement;
-forwardButton.addEventListener('click', () => updateMovePointer(movePointer + 1));
+forwardButton.addEventListener('click', () => updateMovePointer(1));
 const backwardAllButton = document.getElementById('backwardAll')! as HTMLButtonElement;
-backwardAllButton.addEventListener('click', () => updateMovePointer(0));
+backwardAllButton.addEventListener('click', () => updateMovePointer(Number.NEGATIVE_INFINITY));
 const forwardAllButton = document.getElementById('forwardAll')! as HTMLButtonElement;
 forwardAllButton.addEventListener('click', () => updateMovePointer(Number.POSITIVE_INFINITY));
 
