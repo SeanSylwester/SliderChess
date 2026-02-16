@@ -181,11 +181,13 @@ export async function handleQuitGame(client: ClientInfo, games: Map<number, Game
 
     if (game) {
         game.removePlayer(client);
-        if (game.isEmpty() && game.isActive) {
-            // last player leaves and there's some result on the game -> game is no longer active;
-            if (game.result !== GameResultCause.ONGOING) game.isActive = false;
-
-            saveToDB(game);
+        if (game.isEmpty()) {
+            if (game.isActive) {
+                // last player leaves and there's some result on the game -> game is no longer active;
+                if (game.result !== GameResultCause.ONGOING) game.isActive = false;
+                saveToDB(game);
+            }
+            // whether it's active or not, free it from memory when the last player leaves
             games.delete(game.id);
         }
         updateGameInList(game);

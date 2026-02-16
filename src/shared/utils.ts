@@ -183,7 +183,7 @@ export function splitMovesFromNotation(notationString: string): string[] | strin
     return moves
 }
 
-export function getBoardFromMessage(notationString: string, newBoard: Piece[][]): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, mapFEN: Map<string, number>, arrayFEN: string[]} | string {
+export function getBoardFromMessage(notationString: string, newBoard: Piece[][], rules: Rules): {movesLog: Move[], color: PieceColor, QW: boolean, KW: boolean, QB: boolean, KB: boolean, halfmoveClock: number, mapFEN: Map<string, number>, arrayFEN: string[]} | string {
     const moves = splitMovesFromNotation(notationString);
     if (typeof(moves) === 'string') {
         return moves;
@@ -196,26 +196,10 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
     let halfmoveClock = 0;
     const mapFEN = new Map<string, number>();
     const arrayFEN: string[] = [];
-    const {fen, fenNoMoves} = getFEN(newBoard, PieceColor.WHITE, QW, KW, QB, KB, 0, 0);
+    const {fen, fenNoMoves} = getFEN(newBoard, PieceColor.WHITE, QW, KW, QB, KB, 0, 1);
     arrayFEN.push(fen);
     mapFEN.set(fenNoMoves, 1);
     let movesLog: Move[] = [];
-
-    // now do all the moves on a new board with no movement rules
-    const rules: Rules = {
-        ruleMoveOwnKing: true,
-        ruleMoveOwnKingInCheck: true,
-        ruleMoveOpp: true,
-        ruleUndoTileMove: true,
-        ruleMoveOppKing: true,
-        ruleMoveOppCheck: true,
-        ruleDoubleMovePawn: true,
-        ruleCastleNormal: false,
-        ruleCastleMoved: false,
-        ruleEnPassantTile: false,
-        ruleEnPassantTileHome: false,
-        ruleIgnoreAll: true,  // ignore all rules and hope for the best
-    }
 
     const promoRe = /=(?<piece>[QRBN])/;
     const tilePromoRe = /(?<col>[a-h])=(?<piece>[QRBN])/g;  // there could be 2
@@ -223,7 +207,20 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
     const pieceToRe = /(?<col>[a-h])(?<row>[1-8])$/; // always the last 2
     const pieceFromRe = /[NBRQK]?(?<col>[a-h]?)(?<row>[1-8]?)$/; // x and last 2 characters removed first!
     let color = PieceColor.WHITE;
+
     for (const move of moves) {
+        const newMove: Move = {
+            oldPiece: { type: PieceType.EMPTY, color: PieceColor.NONE },
+            newPiece: { type: PieceType.EMPTY, color: PieceColor.NONE },
+            fromRow: 0,
+            fromCol: 0,
+            toRow: 0,
+            toCol: 0,
+            notation: '',
+            isTile: false,
+            promotions: []
+        };
+
         if (move[0] === 'O') {
             const row = color === PieceColor.WHITE ? 0 : 7;
             let rookFromCol: number;
@@ -245,9 +242,17 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
             newBoard[row][rookFromCol] = { type: PieceType.EMPTY, color: PieceColor.NONE };
             newBoard[row][kingToCol] = { type: PieceType.KING, color: color };
             newBoard[row][rookToCol] = { type: PieceType.ROOK, color: color };
-            movesLog.push({oldPiece: { type: PieceType.EMPTY, color: PieceColor.NONE },
-                           newPiece: { type: PieceType.KING, color: color },
-                           fromRow: row, fromCol: 4, toRow: row, toCol: kingToCol, notation: move, isTile: false, promotions: []});
+
+            newMove.oldPiece = { type: PieceType.EMPTY, color: PieceColor.NONE };
+            newMove.newPiece = { type: PieceType.KING, color: color };
+            newMove.fromRow = row;
+            newMove.fromCol = 4;
+            newMove.toRow = row;
+            newMove.toCol = kingToCol;
+            newMove.notation = move;
+            newMove.isTile = false;
+            newMove.promotions = [];
+
         } else if (move[0] === 'T') {
             // guaranteed to be like Ta1c1 or Ta1b1, possibly with promotion
             const matchTile = tileRe.exec(move);
@@ -281,9 +286,16 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
                     promotions.push({ row: promoRow, col: promoCol, piece: newBoard[promoRow][promoCol] })
                 }
             }
-            movesLog.push({oldPiece: { type: PieceType.TILE, color: PieceColor.NONE },
-                           newPiece: { type: PieceType.TILE, color: PieceColor.NONE },
-                           fromRow: fromRow, fromCol: fromCol, toRow: toRow, toCol: toCol, notation: move, isTile: true, promotions: promotions});
+            newMove.oldPiece = { type: PieceType.TILE, color: PieceColor.NONE };
+            newMove.newPiece = { type: PieceType.TILE, color: PieceColor.NONE };
+            newMove.fromRow = fromRow;
+            newMove.fromCol = fromCol;
+            newMove.toRow = toRow;
+            newMove.toCol = toCol;
+            newMove.notation = move;
+            newMove.isTile = true;
+            newMove.promotions = promotions;
+
         } else {
             const pieceType = pieceTypeFromChar(move[0]);
             // can ignore the capture completely
@@ -368,23 +380,41 @@ export function getBoardFromMessage(notationString: string, newBoard: Piece[][])
                 newBoard[toRow][toCol] = { type: pieceTypeFromChar(matchPromo.groups!.piece), color: color };
                 promotions.push({ row: toRow, col: toCol, piece: newBoard[toRow][toCol] });
             }
-            movesLog.push({oldPiece: oldPiece, newPiece: newPiece, fromRow: fromRow!, fromCol: fromCol!, 
-                           toRow: toRow, toCol: toCol, notation: move, isTile: false, promotions: promotions});
+
+            newMove.oldPiece = oldPiece;
+            newMove.newPiece = newPiece;
+            newMove.fromRow = fromRow!;
+            newMove.fromCol = fromCol!;
+            newMove.toRow = toRow;
+            newMove.toCol = toCol;
+            newMove.notation = move;
+            newMove.isTile = false;
+            newMove.promotions = promotions;
         }
+        // change turn
         color = color === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
+
+        // check for check, stalemate, and checkmate
+        const isInCheck = inCheck(color, newBoard);
+        if (!anyValidMoves(color, newBoard, newMove, rules, arrayFEN)) {
+            if (isInCheck) newMove.notation += '#';  // checkmate: no moves and in check
+            else newMove.notation += '$';  // stalemate: no moves but not in check
+        } else if (isInCheck) newMove.notation += '+';  // check: has moves and in check
+        
+        // log the move!
+        movesLog.push(newMove);
+
+        // update FEN parameters (castle, half-move, full-move)
         [QW, KW, QB, KB] = checkCastle(newBoard, QW, KW, QB, KB, rules);
 
-        // keep track of half-moves for the 50 move rule if no capture or pawn move
-        const oldPiece = movesLog.at(-1)!.oldPiece;
-        const newPiece = movesLog.at(-1)!.newPiece;
-        if ((oldPiece.type !== PieceType.EMPTY && oldPiece.type !== PieceType.TILE) || newPiece.type === PieceType.PAWN) {
+        if ((newMove.oldPiece.type !== PieceType.EMPTY && newMove.oldPiece.type !== PieceType.TILE) || newMove.newPiece.type === PieceType.PAWN) {
             halfmoveClock = 0;
         } else {
             halfmoveClock += 1;
         }
 
-        // keep track of the number of times we've been in each position for 3 fold repetition
-        const {fen, fenNoMoves} = getFEN(newBoard, PieceColor.WHITE, QW, KW, QB, KB, halfmoveClock, Math.floor(movesLog.length / 2) + 1 );
+        // update arrayFEN and mapFEN with this move
+        const {fen, fenNoMoves} = getFEN(newBoard, color, QW, KW, QB, KB, halfmoveClock, Math.floor(movesLog.length / 2) + 1 );
         arrayFEN.push(fen);
         if (mapFEN.has(fenNoMoves)) {
             mapFEN.set(fenNoMoves, mapFEN.get(fenNoMoves)! + 1)

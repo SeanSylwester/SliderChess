@@ -254,7 +254,7 @@ export class Game {
 
     public setBoardFromMessage(notationString: string): string | void {
         const newBoard = getDefaultBoard();
-        const ret = getBoardFromMessage(notationString, newBoard);
+        const ret = getBoardFromMessage(notationString, newBoard, this.rules);
         if (typeof ret === 'string') {
             return ret;
         }
@@ -482,7 +482,7 @@ export class Game {
         }
         
         // check for special load-from-notation message
-        if (message.trim().startsWith('1.')) {
+        if (client?.isAdmin && message.trim().startsWith('1.')) {
             const error = this.setBoardFromMessage(message);
             if (error) {
                 if (client) {

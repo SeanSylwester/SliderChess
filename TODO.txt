@@ -24,6 +24,3 @@ refactor so that white/black properties are just indexed into by the color numbe
 refactor rules to all be handled in JS
 rename newPiece->fromPiece
 rename oldPiece->toPiece
-
-fix the array_fen of the first 4 games
-fix the whites_turn of the first 6 games

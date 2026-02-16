@@ -95,7 +95,28 @@ const movesLogDiv = document.getElementById('movesLogDiv') as HTMLDivElement;
 const movesLogColumnNum = document.getElementById('movesLogColumnNum') as HTMLDivElement;
 const movesLogColumnWhite = document.getElementById('movesLogColumnWhite') as HTMLDivElement;
 const movesLogColumnBlack = document.getElementById('movesLogColumnBlack') as HTMLDivElement;
+const copyButton = document.getElementById('copy')! as HTMLButtonElement;
+copyButton.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(getMovesLog());
+    copyButton.disabled = true;
+    setTimeout(() => copyButton.disabled = false, 1000);
+});
 
+function getMovesLog(): string {
+    const nums = movesLogColumnNum.innerHTML.trim().split('<br>');
+    const white = movesLogColumnWhite.innerHTML.trim().split('<br>');
+    const black = movesLogColumnBlack.innerHTML.trim().split('<br>');
+    if (nums.length !== white.length || ![0, 1].includes(white.length - black.length)) {
+        console.error('Error getting moves log', nums.length, white.length, black.length, nums, white, black);
+        return '';
+    }
+
+    let s = '';
+    for (let i = 0; i < nums.length; i++) {
+        s += `${nums[i]} ${i < white.length ? white[i] : ''} ${i < black.length ? black[i] : ''} `;
+    }
+    return s.replace(/\<.*?\>/g, '');
+}
 function appendToMovesLog(notation: string, moveNum: number): void {
     if (moveNum % 2 === 1) {
         movesLogColumnNum.innerHTML += `${Math.floor(moveNum / 2) + 1}.<br>`;
