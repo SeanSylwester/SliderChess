@@ -56,6 +56,7 @@ export function setFlip(doFlip: boolean): void {
 
 const movesLogContainer = document.getElementById('movesLogContainer') as HTMLDivElement;
 const chatContainer = document.getElementById('chatContainer') as HTMLDivElement;
+const gameButtonsDiv = document.getElementById('gameButtonsDiv') as HTMLDivElement;
 const boardContainer = document.getElementById('boardContainer') as HTMLDivElement;
 const chatButtons = 315;
 let isVertical: null | boolean = null;
@@ -83,18 +84,27 @@ export function updateBoardDimensions(): void {
     if (isVertical) {
         setVeritcal(true);
         boardSpaceX = window.innerWidth - 4 * padding; 
+        boardSpaceY = window.innerHeight - chatButtons - padding;
     } else {
         setVeritcal(false);
         boardSpaceX = window.innerWidth - movesLogContainer.offsetWidth - 8 * padding; 
+        boardSpaceY = window.innerHeight - chatButtons - padding - 150; // a bit of extra space on horizontal layout
     }
-    boardSpaceY = window.innerHeight - chatButtons - padding;
 
     boardSize = Math.min(boardWidthMax, Math.max(boardWidthMin, Math.min(boardSpaceX, boardSpaceY)));
     pitch = Math.floor(boardSize / 8); // size of each square
     boardSize = pitch * 8;
     canvas.width = boardSize + textSpace;
     canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
-    boardContainer.style.height = `${canvas.height}px`;
+
+    if (isVertical) {
+        chatContainer.style.maxWidth = '';
+        gameButtonsDiv.style.maxWidth = '';
+    } else {
+        const boardAndNotationWidth = boardSize + (isVertical ? 0 : movesLogContainer.offsetWidth);
+        chatContainer.style.maxWidth = `${boardAndNotationWidth}px`;
+        gameButtonsDiv.style.maxWidth = `${boardAndNotationWidth}px`;
+    }
 
     if (!canvas.width) setTimeout(updateBoardDimensions, 100);
     renderFullBoard();

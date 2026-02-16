@@ -120,7 +120,7 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
     }
 }
 
-async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, useTimeControl: boolean, initialTime: number, increment: number, password: string, gameState: GameState | undefined): Promise<Game | undefined> {
+async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, useTimeControl: boolean, initialTime: number, increment: number, password: string, gameState: GameState | undefined): Promise<void> {
     const forceId = gameState ? gameState.id : 0;
     console.log(`Creating game for client ${client.id}${forceId ? ` with specific id ${forceId}` : ''}`);
 
@@ -133,9 +133,9 @@ async function handleCreateGame(client: ClientInfo, games: Map<number, Game>, us
         games.set(newGame.id, newGame);
 
         handleJoinGame(client, games, newGame.id, password); // note: this will updateGameList() when the client is assigned to a position
+        saveToDB(newGame);  // store initial info to the DB
         gameList.push(newGame.getGameInfo());
         pushGameList();
-        return newGame;
     } else {
         console.error('Failed to create new game');
     }
