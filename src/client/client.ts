@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage } from "../shared/types.js";
+import { MESSAGE_TYPES, Message, AdminMessage, ADMIN_COMMANDS, ReconnectMessage, ChangeNameMessage, PopupMessage, FeedbackMessage } from "../shared/types.js";
 import { move, localGameState, initLocalGameState, clearLocalGameState, setNames } from "./gameLogic.js";
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry, updateGlobalChat } from './lobbyScreen.js'
 import { showGame, updatePassword, updateRules, updateChat, updateRulesAgreement } from './gameScreen.js'
@@ -170,6 +170,26 @@ function handlePopup(message: PopupMessage): void {
     }
     popup.showModal();
 }
+
+const feedbackDialog = document.getElementById('feedbackDialog')! as HTMLDialogElement;
+const feedbackThanks = document.getElementById('feedbackThanks')! as HTMLDialogElement;
+const feedbackForm = document.getElementById('feedbackForm')! as HTMLFormElement;
+const feedbackMessage = document.getElementById('feedbackMessage')! as HTMLTextAreaElement;
+feedbackForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = new FormData(feedbackForm);
+    
+    sendMessage({
+        type: MESSAGE_TYPES.FEEDBACK,
+        feedbackType: form.get('type') as string || '',
+        email: form.get('email') as string || '',
+        message: form.get('message') as string || ''
+    } satisfies FeedbackMessage);
+
+    feedbackDialog.close();
+    feedbackMessage.value = '';
+    feedbackThanks.showModal();
+});
 
 // Connect when page loads
 window.addEventListener('DOMContentLoaded', () => {connectWebSocket();});

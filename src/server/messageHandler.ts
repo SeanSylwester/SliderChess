@@ -1,7 +1,7 @@
 import { Game } from './gameLogic.js';
 import { updateGameInList, sendGameList as sendGameList, serveGameRoom, serveLobby, sendMessage, ClientInfo, handleAdminCommand, pushGameList, handleReconnect, getGame, gameList, sendGlobalChat } from './server.js';
-import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState, GameResultCause } from '../shared/types.js';
-import { saveToDB, storeNewGame, storeNewGameWithId } from './db.js';
+import { ChangeNameMessage, MESSAGE_TYPES, RejectJoinGameMessage, PieceColor, GameState, GameResultCause, FeedbackMessage } from '../shared/types.js';
+import { saveToDB, storeFeedback, storeNewGame, storeNewGameWithId } from './db.js';
 
 
 export async function handleMessage(data: Buffer, client: ClientInfo, games: Map<number, Game>): Promise<void> {
@@ -108,6 +108,10 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
 
         case MESSAGE_TYPES.UNLOCK_RULES:
             game!.unlockRules(client);
+            break;
+
+        case MESSAGE_TYPES.FEEDBACK:
+            storeFeedback(message satisfies FeedbackMessage, client.gameId);
             break;
 
         default:

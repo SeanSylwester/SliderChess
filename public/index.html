@@ -52,9 +52,46 @@
             <li><strong>Pieces by:</strong> <a href="https://commons.wikimedia.org/wiki/File:Chess_Pieces_Sprite.svg">Wikipedia user Cburnett</a> </li>
             <li>Last updated: 2026-02-13</li>
         </ul>
-        
-        <script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script><script type='text/javascript'>kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'Y8Y11UBZKN');kofiwidget2.draw();</script> 
-        <button onclick="document.getElementById('aboutDialog').close()" style="width: 100%; font-size: large">Close</button>
+
+        <script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
+        <script type='text/javascript'>kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'Y8Y11UBZKN');kofiwidget2.draw();</script> 
+        <div style="display: flex; justify-content: space-between; margin-top: 10px">
+            <button onclick="document.getElementById('feedbackDialog').showModal()" style="font-size: large">Give Feedback</button>
+            <button onclick="document.getElementById('aboutDialog').close()" style="font-size: large">Close</button>
+        </div>
+    </dialog>
+
+    <dialog id="feedbackDialog">
+        <form id="feedbackForm">
+            <h2 style="margin: 0;">Feedback type:</h2>
+            <div>
+                <div>
+                    <input type="radio" id="feedbackFeedback" name="type" value="feedback" checked="true">
+                    <label for="feedbackFeedback">Suggestion/Review</label>
+                </div>
+                <div>
+                    <input type="radio" id="feedbackBug" name="type" value="bug">
+                    <label for="feedbackBug">Bug/Problem/Complaint</label>
+                </div>
+            </div>
+
+            <p>
+                <label for="feedbackEmail">Email (optional):</label>
+                <input type="email" id="feedbackEmail" name="email">
+            </p>
+
+            <h2 style="margin: 0;">Comment:</h2>
+            <textarea required id="feedbackMessage" name="message" rows="10" style="width: 100%; max-width: 400px;"></textarea>
+
+            <div>
+                <button style="font-size: large">Submit</button>
+                <button onclick="document.getElementById('feedbackDialog').close();" id="feedbackCancel" type="button" style="font-size: large">Cancel</button>
+            </div>
+        </form>
+    </dialog>
+    <dialog id="feedbackThanks">
+        <h2>Thank you for your feedback!</h2>
+        <button onclick="document.getElementById('feedbackThanks').close()" style="font-size: large">Close</button>
     </dialog>
 
     <div id="lobby-screen">

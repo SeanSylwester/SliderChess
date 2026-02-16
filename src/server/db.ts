@@ -1,6 +1,6 @@
 import { Pool, PoolClient, QueryArrayResult } from 'pg';
 import { Game } from './gameLogic.js'
-import { GameInfo, PieceColor } from '../shared/types.js';
+import { FeedbackMessage, GameInfo, PieceColor } from '../shared/types.js';
 
 
 const pool = new Pool({ ssl: { rejectUnauthorized: false } });
@@ -134,4 +134,8 @@ export async function createDummyTable(): Promise<void> {
     await client.query('ALTER TABLE games_dummy ALTER COLUMN creation_timestamp SET DEFAULT CURRENT_TIMESTAMP;', []);
     await client.query('ALTER TABLE games_dummy ALTER COLUMN creation_timestamp SET NOT NULL;', []);
     client.release();
+}
+
+export async function storeFeedback(message: FeedbackMessage, gameId: number): Promise<void> {
+    await query('INSERT INTO feedback (type, email, message, gameId) VALUES ($1, $2, $3, $4)', [message.feedbackType, message.email, message.message, gameId]);
 }

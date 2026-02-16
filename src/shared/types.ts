@@ -192,6 +192,7 @@ export const MESSAGE_TYPES = {
     POPUP: 'popup',
     UNLOCK_RULES: 'unlockRules',
     GAME_NAMES: 'gameNames',
+    FEEDBACK: 'feedback',
 } as const;
 
 // Message type definitions
@@ -309,4 +310,10 @@ export interface GameNamesMessage extends Message {
     playerBlackName: string | null;
     spectatorNames: string[];
     yourColor: PieceColor;
+}
+export interface FeedbackMessage extends Message {
+    type: typeof MESSAGE_TYPES.FEEDBACK;
+    feedbackType: string;
+    email: string;
+    message: string;
 }
