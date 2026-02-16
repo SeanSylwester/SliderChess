@@ -114,6 +114,12 @@ export function updateGameList(newGameList: GameInfo[], nClients: number): void 
     gameListElement.innerHTML = ''; // Clear existing list
     newGameList.sort((a, b) => b.creationTime - a.creationTime);
     let nActive = 0;
+
+    const testButton = document.createElement('button');
+    testButton.textContent = 'View';
+    gameListElement.appendChild(testButton);
+    const buttonWidth = testButton.offsetWidth;
+    gameListElement.removeChild(testButton);
     for (const game of newGameList){
         if (game.isActive) nActive++;
         // transfer over our stored password to games with matching IDs
@@ -126,6 +132,7 @@ export function updateGameList(newGameList: GameInfo[], nClients: number): void 
 
         const gameButton = document.createElement('button');
         gameButton.textContent = game.isActive ? 'Join' : 'View';
+        gameButton.style = `width: ${buttonWidth}px`;
         gameButton.addEventListener('click', () => requestJoinGame(game.gameId));
         gameItem.appendChild(gameButton);
 
