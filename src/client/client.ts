@@ -15,7 +15,7 @@ function connectWebSocket(): void {
 
     if (window.location.hostname === 'localhost') ws = new WebSocket('wss://localhost:10000');
     else if (window.location.hostname.startsWith('192.168.')) ws = new WebSocket('wss://192.168.1.195:10000');
-    else ws = new WebSocket('wss://sliderchess.onrender.com');
+    else ws = new WebSocket('wss://sliderchess-production.up.railway.app');
 
     ws.onopen = () => {
         (window as any).ws = ws;
