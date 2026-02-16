@@ -96,6 +96,7 @@ export function updateBoardDimensions(): void {
     boardSize = pitch * 8;
     canvas.width = boardSize + textSpace;
     canvas.height = boardSize + 1.5*textHeight + textMargin + lineSpace;
+    boardContainer.style.height = `${canvas.height}px`;
 
     if (isVertical) {
         chatContainer.style.maxWidth = '';
@@ -106,7 +107,6 @@ export function updateBoardDimensions(): void {
         gameButtonsDiv.style.maxWidth = `${boardAndNotationWidth}px`;
     }
 
-    if (!canvas.width) setTimeout(updateBoardDimensions, 100);
     renderFullBoard();
 }
 window.addEventListener('resize', updateBoardDimensions);
