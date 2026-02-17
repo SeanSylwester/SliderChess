@@ -13,11 +13,10 @@ before sharing:
 implement special rules for castling
 implement special rules for en passant
 gameover screen
-show captured pieces
 sound effects
 animations
 offline play: flag on create game to instead run a game locally, controlling black and white
-make gameList into a table
+make the lobby gameList display as a table
 
 unit tests on LOCAL
 refactor so that white/black properties are just indexed into by the color number (white==0, black==1)

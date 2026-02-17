@@ -3,6 +3,7 @@ import { inCheck, moveOnBoard, checkCastle, moveNotation, anyValidMoves, getDefa
 import { sendMessage, ClientInfo } from './server.js';
 
 const undoText = 'Your opponent has requested an undo.';
+const shuffleText = 'Your opponent has requested to randomly assign colors.';
 const unlockRulesText = 'Your opponent has requested to unlock the rules.';
 
 export class Game {
@@ -29,6 +30,7 @@ export class Game {
 
     lastMoveTime = 0;  // not sent to client
     waitingForUndoResponse = 0;  // number shows how many rewinds they're requesting
+    waitingForShuffleResponse = false;
     waitingForUnlockRulesResponse = false;
     rulesLocked = false;
     rulesMap = new Map<ClientInfo, Rules>();
@@ -398,6 +400,22 @@ export class Game {
             this.logChatMessage(`${player.name} has disconnected.`);
         }
         this.sendNamesToAll();
+    }
+
+    public requestShuffle(client: ClientInfo): void {
+        let opp: ClientInfo | null;
+        if (client === this.playerWhite) {
+            opp = this.playerBlack;
+        } else if (client === this.playerBlack) {
+            opp = this.playerWhite;
+        } else {
+            return;
+        }
+        if (!opp) return;
+        this.logChatMessage('has requested to randomly assign colors.', client);
+        this.waitingForShuffleResponse = true;
+        
+        sendMessage(opp, { type: MESSAGE_TYPES.POPUP, text: shuffleText, button: ['Agree', 'Disagree']} satisfies PopupMessage);
     }
 
     public sendNamesToAll(): void {
@@ -805,6 +823,27 @@ export class Game {
                         this.sendRulesAgreement();   // basically just to tell them that the rules are locked now. They should match
                     } else {
                         this.logChatMessage('has declined to unlock the rules.', client);
+                    }
+                }
+                break;
+
+            case shuffleText:
+                if (this.waitingForShuffleResponse) {
+                    this.waitingForShuffleResponse = false;
+                    if (message.button === 'Agree') {
+                        this.logChatMessage('has agreed to randomly assign colors.', client);
+                        if (Math.random() < 0.5) {
+                            this.logChatMessage(`Randomly decided to swap colors!\nMoving ${this.playerBlack?.name} to White and ${this.playerWhite?.name} to Black.`);
+                            const temp = this.playerWhite;
+                            this.playerWhite = this.playerBlack;
+                            this.playerBlack = temp;
+                            this.updateLastNames();
+                            this.sendNamesToAll();
+                        } else {
+                            this.logChatMessage('Randomly decided to keep the same colors');
+                        }
+                    } else {
+                        this.logChatMessage('has declined to randomly assign colors.', client);
                     }
                 }
                 break;

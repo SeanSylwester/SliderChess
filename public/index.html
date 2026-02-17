@@ -168,9 +168,10 @@
         <h1 style="margin: 0">Game Room #<span id="gameIdDisplay"></span></h1>
         <div>
             <span>Game password:<input type="text" id="gamePassword"/> <button id="updateGamePassword">Update</button></span> <br>
-            <button id="claimWhite">White</button><span id="whitePlayerInfo"></span> <br>
-            <button id="claimBlack">Black</button><span id="blackPlayerInfo"></span> <br>
-            <button id="claimSpectator">Spectators</button><span id="spectatorInfo"></span> <br>
+            <span id="shuffleSpan"><button id="shuffle">Randomly assign colors?</button> <br></span>
+            White: <button id="claimWhite">Claim</button><span id="whitePlayerInfo"></span> <br>
+            Black: <button id="claimBlack">Claim</button><span id="blackPlayerInfo"></span> <br>
+            Spectators: <button id="claimSpectator">Spectate</button><span id="spectatorInfo"></span> <br>
         </div>
 
         <div id="boardAndChatContainer">
@@ -203,12 +204,12 @@
 
             <div id="gameButtonsDiv">
                 <button id="quitGame">Quit</button>
-                <button id="flipBoard">Flip board view</button>
-                <button id="rewind">Undo</button>
-                <button id="unlockRules">Unlock Rules</button>
+                <button id="flipBoard">Flip</button>
+                <button id="rewind">Undo?</button>
+                <button id="unlockRules">Unlock Rules?</button>
                 <button id="pause">Pause</button>
                 <button id="draw">Offer Draw</button>
-                <button id="surrender">Surrender</button> <br>
+                <button id="surrender">Surrender</button>
             </div>
             
             <div id="chatContainer">

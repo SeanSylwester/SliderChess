@@ -130,7 +130,7 @@ export function updateGameList(newGameList: GameInfo[], nClients: number): void 
         gameButton.addEventListener('click', () => requestJoinGame(game.gameId));
         gameItem.appendChild(gameButton);
 
-        if (game.hasPassword && game.isActive) {
+        if (game.hasPassword) {
             const lock = document.createElement('span');
             lock.textContent = ' 🔒';
             gameItem.appendChild(lock);

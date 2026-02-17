@@ -43,7 +43,7 @@ function connectWebSocket(): void {
         switch (message.type) {
             case MESSAGE_TYPES.CHANGE_NAME:
                 playerNameEntry.value = message.name;
-                localStorage.setItem('oldName', message.name);
+                if (message.name !== 'admin') localStorage.setItem('oldName', message.name);
                 localStorage.setItem('oldId', `${message.clientId}`);
                 break;
             case MESSAGE_TYPES.GAME_LIST:

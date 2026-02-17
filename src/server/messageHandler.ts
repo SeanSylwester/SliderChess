@@ -10,7 +10,7 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
     // lookup the game that the client is in for most message types
     let game: Game | undefined;
     if ([MESSAGE_TYPES.CHANGE_POSITION, MESSAGE_TYPES.MOVE_PIECE, MESSAGE_TYPES.REWIND, MESSAGE_TYPES.PAUSE, MESSAGE_TYPES.DRAW, 
-         MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER,
+         MESSAGE_TYPES.SURRENDER, MESSAGE_TYPES.CHAT, MESSAGE_TYPES.RULES, MESSAGE_TYPES.GAME_OVER, MESSAGE_TYPES.SHUFFLE,
          MESSAGE_TYPES.GAME_PASSWORD, MESSAGE_TYPES.POPUP, MESSAGE_TYPES.UNLOCK_RULES].includes(message.type)) {
         if (!client.gameId) {
             console.error(`Client ${client.id} is not in a game.`);
@@ -112,6 +112,10 @@ export async function handleMessage(data: Buffer, client: ClientInfo, games: Map
 
         case MESSAGE_TYPES.FEEDBACK:
             storeFeedback(message satisfies FeedbackMessage, client.gameId);
+            break;
+
+        case MESSAGE_TYPES.SHUFFLE:
+            game!.requestShuffle(client);
             break;
 
         default:

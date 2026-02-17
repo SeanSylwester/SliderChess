@@ -2,7 +2,7 @@ import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessag
 import { sendMessage } from "./client.js";
 import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard, getFEN, parseFEN, decompressMovesLog } from '../shared/utils.js'
 import { gameList, getGame } from "./lobbyScreen.js";
-import { disableRules, updateCaptures, updateGameButtons, updateNames, updatePositionButtons } from "./gameScreen.js";
+import { disableRules, updateCaptures, disableGameButtons, updateNames, hidePositionButtons } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
 import { canvas, checkIfTile, ctx, drawSquare, getBoardRowCol, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
 import { syncTime } from "./timer.js";
@@ -167,7 +167,6 @@ export function setNames(playerWhiteName: string | null, playerBlackName: string
     localGameState.playerWhiteName = playerWhiteName;
     localGameState.playerBlackName = playerBlackName;
     localGameState.spectatorNames = spectatorNames;
-    updateNames(localGameState.playerWhiteName, localGameState.playerBlackName, localGameState.spectatorNames, !localGameState.isActive);
 
     if (myColor !== yourColor) {
         if (yourColor === PieceColor.WHITE) {
@@ -177,7 +176,8 @@ export function setNames(playerWhiteName: string | null, playerBlackName: string
         }
     }
     myColor = yourColor;
-    updateGameButtons(!localGameState.isActive || yourColor === PieceColor.NONE);
+    disableGameButtons(!localGameState.isActive || yourColor === PieceColor.NONE);
+    updateNames(localGameState.playerWhiteName, localGameState.playerBlackName, localGameState.spectatorNames, !localGameState.isActive);
 }
 
 
@@ -231,8 +231,8 @@ export function initLocalGameState(compressedGameState: CompressedGameState, you
         setFlip(true);
     }
     updateCaptures(captures);
-    updateGameButtons(!localGameState.isActive || yourColor === PieceColor.NONE);
-    updatePositionButtons(!localGameState.isActive);
+    disableGameButtons(!localGameState.isActive || yourColor === PieceColor.NONE);
+    hidePositionButtons(!localGameState.isActive);
 
     document.getElementById('gameIdDisplay')!.textContent = `${localGameState.id}`;
     updateNames(localGameState.playerWhiteName, localGameState.playerBlackName, localGameState.spectatorNames, !localGameState.isActive);

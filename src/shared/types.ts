@@ -193,6 +193,7 @@ export const MESSAGE_TYPES = {
     UNLOCK_RULES: 'unlockRules',
     GAME_NAMES: 'gameNames',
     FEEDBACK: 'feedback',
+    SHUFFLE: 'shuffle',
 } as const;
 
 // Message type definitions

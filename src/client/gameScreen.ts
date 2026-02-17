@@ -147,6 +147,9 @@ export function updatePassword(password: string): void {
 
 
 // game buttons
+const shuffleButton = document.getElementById('shuffle') as HTMLButtonElement;
+const shuffleSpan = document.getElementById('shuffleSpan') as HTMLSpanElement;
+shuffleButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.SHUFFLE } satisfies Message));
 const claimWhiteButton = document.getElementById('claimWhite') as HTMLButtonElement;
 claimWhiteButton!.addEventListener('click', () => sendMessage({ type: MESSAGE_TYPES.CHANGE_POSITION, position: PieceColor.WHITE } satisfies ChangePositionMessage));
 const claimBlackButton = document.getElementById('claimBlack') as HTMLButtonElement;
@@ -175,31 +178,34 @@ drawButton!.addEventListener('click', () => handleButton(MESSAGE_TYPES.DRAW));
 const surrenderButton = document.getElementById('surrender') as HTMLButtonElement;
 surrenderButton!.addEventListener('click', () => handleButton(MESSAGE_TYPES.SURRENDER));
 
-export function updateGameButtons(disable: boolean): void {
+export function disableGameButtons(disable: boolean): void {
     rewindButton.disabled = disable;
     unlockRulesButton.disabled = disable;
     pauseButton.disabled = disable;
     drawButton.disabled = disable;
     surrenderButton.disabled = disable;
 }
-export function updatePositionButtons(disable: boolean): void {
-    claimWhiteButton.disabled = disable;
-    claimBlackButton.disabled = disable;
-    claimSpectatorButton.disabled = disable;
+export function hidePositionButtons(hide: boolean): void {
+    claimWhiteButton.hidden = hide;
+    claimBlackButton.hidden = hide;
+    claimSpectatorButton.hidden = hide;
+    shuffleSpan.hidden = hide;
 }
 
 const whitePlayerInfoText = document.getElementById('whitePlayerInfo')!;
 const blackPlayerInfoText = document.getElementById('blackPlayerInfo')!;
 const spectatorInfoText = document.getElementById('spectatorInfo')!;
-export function updateNames(playerWhiteName: string | null, playerBlackName: string | null, spectatorNames: string[], disable: boolean): void {
+export function updateNames(playerWhiteName: string | null, playerBlackName: string | null, spectatorNames: string[], hide: boolean): void {
     whitePlayerInfoText.textContent = playerWhiteName ? playerWhiteName : '';
-    claimWhiteButton.disabled = disable || (playerWhiteName !== null);
+    claimWhiteButton.hidden = hide || (playerWhiteName !== null);
 
     blackPlayerInfoText.textContent = playerBlackName ? playerBlackName : '';
-    claimBlackButton.disabled = disable || (playerBlackName !== null);
+    claimBlackButton.hidden = hide || (playerBlackName !== null);
 
     spectatorInfoText.textContent = spectatorNames.join(', ');
-    claimSpectatorButton.disabled = disable;
+    claimSpectatorButton.hidden = hide;
+
+    shuffleSpan.hidden = myColor === PieceColor.NONE || hide || (playerWhiteName === null) || (playerBlackName === null);
 }
 
 
@@ -286,7 +292,10 @@ export function disableRules(): void {
         ruleEnPassantTile.disabled = true;
         ruleEnPassantTileHome.disabled = true;
         ruleIgnoreAll.disabled = true;
+
+        shuffleSpan.hidden = true;  // also hide the shuffle button under all the same conditions that lock the rules
     } else {
+        // unlocked rules, active game, and we're white or black
         ruleMoveOwnKing.disabled = false;
         ruleMoveOwnKingInCheck.disabled = ruleMoveOwnKing.checked;
         ruleMoveOpp.disabled = false;
@@ -299,6 +308,10 @@ export function disableRules(): void {
         ruleEnPassantTile.disabled = true; // TODO
         ruleEnPassantTileHome.disabled = true; // TODO
         ruleIgnoreAll.disabled = false;
+
+        if (localGameState.playerBlackName && localGameState.playerWhiteName) {
+            shuffleSpan.hidden = false;  // also show the shuffle button if both players are present
+        }
     }
 }
 function hideRulesAgreement(): void {
