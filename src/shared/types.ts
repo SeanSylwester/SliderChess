@@ -66,7 +66,6 @@ export interface CompressedGameState {
 }  
 export interface GameInfo {
     hasPassword: boolean;
-    password?: string;  // client will store known passwords here
     gameId: number;
     playerWhite: string | null;
     playerBlack: string | null;
@@ -288,6 +287,7 @@ export interface LogMessage extends Message {
 }
 export interface GamePasswordMessage extends Message {
     type: typeof MESSAGE_TYPES.GAME_PASSWORD;
+    gameId: number;  // ignored on the server, sent to client just in case there's a mixup (probably unnecessary)
     password: string;
 }
 export interface RejectJoinGameMessage extends Message {

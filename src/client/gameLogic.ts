@@ -2,7 +2,7 @@ import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessag
 import { sendMessage } from "./client.js";
 import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard, getFEN, parseFEN, decompressMovesLog } from '../shared/utils.js'
 import { gameList, getGame } from "./lobbyScreen.js";
-import { disableRules, updateCaptures, disableGameButtons, updateNames, hidePositionButtons } from "./gameScreen.js";
+import { disableRules, updateCaptures, disableGameButtons, updateNames, hidePositionButtons, updatePassword } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
 import { canvas, checkIfTile, ctx, drawSquare, getBoardRowCol, highlightSquare, renderFullBoard, setFlip } from "./drawBoard.js";
 import { syncTime } from "./timer.js";
@@ -254,9 +254,9 @@ export function initLocalGameState(compressedGameState: CompressedGameState, you
     // if we don't have this game in our list, create it locally 
     if (!getGame(localGameState.id)) {
         const game = gameInfoFromGameState(localGameState);
-        game.password = localGameState.password;
         gameList.push(game);
     }
+    updatePassword(localGameState.id, localGameState.password);
     if (myColor === PieceColor.NONE) disableRules();
 }
 

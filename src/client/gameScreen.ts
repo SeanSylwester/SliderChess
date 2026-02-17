@@ -1,6 +1,6 @@
 import { MESSAGE_TYPES,  Message, ChatMessage, ChangePositionMessage, PieceColor, GamePasswordMessage, GameResultCause, Rules, RulesMessage, GlobalChatMessage, Piece, PieceType } from "../shared/types.js";
 import { handleButton, localGameState, myColor } from "./gameLogic.js";
-import { sendMessage, fromHistory, myGameId } from "./client.js";
+import { sendMessage, fromHistory, myGameId, passwords } from "./client.js";
 import { getGame, gameList } from "./lobbyScreen.js"
 import { flip, flipBoard, updateBoardDimensions } from "./drawBoard.js";
 
@@ -14,16 +14,13 @@ export function showGame(gameId: number, password: string): void {
     if (!fromHistory) window.history.pushState({}, '', window.location.origin + `/${gameId}`);
     chatLog.scrollTop = chatLog.scrollHeight;
 
-    updatePassword(password);
+    updatePassword(gameId, password);
     const game = getGame(gameId);
-    if (game) {
-        game.password = password;
-    } else {
-        // set some defaults and store the password, then let updateGameList() fix it
-        console.log('adding default game list entry')
+    if (!game) {
+        // set some defaults, then let updateGameList() fix it
+        console.error('adding default game list entry');
         gameList.push({
             hasPassword: password !== '', 
-            password: password, 
             gameId: gameId,
             playerWhite: '?',
             playerBlack: '?',
@@ -130,17 +127,24 @@ export function moveGlobalChat(toGameScreen: boolean): void {
 const updatePasswordButton = document.getElementById('updateGamePassword') as HTMLButtonElement;
 const passwordEntry = document.getElementById('gamePassword') as HTMLInputElement;
 updatePasswordButton!.addEventListener('click', () => {
-    sendMessage({ type: MESSAGE_TYPES.GAME_PASSWORD,  password: passwordEntry.value } satisfies GamePasswordMessage);
+    sendMessage({ type: MESSAGE_TYPES.GAME_PASSWORD,  gameId: myGameId, password: passwordEntry.value } satisfies GamePasswordMessage);
 });
 passwordEntry!.addEventListener('keypress', function (event) {
     if (event.key === "Enter") {
         updatePasswordButton?.click();
     }
 });
-export function updatePassword(password: string): void {
-    passwordEntry!.value = password;
-    const game = getGame(myGameId);
-    if (game) game.password = password
+export function updatePassword(gameId: number, password: string): void {
+    if (gameId === myGameId || !myGameId) {
+        // only set the text if it matches, or if we're not in a game
+        passwordEntry!.value = password;
+    } else {
+        console.error('Got a password for a game we are not in!', myGameId, gameId);
+    }
+
+    passwords.set(gameId, password);
+    localStorage.setItem('passwords', JSON.stringify([...passwords]));
+    console.log(passwords);
 }
 
 

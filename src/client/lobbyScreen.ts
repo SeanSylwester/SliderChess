@@ -1,7 +1,7 @@
 import { MESSAGE_TYPES, GameInfo, Message, JoinGameMessage,  ChangeNameMessage, CreateGameMessage, GameScore, PieceColor, GlobalChatMessage } from "../shared/types.js";
 import { formatMinSec } from '../shared/utils.js'
-import { sendMessage, fromHistory } from './client.js'
-import { moveGlobalChat } from "./gameScreen.js";
+import { sendMessage, fromHistory, passwords } from './client.js'
+import { moveGlobalChat, updatePassword } from "./gameScreen.js";
 
 
 const lobbyScreen = document.getElementById('lobby-screen');
@@ -18,22 +18,18 @@ export function showLobby(): void {
 export function requestJoinGame(gameId: number): void {
     // see if the game is in our map
     const game = getGame(gameId);
-    let password = '';
+    let password = passwords.get(gameId) || '';
 
     // if there's a game in our map, and we know it has a password, then send our stored password or prompt for one if needed
     // the server will either join the game, at which point we'll store the the prompted password
     //   or it'll send a reject message. If we get that, then clear the stored password and recall this function to try again
-    if (game && game.hasPassword) {
-        if (game.password) {
-            password = game.password;
+    if (game && game.hasPassword && !password) {
+        const input = prompt('Input the password for the game room', '');
+        if (input) {
+            password = input;
         } else {
-            const input = prompt('Input the password for the game room', '');
-            if (input) {
-                password = input;
-            } else {
-                // cancelling on the password prompt will break the incorrect-password-retry loop
-                return;
-            }
+            // cancelling on the password prompt will break the incorrect-password-retry loop
+            return;
         }
     }
 
@@ -49,7 +45,7 @@ export function handleRejection(gameId: number): void {
 
     console.log(`Rejected from game ${gameId}. Trying again...`)
     game.hasPassword = true;
-    game.password = '';
+    updatePassword(gameId, '');
     requestJoinGame(gameId);
 }
 
@@ -115,11 +111,7 @@ export function updateGameList(newGameList: GameInfo[], nClients: number): void 
     newGameList.sort((a, b) => b.creationTime - a.creationTime);
     let nActive = 0;
     for (const game of newGameList){
-        if (game.isActive) nActive++;
-        // transfer over our stored password to games with matching IDs
-        const oldGameInfo = getGame(game.gameId);
-        if (oldGameInfo && oldGameInfo.password) game.password = oldGameInfo.password;
-        
+        if (game.isActive) nActive++;        
 
         const gameItem = document.createElement('li');
         gameItem.value = game.gameId;
@@ -132,7 +124,7 @@ export function updateGameList(newGameList: GameInfo[], nClients: number): void 
 
         if (game.hasPassword) {
             const lock = document.createElement('span');
-            lock.textContent = ' 🔒';
+            lock.textContent = passwords.has(game.gameId) ? ' 🔓' : ' 🔒';
             gameItem.appendChild(lock);
         }
 

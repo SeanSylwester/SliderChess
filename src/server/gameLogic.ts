@@ -1,4 +1,4 @@
-import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage, CompressedGameState } from '../shared/types.js';
+import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage, CompressedGameState, GamePasswordMessage } from '../shared/types.js';
 import { inCheck, moveOnBoard, checkCastle, moveNotation, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, fenStripMoves, parseFEN, checkRules, compressMovesLog, decompressMovesLog } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
@@ -209,7 +209,7 @@ export class Game {
 
     public setPassword(password: string, client?: ClientInfo): void {
         this.password = password;
-        this.sendMessageToAll({ type: MESSAGE_TYPES.GAME_PASSWORD, password: password });
+        this.sendMessageToAll({ type: MESSAGE_TYPES.GAME_PASSWORD, gameId: this.id, password: password } satisfies GamePasswordMessage);
         if (client) this.logChatMessage(`has ${password !== '' ? 'updated' : 'removed'} the password`, client);
     }
 

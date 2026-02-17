@@ -8,6 +8,7 @@ let reconnectAttempts = 0;
 let reconnectMax = 10;
 export let myGameId = 0;
 export let fromHistory = false;
+export const passwords = new Map<number, string>(JSON.parse(localStorage.getItem('passwords') || '[]'));
 
 function connectWebSocket(): void {
     // Extract game ID from URL, if available
@@ -92,8 +93,8 @@ function connectWebSocket(): void {
                 console.log(message.log);
                 break;
             case MESSAGE_TYPES.GAME_PASSWORD:
-                updatePassword(message.password);
-                break
+                updatePassword(message.gameId, message.password);
+                break;
             case MESSAGE_TYPES.POPUP:
                 handlePopup(message);
                 break;
