@@ -12,7 +12,7 @@ const __dirname = dirname(__filename);
 
 import { Game } from './gameLogic.js';
 import { handleMessage, handleQuitGame, handleCreateGameFromState, handleJoinGame, handleChangeName } from './messageHandler.js';
-import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState, GlobalChatMessage } from '../shared/types.js';
+import { MESSAGE_TYPES, gameListMessage, JoinGameMessage, Message, ADMIN_COMMANDS, GameInfo, LogMessage, PieceColor, GameState, GlobalChatMessage, CompressedGameState } from '../shared/types.js';
 import * as db from './db.js';
 import { QueryArrayResult } from 'pg';
 
@@ -75,6 +75,7 @@ export async function getGame(gameId: number): Promise<Game | undefined> {
 
 export function sendMessage<T extends Message>(client: ClientInfo, message: T): void {
     if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
+        //console.log("Sent:", message.type, JSON.stringify(message).length);
         client.ws.send(JSON.stringify(message));
     } else {
         console.error(`WebSocket is not connected, cannot send ${message.type} message to ${client.id} (${client.name})`);
@@ -157,7 +158,7 @@ export function handleAdminCommand(admin: ClientInfo, command: ADMIN_COMMANDS, d
     }
     switch (command) {
         case ADMIN_COMMANDS.GAME_GET_IDS:
-            sendLog(admin, game!.allClients());
+            sendLog(admin, game!.allClients().map(c => c.id));
             break;
         
         case ADMIN_COMMANDS.GAME_KICK_PLAYER:
@@ -232,10 +233,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 });
 
 let reconnectingSomeone = false;
-export async function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, gameState: GameState | undefined): Promise<void> {
+export async function handleReconnect(client: ClientInfo, clientOldId: number, clientOldName: string, compressedGameState: CompressedGameState | undefined): Promise<void> {
     // wait until we've heard from the DB to do any reconnections
     if (!loadedFromDB || reconnectingSomeone) {
-        setTimeout(() => handleReconnect(client, clientOldId, clientOldName, gameState), !loadedFromDB ? 1000 : 100);
+        setTimeout(() => handleReconnect(client, clientOldId, clientOldName, compressedGameState), !loadedFromDB ? 1000 : 100);
         return;
     }
     reconnectingSomeone = true;  // TODO: does this make a race condition?
@@ -244,18 +245,18 @@ export async function handleReconnect(client: ClientInfo, clientOldId: number, c
     console.log(`Reconnecting client ${client.id} (was ${clientOldId}) to their old name (${clientOldName})`);
     handleChangeName(client, clientOldName);
     
-    if (!gameState || !gameState.id) return;
+    if (!compressedGameState || !compressedGameState.id) return;
 
     // if the client says that they're in a game, then try to reconnect them
     //   if we don't have the indicated game, then make a new game and load from the client's gameState
-    const game = await getGame(gameState.id);
+    const game = await getGame(compressedGameState.id);
     if (game) {
-        console.log(` and also connecting client ${client.id} to game ${gameState.id}, if they have the right password`);
-        await handleJoinGame(client, games, gameState.id, gameState.password);
+        console.log(` and also connecting client ${client.id} to game ${compressedGameState.id}, if they have the right password`);
+        await handleJoinGame(client, games, compressedGameState.id, compressedGameState.password);
     } else {
         // recreate the game with a new id if it wasn't found on the DB at startup
-        console.log(` but we couldn't find their game (${gameState.id}), so we're recreating from client state with a new ID`);
-        await handleCreateGameFromState(client, games, gameState);
+        console.log(` but we couldn't find their game (${compressedGameState.id}), so we're recreating from client state with a new ID`);
+        await handleCreateGameFromState(client, games, compressedGameState);
     } 
     reconnectingSomeone = false;
 }
@@ -317,7 +318,7 @@ async function gracefulExit(term: string) {
         // tell all the active games currently in memory that they're getting shut down
         for (const [gameId, game] of games) {
             if (game.isActive && !game.isEmpty()) {
-                game.logChatMessage('SERVER SHUTTING DOWN! Trying to save game to database...|  Keep this tab open just in case the DB write fails to avoid losing your game');
+                game.logChatMessage('SERVER SHUTTING DOWN! Trying to save game to database...\n  Keep this tab open just in case the DB write fails to avoid losing your game');
             }
         }
 

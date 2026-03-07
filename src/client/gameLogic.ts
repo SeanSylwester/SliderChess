@@ -1,6 +1,6 @@
 import { GameState, PieceType, Piece, PieceColor, MESSAGE_TYPES, MovePieceMessage, Message, CompressedGameState } from "../shared/types.js";
 import { sendMessage } from "./client.js";
-import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard, getFEN, parseFEN, decompressMovesLog } from '../shared/utils.js'
+import { inCheck, checkCastle, moveOnBoard, checkPromotion, getValidMoves, anyValidMoves, rotateTileOnBoard, swapTilesOnBoard, getPiecesOnTile, gameInfoFromGameState, getDefaultBoard, getPieceOnBoard, getFEN, parseFEN, decompressMovesLog, getDefaultGameState, decompressGameState } from '../shared/utils.js'
 import { gameList, getGame } from "./lobbyScreen.js";
 import { disableRules, updateCaptures, disableGameButtons, updateNames, hidePositionButtons, updatePassword } from "./gameScreen.js";
 import { drawPromotionSelector, waitForPromo } from "./promotionSelector.js";
@@ -8,52 +8,6 @@ import { canvas, checkIfTile, ctx, drawSquare, getBoardRowCol, highlightSquare, 
 import { syncTime } from "./timer.js";
 
 
-function getDefaultGameState(): GameState {
-    return {
-        playerWhiteName: null,
-        playerBlackName: null,
-        spectatorNames: [],
-        id: 0,
-        password: '',
-        board: getDefaultBoard(),
-        chatLog: [],
-        movesLog: [],
-        currentTurn: PieceColor.WHITE,
-        useTimeControl: true,
-        initialTimeWhite: 0,
-        initialTimeBlack: 0,
-        incrementWhite: 0,
-        incrementBlack: 0,
-        timeLeftWhite: 0,
-        timeLeftBlack: 0,
-        clockRunning: false,
-        KW: true,
-        QW: true,
-        KB: true,
-        QB: true,
-        drawWhite: false,
-        drawBlack: false,
-        rules: {
-            ruleMoveOwnKing: true,
-            ruleMoveOwnKingInCheck: true,
-            ruleMoveOpp: true,
-            ruleUndoTileMove: true,
-            ruleMoveOppKing: true,
-            ruleMoveOppCheck: true,
-            ruleDoubleMovePawn: true,
-            ruleCastleNormal: false,
-            ruleCastleMoved: false,
-            ruleEnPassantTile: false,
-            ruleEnPassantTileHome: false,
-            ruleIgnoreAll: false
-        },
-        rulesLocked: false,
-        halfmoveClock: 0,
-        arrayFEN: [],
-        creationTime: 0,
-        isActive: true
-    };
-}
 export let localGameState = getDefaultGameState();
 
 
@@ -192,37 +146,15 @@ export let movePointer = Number.POSITIVE_INFINITY;  // will be set to max value 
 let captures: Piece[] = [];
 
 export function initLocalGameState(compressedGameState: CompressedGameState, yourColor: PieceColor): void {
-    localGameState = {...localGameState, ...compressedGameState};
+    localGameState = {...localGameState, ...decompressGameState(compressedGameState)};
+
+    // get captured pieces
     captures = [];
-
-    // reconstruct from compressedMovesLog: movesLog, board, arrayFEN, QW, KW, QB, KB, halfmoveClock
-    localGameState.movesLog = decompressMovesLog(compressedGameState.compressedMovesLog);
-    localGameState.board = getDefaultBoard();
-    localGameState.currentTurn = PieceColor.WHITE;
-    const {fen} = getFEN(localGameState.board, localGameState.currentTurn, true, true, true, true, 0, 1);
-    localGameState.arrayFEN = [fen];
     for (const [i, move] of localGameState.movesLog.entries()) {
-        moveOnBoard(localGameState.board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
-
-        // update arrayFEN
-        localGameState.currentTurn = localGameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
-        [localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB] = checkCastle(localGameState.board, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.rules);
-        
-        if ((move.oldPiece.type !== PieceType.EMPTY && move.oldPiece.type !== PieceType.TILE) || move.newPiece.type === PieceType.PAWN) {
-            localGameState.halfmoveClock = 0;
-        } else {
-            localGameState.halfmoveClock += 1;
-        }
-        
-        const {fen} = getFEN(localGameState.board, localGameState.currentTurn, localGameState.QW, localGameState.KW, localGameState.QB, localGameState.KB, localGameState.halfmoveClock, Math.floor((i + 1) / 2) + 1 );
-        localGameState.arrayFEN.push(fen);
-
-        // append captured pieces
         if (move.oldPiece.color !== PieceColor.NONE) {
             captures.push(move.oldPiece);
         }
     }
-    delete (localGameState as any).compressedMovesLog;
 
     myColor = yourColor;
     if (myColor === PieceColor.WHITE) {

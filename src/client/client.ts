@@ -3,6 +3,7 @@ import { move, localGameState, initLocalGameState, clearLocalGameState, setNames
 import { showLobby, handleRejection, requestJoinGame, updateGameList, playerNameEntry, updateGlobalChat } from './lobbyScreen.js'
 import { showGame, updatePassword, updateRules, updateChat, updateRulesAgreement } from './gameScreen.js'
 import { syncTime } from "./timer.js";
+import { compressGameState } from "../shared/utils.js";
 let ws: WebSocket;
 let reconnectAttempts = 0;
 let reconnectMax = 10;
@@ -26,7 +27,9 @@ function connectWebSocket(): void {
             console.log('Successfully reconnected to the WebSocket server!');
             if (localGameState.id) console.log('Trying to reconnect to my game');
             reconnectAttempts = 0;
-            sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: oldId, clientName: oldName!, gameState: localGameState } satisfies ReconnectMessage);
+            const compressedGameState = compressGameState(localGameState);
+            //compressedGameState.chatLog = ['Recovered game'];
+            sendMessage({ type: MESSAGE_TYPES.RECONNECT, clientId: oldId, clientName: oldName!, compressedGameState } satisfies ReconnectMessage);
         } else {
             console.log('Connected to WebSocket server');
             sendMessage({ type: MESSAGE_TYPES.CHANGE_NAME, name: oldName } satisfies ChangeNameMessage);  // sync my name with the server

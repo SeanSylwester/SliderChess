@@ -1,5 +1,5 @@
 import { PieceColor, PieceType, Piece, GameState, MESSAGE_TYPES, GameStateMessage, MovePieceMessage, Message, TimeMessage, ChatMessage, Move, Rules, RulesMessage, GameResultCause, GameScore, PopupMessage, RulesAgreementMessage, GameInfo, GameNamesMessage, CompressedGameState, GamePasswordMessage } from '../shared/types.js';
-import { inCheck, moveOnBoard, checkCastle, moveNotation, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, fenStripMoves, parseFEN, checkRules, compressMovesLog, decompressMovesLog } from '../shared/utils.js'
+import { inCheck, moveOnBoard, checkCastle, moveNotation, anyValidMoves, getDefaultBoard, getBoardFromMessage, getFEN, getMoveDisambiguationStr, fenStripMoves, parseFEN, checkRules, compressMovesLog, decompressMovesLog, decompressGameState } from '../shared/utils.js'
 import { sendMessage, ClientInfo } from './server.js';
 
 const undoText = 'Your opponent has requested an undo.';
@@ -102,7 +102,8 @@ export class Game {
         this.creationTime = Date.now();
     }
 
-    public loadFromState(gameState: GameState): void {
+    public loadFromState(compressedGameState: CompressedGameState): void {
+        const gameState = decompressGameState(compressedGameState);
         this.id = gameState.id;
         this.password = gameState.password;
         this.lastNameWhite = gameState.playerWhiteName || '';

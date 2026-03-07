@@ -298,7 +298,7 @@ export interface ReconnectMessage extends Message {
     type: typeof MESSAGE_TYPES.RECONNECT;
     clientId: number;
     clientName: string;
-    gameState?: GameState;  // sent from the client to use when the server can't reload the game
+    compressedGameState: CompressedGameState;
 }
 export interface PopupMessage extends Message {
     type: typeof MESSAGE_TYPES.POPUP;

@@ -1,5 +1,6 @@
 before sharing:
     paged game list
+    fix en passant adding to captures
 
     improve visuals (backgrounds, borders, padding, etc.)
 

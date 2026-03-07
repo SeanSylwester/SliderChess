@@ -1,4 +1,4 @@
-import { Piece, PieceColor, PieceType, Move, Rules, GameState, GameInfo, GameResultCause } from '../shared/types.js'
+import { Piece, PieceColor, PieceType, Move, Rules, GameState, GameInfo, GameResultCause, CompressedGameState } from '../shared/types.js'
 const knightMoves = [[-2, 1], [-1, 2], [1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1]];
 const bishopDirections = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
 const rookDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -1209,4 +1209,103 @@ export function decompressMovesLog(movesLogStr: string): Move[] {
     }
 
     return movesLog;
+}
+
+export function getDefaultGameState(): GameState {
+    return {
+        playerWhiteName: null,
+        playerBlackName: null,
+        spectatorNames: [],
+        id: 0,
+        password: '',
+        board: getDefaultBoard(),
+        chatLog: [],
+        movesLog: [],
+        currentTurn: PieceColor.WHITE,
+        useTimeControl: true,
+        initialTimeWhite: 0,
+        initialTimeBlack: 0,
+        incrementWhite: 0,
+        incrementBlack: 0,
+        timeLeftWhite: 0,
+        timeLeftBlack: 0,
+        clockRunning: false,
+        KW: true,
+        QW: true,
+        KB: true,
+        QB: true,
+        drawWhite: false,
+        drawBlack: false,
+        rules: {
+            ruleMoveOwnKing: true,
+            ruleMoveOwnKingInCheck: true,
+            ruleMoveOpp: true,
+            ruleUndoTileMove: true,
+            ruleMoveOppKing: true,
+            ruleMoveOppCheck: true,
+            ruleDoubleMovePawn: true,
+            ruleCastleNormal: false,
+            ruleCastleMoved: false,
+            ruleEnPassantTile: false,
+            ruleEnPassantTileHome: false,
+            ruleIgnoreAll: false
+        },
+        rulesLocked: false,
+        halfmoveClock: 0,
+        arrayFEN: [],
+        creationTime: 0,
+        isActive: true
+    };
+}
+
+export function compressGameState(gameState: GameState): CompressedGameState {
+    return {
+        id: gameState.id,
+        password: gameState.password,
+        chatLog: gameState.chatLog,
+        compressedMovesLog: compressMovesLog(gameState.movesLog),
+        currentTurn: gameState.currentTurn,
+        useTimeControl: gameState.useTimeControl,
+        initialTimeWhite: gameState.initialTimeWhite,
+        initialTimeBlack: gameState.initialTimeBlack,
+        incrementWhite: gameState.incrementWhite,
+        incrementBlack: gameState.incrementBlack,
+        timeLeftWhite: gameState.timeLeftWhite,
+        timeLeftBlack: gameState.timeLeftBlack,
+        clockRunning: gameState.clockRunning,
+        drawWhite: gameState.drawWhite,
+        drawBlack: gameState.drawBlack,
+        creationTime: gameState.creationTime,
+        isActive: gameState.isActive
+    };
+}
+
+export function decompressGameState(compressedGameState: CompressedGameState): GameState {
+    const gameState = {...getDefaultGameState(), ...compressedGameState};
+
+    // reconstruct from compressedMovesLog: movesLog, board, arrayFEN, QW, KW, QB, KB, halfmoveClock
+    gameState.movesLog = decompressMovesLog(compressedGameState.compressedMovesLog);
+    gameState.board = getDefaultBoard();
+    gameState.currentTurn = PieceColor.WHITE;
+    const {fen} = getFEN(gameState.board, gameState.currentTurn, true, true, true, true, 0, 1);
+    gameState.arrayFEN = [fen];
+    for (const [i, move] of gameState.movesLog.entries()) {
+        moveOnBoard(gameState.board, move.fromRow, move.fromCol, move.toRow, move.toCol, move.isTile, move.promotions);
+
+        // update arrayFEN
+        gameState.currentTurn = gameState.currentTurn === PieceColor.WHITE ? PieceColor.BLACK : PieceColor.WHITE;
+        [gameState.QW, gameState.KW, gameState.QB, gameState.KB] = checkCastle(gameState.board, gameState.QW, gameState.KW, gameState.QB, gameState.KB, gameState.rules);
+        
+        if ((move.oldPiece.type !== PieceType.EMPTY && move.oldPiece.type !== PieceType.TILE) || move.newPiece.type === PieceType.PAWN) {
+            gameState.halfmoveClock = 0;
+        } else {
+            gameState.halfmoveClock += 1;
+        }
+        
+        const {fen} = getFEN(gameState.board, gameState.currentTurn, gameState.QW, gameState.KW, gameState.QB, gameState.KB, gameState.halfmoveClock, Math.floor((i + 1) / 2) + 1 );
+        gameState.arrayFEN.push(fen);
+    }
+    delete (gameState as any).compressedMovesLog;
+
+    return gameState
 }
